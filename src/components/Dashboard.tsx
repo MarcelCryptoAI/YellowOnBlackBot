@@ -1,4 +1,4 @@
-/ Dashboard.tsx
+// Dashboard.tsx
 import React from 'react';
 
 interface Trade {
@@ -61,7 +61,7 @@ const StatCard: React.FC<{
   </div>
 );
 
-const Dashboard: React.FC<DashboardProps> = ({ mockTrades, mockStrategies }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ mockTrades, mockStrategies }) => {
   const totalPnL = mockTrades
     .filter(trade => trade.status === 'OPEN')
     .reduce((sum, trade) => sum + trade.pnl, 0);
@@ -154,3 +154,5 @@ const Dashboard: React.FC<DashboardProps> = ({ mockTrades, mockStrategies }) => 
     </div>
   );
 };
+
+export default Dashboard;

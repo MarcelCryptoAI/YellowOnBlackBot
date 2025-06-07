@@ -8,7 +8,7 @@ interface HeaderProps {
   onRefresh: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab, isRefreshing, onRefresh }) => {
+export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab, isRefreshing, onRefresh }) => {
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: '📊' },
     { id: 'trades', label: 'Trades', icon: '💹' },
@@ -72,3 +72,5 @@ const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab, isRefreshing
     </header>
   );
 };
+
+export default Header;

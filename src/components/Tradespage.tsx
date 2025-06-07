@@ -1,4 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { FaEye, FaEyeSlash, FaSync } from 'react-icons/fa';
+import { bybitApi, healthCheck } from '../services/api';
+
+// Utility function for currency formatting
+function toCurrency(v: number) {
+  return "$" + (+v).toLocaleString("en-US", { minimumFractionDigits: 2 });
+}
 
 // Types
 interface Trade {
@@ -15,80 +22,23 @@ interface Trade {
   timestamp: string;
 }
 
-// Mock Data per tab
-const openPositions: Trade[] = [
-  {
-    id: '1',
-    symbol: 'BTCUSDT',
-    direction: 'LONG',
-    amount: 0.1,
-    entryPrice: 43250,
-    currentPrice: 43890,
-    pnl: 64,
-    pnlPercent: 1.48,
-    status: 'OPEN',
-    exchange: 'Bybit',
-    timestamp: '2025-06-05T09:30:00Z'
-  },
-  {
-    id: '2',
-    symbol: 'ETHUSDT',
-    direction: 'SHORT',
-    amount: 2.5,
-    entryPrice: 2680,
-    currentPrice: 2645,
-    pnl: 87.5,
-    pnlPercent: 1.31,
-    status: 'OPEN',
-    exchange: 'MEXC',
-    timestamp: '2025-06-05T08:45:00Z'
-  }
-];
-
-const openOrders: Trade[] = [
-  {
-    id: '4',
-    symbol: 'ADAUSDT',
-    direction: 'LONG',
-    amount: 1000,
-    entryPrice: 0.485,
-    currentPrice: 0.490,
-    pnl: 5,
-    pnlPercent: 1.03,
-    status: 'PENDING',
-    exchange: 'Binance',
-    timestamp: '2025-06-05T11:20:00Z'
-  }
-];
-
-const closedTrades: Trade[] = [
-  {
-    id: '3',
-    symbol: 'SOLUSDT',
-    direction: 'LONG',
-    amount: 50,
-    entryPrice: 145.20,
-    currentPrice: 148.75,
-    pnl: 177.5,
-    pnlPercent: 2.44,
-    status: 'CLOSED',
-    exchange: 'Binance',
-    timestamp: '2025-06-05T07:15:00Z'
-  },
-  {
-    id: '5',
-    symbol: 'DOGEUSDT',
-    direction: 'SHORT',
-    amount: 10000,
-    entryPrice: 0.165,
-    currentPrice: 0.155,
-    pnl: -23.12,
-    pnlPercent: -1.4,
-    status: 'CLOSED',
-    exchange: 'Bybit',
-    timestamp: '2025-06-04T18:44:00Z'
-  }
-];
+interface BybitConnection {
+  id: string;
+  name: string;
+  status: string;
+  balance: {
+    total: number;
+    available: number;
+    inOrder: number;
+    coins: Array<{
+      coin: string;
+      walletBalance: number;
+      availableBalance: number;
+      locked: number;
+    }>;
+  } | null;
+  positions: Trade[];
+}
 
 // Trade Card Component
 const TradeCard: React.FC<{ trade: Trade }> = ({ trade }) => (
@@ -163,6 +113,118 @@ const TradeCard: React.FC<{ trade: Trade }> = ({ trade }) => (
 // Main TradesPage Component
 const TradesPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState('Open Positions');
+  const [accounts, setAccounts] = useState([]);
+  const [balances, setBalances] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [showBalances, setShowBalances] = useState(true);
+
+  // Mock accounts data (same as your script)
+  const mockAccounts = [
+    {
+      id: 1,
+      name: "Crypto Opulence - Spot",
+      broker: "ByBit Spot",
+      status: "active",
+      type: "spot",
+      balance: 15420.50,
+      available: 14250.30,
+      performance24h: +12.5,
+      trades: 156,
+      winRate: 73.2
+    },
+    {
+      id: 2,
+      name: "Crypto Opulence - USDT",
+      broker: "ByBit USDT",
+      status: "active", 
+      type: "futures",
+      balance: 25840.75,
+      available: 22100.45,
+      performance24h: +8.7,
+      trades: 89,
+      winRate: 68.5
+    },
+    {
+      id: 3,
+      name: "Lt. Aldo Raine - USDT",
+      broker: "ByBit USDT",
+      status: "active",
+      type: "futures", 
+      balance: 8950.25,
+      available: 7800.00,
+      performance24h: -2.1,
+      trades: 45,
+      winRate: 55.6
+    }
+  ];
+
+  useEffect(() => {
+    async function fetchData() {
+      setLoading(true);
+      try {
+        // Try CCXT API first, then fallback to mock data
+        try {
+          const balancesRes = await axios.get("http://localhost:5000/api/ccxt/balances");
+          if (balancesRes.data.success && balancesRes.data.balances.length > 0) {
+            const accountsData = balancesRes.data.balances.map(balance => ({
+              id: balance.accountId,
+              name: balance.accountName,
+              broker: 'ByBit',
+              status: 'active' as const,
+              type: balance.accountType as 'spot' | 'futures'
+            }));
+            setAccounts(accountsData);
+
+            const balanceMap = {};
+            balancesRes.data.balances.forEach(balance => {
+              balanceMap[balance.accountId] = balance.total;
+            });
+            setBalances(balanceMap);
+            
+            console.log("✅ Using CCXT API data");
+          } else {
+            throw new Error("No CCXT data available");
+          }
+        } catch (apiError) {
+          console.log("Using mock data for accounts demo");
+          setAccounts(mockAccounts);
+          let bal = {};
+          mockAccounts.forEach(acc => {
+            bal[acc.id] = acc.balance;
+          });
+          setBalances(bal);
+        }
+      } catch {
+        setAccounts(mockAccounts);
+        let bal = {};
+        mockAccounts.forEach(acc => {
+          bal[acc.id] = acc.balance;
+        });
+        setBalances(bal);
+      }
+      setLoading(false);
+    }
+    fetchData();
+  }, []);
+
+  // Refresh data function
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      const balancesRes = await axios.get("http://localhost:5000/api/ccxt/balances");
+      if (balancesRes.data.success && balancesRes.data.balances.length > 0) {
+        const balanceMap = {};
+        balancesRes.data.balances.forEach(balance => {
+          balanceMap[balance.accountId] = balance.total;
+        });
+        setBalances(balanceMap);
+        console.log("✅ Refreshed CCXT balance data");
+      }
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    }
+    setRefreshing(false);
+  };
 
   const tabs = [
     { name: 'Open Positions', data: openPositions, count: openPositions.length },
@@ -172,12 +234,73 @@ const TradesPage: React.FC = () => {
 
   const currentData = tabs.find(tab => tab.name === activeTab)?.data || [];
 
-  // Calculate totals for open positions
+  // Calculate totals using real balance data
+  const totalBalance = Object.values(balances).reduce((a, b) => +a + +b, 0);
   const totalPnL = openPositions.reduce((sum, trade) => sum + trade.pnl, 0);
-  const totalValue = 50000 + totalPnL; // Base portfolio value + current PnL
+  const totalValue = totalBalance + totalPnL;
+  const activeAccounts = accounts.filter(acc => acc.status === "active");
 
   return (
     <div className="p-6 space-y-6">
+      {/* Header with Balance Controls */}
+      <div className="flex justify-between items-center mb-6">
+        <div className="flex items-center space-x-4">
+          <h1 className="text-3xl font-bold text-white">Trading Dashboard</h1>
+          <div className="flex items-center space-x-2 text-sm text-gray-400">
+            <span>{activeAccounts.length} accounts connected</span>
+          </div>
+        </div>
+        <div className="flex items-center space-x-3">
+          <button 
+            onClick={() => setShowBalances(!showBalances)}
+            className="flex items-center space-x-2 bg-gradient-to-r from-gray-700 to-gray-600 hover:from-gray-600 hover:to-gray-500 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 shadow-lg"
+          >
+            {showBalances ? <FaEyeSlash /> : <FaEye />}
+            <span>{showBalances ? 'Hide' : 'Show'} Balances</span>
+          </button>
+          <button 
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 disabled:opacity-50 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 shadow-lg"
+          >
+            <FaSync className={refreshing ? 'animate-spin' : ''} />
+            <span>Refresh</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Account Balances Section */}
+      {accounts.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+          {accounts.map((account) => (
+            <div key={account.id} className="relative group">
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-400/10 to-blue-600/10 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
+              <div className="relative bg-gradient-to-br from-black to-gray-900 p-4 rounded-xl border border-gray-600/30 hover:border-blue-400/40 transition-all duration-300 shadow-2xl shadow-black/50">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-bold text-white text-sm truncate">{account.name}</h3>
+                  <span className={`text-xs px-2 py-1 rounded-full ${
+                    account.status === 'active' 
+                      ? 'bg-green-500/20 text-green-300 border border-green-500/30'
+                      : 'bg-gray-500/20 text-gray-300 border border-gray-500/30'
+                  }`}>
+                    {account.status}
+                  </span>
+                </div>
+                <div className="text-xs text-gray-400 mb-3">{account.broker} • {account.type}</div>
+                <div className="text-lg font-bold text-white">
+                  {showBalances ? toCurrency(balances[account.id] || 0) : '●●●●●'}
+                </div>
+                {showBalances && totalBalance > 0 && (
+                  <div className="text-xs text-gray-400 mt-1">
+                    {((balances[account.id] || 0) / totalBalance * 100).toFixed(1)}% of total
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Header with Summary Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="relative group">
@@ -186,9 +309,9 @@ const TradesPage: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-400 text-sm font-medium tracking-wider uppercase">Total Portfolio</p>
-                <p className="text-3xl font-bold text-white mt-2 drop-shadow-lg">${totalValue.toLocaleString()}</p>
+                <p className="text-3xl font-bold text-white mt-2 drop-shadow-lg">{showBalances ? toCurrency(totalValue) : '●●●●●'}</p>
                 <p className="text-sm mt-2 flex items-center font-medium text-green-300">
-                  <span className="mr-1">↗️</span> +{((totalPnL / 50000) * 100).toFixed(2)}%
+                  <span className="mr-1">↗️</span> +{totalBalance > 0 ? ((totalPnL / totalBalance) * 100).toFixed(2) : '0.00'}%
                 </p>
               </div>
               <div className="text-4xl opacity-80 group-hover:opacity-100 transition-opacity duration-300">
@@ -205,7 +328,7 @@ const TradesPage: React.FC = () => {
               <div>
                 <p className="text-gray-400 text-sm font-medium tracking-wider uppercase">Total PnL</p>
                 <p className={`text-3xl font-bold mt-2 drop-shadow-lg ${totalPnL >= 0 ? 'text-green-300' : 'text-red-300'}`}>
-                  {totalPnL >= 0 ? '+' : ''}${totalPnL.toFixed(2)}
+                  {showBalances ? (totalPnL >= 0 ? '+' : '') + toCurrency(Math.abs(totalPnL)) : '●●●●●'}
                 </p>
                 <p className="text-sm mt-2 flex items-center font-medium text-green-300">
                   <span className="mr-1">📈</span> Today

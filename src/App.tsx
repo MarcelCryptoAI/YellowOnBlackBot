@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { userStorage, apiStorage } from './utils/storage';
+import { bybitApi, openaiApi, websocketManager, healthCheck, type BalanceData, type Position, type ConnectionData, type MarketData, type OpenAIConnection } from './services/api';
 
 // Types
 interface Trade {
@@ -64,166 +66,45 @@ interface BybitConnection {
     inverseUsd: boolean;
   };
   status: 'Active' | 'Inactive' | 'Testing' | 'Error';
-  balance: {
-    total: number;
-    available: number;
-    balanceHistory: { time: string; value: number }[];
-  };
+  balance: BalanceData | null;
+  positions?: Position[];
   createdAt: string;
-  performance: {
-    dailyChange: number;
-    weeklyChange: number;
-    monthlyChange: number;
-  };
+  lastUpdated?: string;
+  connectionData?: ConnectionData;
 }
 
-// Mock Data
-const mockTrades: Trade[] = [
-  {
-    id: '1',
-    symbol: 'BTCUSDT',
-    direction: 'LONG',
-    amount: 0.1,
-    entryPrice: 43250,
-    currentPrice: 43890,
-    pnl: 64,
-    pnlPercent: 1.48,
-    status: 'OPEN',
-    exchange: 'Bybit',
-    timestamp: '2025-06-05T09:30:00Z'
-  },
-  {
-    id: '2',
-    symbol: 'ETHUSDT',
-    direction: 'SHORT',
-    amount: 2.5,
-    entryPrice: 2680,
-    currentPrice: 2645,
-    pnl: 87.5,
-    pnlPercent: 1.31,
-    status: 'OPEN',
-    exchange: 'MEXC',
-    timestamp: '2025-06-05T08:45:00Z'
-  },
-  {
-    id: '3',
-    symbol: 'SOLUSDT',
-    direction: 'LONG',
-    amount: 50,
-    entryPrice: 145.20,
-    currentPrice: 148.75,
-    pnl: 177.5,
-    pnlPercent: 2.44,
-    status: 'CLOSED',
-    exchange: 'Binance',
-    timestamp: '2025-06-05T07:15:00Z'
-  }
-];
-
+// Live data state will replace these
 const mockStrategies: Strategy[] = [
   {
     id: '1',
-    name: 'BTC Scalping AI',
+    name: 'BTC Small Position Strategy',
     symbol: 'BTCUSDT',
     status: 'ACTIVE',
-    profit: 1247.85,
-    trades: 156,
-    winRate: 73.8
+    profit: 3.25,
+    trades: 12,
+    winRate: 66.7
   },
   {
     id: '2',
-    name: 'ETH Trend Following',
+    name: 'ETH Learning Bot',
     symbol: 'ETHUSDT',
     status: 'ACTIVE',
-    profit: 892.40,
-    trades: 89,
-    winRate: 68.5
+    profit: 2.10,
+    trades: 8,
+    winRate: 62.5
   },
   {
     id: '3',
-    name: 'Multi-Coin Mean Reversion',
+    name: 'Practice Scalping',
     symbol: 'MIXED',
     status: 'PAUSED',
-    profit: 2156.90,
-    trades: 234,
-    winRate: 81.2
+    profit: 1.85,
+    trades: 15,
+    winRate: 53.3
   }
 ];
 
-// Trade data per tab
-const openPositions = [
-  {
-    id: '1',
-    symbol: 'BTCUSDT',
-    direction: 'LONG' as const,
-    amount: 0.1,
-    entryPrice: 43250,
-    currentPrice: 43890,
-    pnl: 64,
-    pnlPercent: 1.48,
-    status: 'OPEN' as const,
-    exchange: 'Bybit',
-    timestamp: '2025-06-05T09:30:00Z'
-  },
-  {
-    id: '2',
-    symbol: 'ETHUSDT',
-    direction: 'SHORT' as const,
-    amount: 2.5,
-    entryPrice: 2680,
-    currentPrice: 2645,
-    pnl: 87.5,
-    pnlPercent: 1.31,
-    status: 'OPEN' as const,
-    exchange: 'MEXC',
-    timestamp: '2025-06-05T08:45:00Z'
-  }
-];
-
-const openOrders = [
-  {
-    id: '4',
-    symbol: 'ADAUSDT',
-    direction: 'LONG' as const,
-    amount: 1000,
-    entryPrice: 0.485,
-    currentPrice: 0.490,
-    pnl: 5,
-    pnlPercent: 1.03,
-    status: 'PENDING' as const,
-    exchange: 'Binance',
-    timestamp: '2025-06-05T11:20:00Z'
-  }
-];
-
-const closedTrades = [
-  {
-    id: '3',
-    symbol: 'SOLUSDT',
-    direction: 'LONG' as const,
-    amount: 50,
-    entryPrice: 145.20,
-    currentPrice: 148.75,
-    pnl: 177.5,
-    pnlPercent: 2.44,
-    status: 'CLOSED' as const,
-    exchange: 'Binance',
-    timestamp: '2025-06-05T07:15:00Z'
-  },
-  {
-    id: '5',
-    symbol: 'DOGEUSDT',
-    direction: 'SHORT' as const,
-    amount: 10000,
-    entryPrice: 0.165,
-    currentPrice: 0.155,
-    pnl: -23.12,
-    pnlPercent: -1.4,
-    status: 'CLOSED' as const,
-    exchange: 'Bybit',
-    timestamp: '2025-06-04T18:44:00Z'
-  }
-];
+// These will be populated with live data from ByBit API
 
 // Components
 const StatCard: React.FC<{
@@ -390,17 +271,17 @@ const App: React.FC = () => {
   const [systemStatus, setSystemStatus] = useState<SystemStatus>({
     backend: true,
     frontend: true,
-    openai: true,
-    bybit: true,
+    openai: false,
+    bybit: false,
     mexc: false,
-    binance: true,
+    binance: false,
   });
 
   const [apiCredentials, setApiCredentials] = useState<ApiCredentials>({
     bybit: {
       apiKey: '',
       secretKey: '',
-      testnet: true,
+      testnet: false,
       name: '',
       markets: {
         spot: false,
@@ -414,169 +295,163 @@ const App: React.FC = () => {
     },
   });
 
-  // Multiple Bybit Connections with Different Levels/Gradations
-  const [bybitConnections, setBybitConnections] = useState<BybitConnection[]>([
-    {
-      id: '1',
-      name: 'Crypto Opulence - Premium Spot',
-      apiKey: '****67AK',
-      secretKey: '****hidden',
-      testnet: false,
-      markets: { spot: true, usdtPerpetual: false, inverseUsd: false },
-      status: 'Active',
-      balance: {
-        total: 15303.54,
-        available: 14850.32,
-        balanceHistory: [
-          { time: '00:00', value: 15100 },
-          { time: '04:00', value: 14950 },
-          { time: '08:00', value: 15200 },
-          { time: '12:00', value: 15350 },
-          { time: '16:00', value: 15303.54 }
-        ]
-      },
-      createdAt: 'Jun 4th, 25 04:03',
-      performance: { dailyChange: 2.4, weeklyChange: 15.8, monthlyChange: 34.2 }
-    },
-    {
-      id: '2',
-      name: 'High Frequency USDT Perpetual',
-      apiKey: '****82BC',
-      secretKey: '****hidden',
-      testnet: false,
-      markets: { spot: false, usdtPerpetual: true, inverseUsd: false },
-      status: 'Active',
-      balance: {
-        total: 8750.89,
-        available: 7200.45,
-        balanceHistory: [
-          { time: '00:00', value: 8500 },
-          { time: '04:00', value: 8600 },
-          { time: '08:00', value: 8450 },
-          { time: '12:00', value: 8700 },
-          { time: '16:00', value: 8750.89 }
-        ]
-      },
-      createdAt: 'Jun 3rd, 25 12:15',
-      performance: { dailyChange: 3.1, weeklyChange: 12.4, monthlyChange: 28.7 }
-    },
-    {
-      id: '3',
-      name: 'Multi-Market Pro Trading',
-      apiKey: '****91XY',
-      secretKey: '****hidden',
-      testnet: false,
-      markets: { spot: true, usdtPerpetual: true, inverseUsd: true },
-      status: 'Active',
-      balance: {
-        total: 25640.12,
-        available: 23100.78,
-        balanceHistory: [
-          { time: '00:00', value: 25200 },
-          { time: '04:00', value: 25400 },
-          { time: '08:00', value: 25300 },
-          { time: '12:00', value: 25600 },
-          { time: '16:00', value: 25640.12 }
-        ]
-      },
-      createdAt: 'Jun 2nd, 25 09:30',
-      performance: { dailyChange: 1.8, weeklyChange: 8.9, monthlyChange: 22.1 }
-    },
-    {
-      id: '4',
-      name: 'Lt. Aldo Raine - USDT Testnet',
-      apiKey: '****45ZZ',
-      secretKey: '****hidden',
-      testnet: true,
-      markets: { spot: false, usdtPerpetual: true, inverseUsd: false },
-      status: 'Active',
-      balance: {
-        total: 10000.00,
-        available: 9850.00,
-        balanceHistory: [
-          { time: '00:00', value: 10000 },
-          { time: '04:00', value: 9950 },
-          { time: '08:00', value: 10050 },
-          { time: '12:00', value: 9980 },
-          { time: '16:00', value: 10000 }
-        ]
-      },
-      createdAt: 'May 30th, 25 16:45',
-      performance: { dailyChange: 0.0, weeklyChange: 2.1, monthlyChange: 5.4 }
-    },
-    {
-      id: '5',
-      name: 'Scalping Bot - Inverse USD',
-      apiKey: '****33DD',
-      secretKey: '****hidden',
-      testnet: false,
-      markets: { spot: false, usdtPerpetual: false, inverseUsd: true },
-      status: 'Inactive',
-      balance: {
-        total: 1250.45,
-        available: 1180.30,
-        balanceHistory: [
-          { time: '00:00', value: 1300 },
-          { time: '04:00', value: 1280 },
-          { time: '08:00', value: 1260 },
-          { time: '12:00', value: 1240 },
-          { time: '16:00', value: 1250.45 }
-        ]
-      },
-      createdAt: 'May 28th, 25 11:20',
-      performance: { dailyChange: -1.2, weeklyChange: -3.8, monthlyChange: 8.9 }
-    },
-    {
-      id: '6',
-      name: 'Demo Account - All Markets',
-      apiKey: '****99TT',
-      secretKey: '****hidden',
-      testnet: true,
-      markets: { spot: true, usdtPerpetual: true, inverseUsd: true },
-      status: 'Testing',
-      balance: {
-        total: 50000.00,
-        available: 48500.00,
-        balanceHistory: [
-          { time: '00:00', value: 50000 },
-          { time: '04:00', value: 49800 },
-          { time: '08:00', value: 50200 },
-          { time: '12:00', value: 50100 },
-          { time: '16:00', value: 50000 }
-        ]
-      },
-      createdAt: 'May 25th, 25 14:30',
-      performance: { dailyChange: 0.4, weeklyChange: 1.2, monthlyChange: 3.1 }
-    },
-    {
-      id: '7',
-      name: 'Emergency Backup Account',
-      apiKey: '****77BB',
-      secretKey: '****hidden',
-      testnet: false,
-      markets: { spot: true, usdtPerpetual: false, inverseUsd: false },
-      status: 'Error',
-      balance: {
-        total: 0,
-        available: 0,
-        balanceHistory: [
-          { time: '00:00', value: 0 },
-          { time: '04:00', value: 0 },
-          { time: '08:00', value: 0 },
-          { time: '12:00', value: 0 },
-          { time: '16:00', value: 0 }
-        ]
-      },
-      createdAt: 'May 20th, 25 08:15',
-      performance: { dailyChange: 0, weeklyChange: 0, monthlyChange: 0 }
-    }
-  ]);
+  // User and storage state
+  const [currentUser] = useState(() => userStorage.getCurrentUser());
+  const [hasStoredCredentials, setHasStoredCredentials] = useState(false);
+  const [storageInfo, setStorageInfo] = useState<any>(null);
+
+  // Live data state
+  const [bybitConnections, setBybitConnections] = useState<BybitConnection[]>([]);
+  const [openaiConnections, setOpenaiConnections] = useState<OpenAIConnection[]>([]);
+  const [livePositions, setLivePositions] = useState<Position[]>([]);
+  const [marketData, setMarketData] = useState<MarketData[]>([]);
+  const [portfolioSummary, setPortfolioSummary] = useState<any>(null);
+  const [backendStatus, setBackendStatus] = useState<'connected' | 'connecting' | 'disconnected'>('connecting');
 
   const [selectedConnection, setSelectedConnection] = useState<BybitConnection | null>(null);
   const [showConnectionDetails, setShowConnectionDetails] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isTesting, setIsTesting] = useState({ bybit: false, openai: false });
   const [lastSaved, setLastSaved] = useState<string>('');
+
+  // Initialize backend connection and load live data
+  useEffect(() => {
+    const initializeApp = async () => {
+      console.log('🚀 Initializing CTB App with live ByBit data...');
+      
+      // Initialize connections
+      setOpenaiConnections([]);
+      setBybitConnections([]);
+      
+      // Check backend health
+      try {
+        const health = await healthCheck();
+        if (health.success) {
+          setBackendStatus('connected');
+          console.log('✅ Backend connected');
+        } else {
+          setBackendStatus('disconnected');
+          console.log('❌ Backend unavailable');
+          return;
+        }
+      } catch (error) {
+        setBackendStatus('disconnected');
+        console.error('❌ Backend health check failed:', error);
+        return;
+      }
+
+      // Setup WebSocket for real-time updates
+      const socket = websocketManager.connect();
+      
+      // Listen for market data updates
+      websocketManager.onMarketData((data) => {
+        setMarketData(data);
+      });
+      
+      // Listen for portfolio updates
+      websocketManager.onPortfolioData((data) => {
+        const connections = data.map(item => ({
+          id: item.connectionId,
+          name: 'ByBit Connection', // Will be updated with real metadata
+          apiKey: '****LIVE',
+          secretKey: '****hidden',
+          testnet: false,
+          markets: { spot: true, usdtPerpetual: true, inverseUsd: false },
+          status: 'Active' as const,
+          balance: item.data.balance,
+          positions: item.data.positions,
+          createdAt: item.data.lastUpdated,
+          connectionData: item.data
+        }));
+        setBybitConnections(connections);
+        
+        // Aggregate all positions
+        const allPositions = data.flatMap(item => item.data.positions || []);
+        setLivePositions(allPositions);
+      });
+
+      // Load initial data and restore saved credentials
+      try {
+        // Load stored credentials and restore connections to backend
+        const storedCredentials = apiStorage.loadCredentials();
+        if (storedCredentials && storedCredentials.bybitConnections.length > 0) {
+          console.log('🔄 Restoring ByBit connections from storage...');
+          
+          // Restore each ByBit connection to backend
+          for (const conn of storedCredentials.bybitConnections) {
+            try {
+              const addResult = await bybitApi.addConnection({
+                connectionId: conn.id,
+                name: conn.name,
+                apiKey: conn.apiKey,
+                secretKey: conn.secretKey,
+                testnet: conn.testnet,
+                markets: conn.markets
+              });
+              
+              if (addResult.success) {
+                console.log(`✅ Restored connection: ${conn.name}`);
+              }
+            } catch (error) {
+              console.error(`❌ Failed to restore connection ${conn.name}:`, error);
+            }
+          }
+          
+          setHasStoredCredentials(true);
+          setStorageInfo(apiStorage.getStorageInfo());
+        }
+
+        // Load live connections from backend
+        const connectionsResponse = await bybitApi.getConnections();
+        if (connectionsResponse.success) {
+          const liveConnections = connectionsResponse.connections.map(conn => ({
+            id: conn.connectionId,
+            name: conn.metadata?.name || 'ByBit Connection',
+            apiKey: '****LIVE',
+            secretKey: '****hidden',
+            testnet: conn.metadata?.testnet || false,
+            markets: conn.metadata?.markets || { spot: true, usdtPerpetual: false, inverseUsd: false },
+            status: conn.data ? 'Active' as const : 'Error' as const,
+            balance: conn.data?.balance || null,
+            positions: conn.data?.positions || [],
+            createdAt: conn.metadata?.createdAt || new Date().toISOString(),
+            connectionData: conn.data
+          }));
+          setBybitConnections(liveConnections);
+          setSystemStatus(prev => ({ ...prev, bybit: liveConnections.length > 0 }));
+        }
+
+        // Load market data
+        const marketResponse = await bybitApi.getMarketData();
+        if (marketResponse.success) {
+          setMarketData(marketResponse.data);
+        }
+
+        // Load portfolio summary
+        const portfolioResponse = await bybitApi.getPortfolioSummary();
+        if (portfolioResponse.success) {
+          setPortfolioSummary(portfolioResponse.summary);
+        }
+
+        // Load OpenAI connections
+        const openaiResponse = await openaiApi.getConnections();
+        if (openaiResponse.success) {
+          setOpenaiConnections(openaiResponse.connections);
+          setSystemStatus(prev => ({ ...prev, openai: openaiResponse.connections.length > 0 }));
+        }
+
+      } catch (error) {
+        console.error('❌ Error loading initial data:', error);
+      }
+    };
+
+    initializeApp();
+
+    // Cleanup WebSocket on unmount
+    return () => {
+      websocketManager.disconnect();
+    };
+  }, [currentUser.name]);
 
   const handleRefresh = () => {
     setIsRefreshing(true);
@@ -594,46 +469,90 @@ const App: React.FC = () => {
       return;
     }
 
+    if (backendStatus !== 'connected') {
+      alert('Backend not connected. Please check if the backend server is running.');
+      return;
+    }
+
     setIsTesting(prev => ({ ...prev, bybit: true }));
     
-    // Simulate API test
-    setTimeout(() => {
+    try {
+      // Test connection using real ByBit API
+      console.log('🔄 Testing ByBit connection...');
+      const testResult = await bybitApi.testConnection(
+        apiCredentials.bybit.apiKey,
+        apiCredentials.bybit.secretKey,
+        false
+      );
+
+      if (!testResult.success) {
+        alert(`Connection test failed: ${testResult.error || testResult.message}`);
+        setIsTesting(prev => ({ ...prev, bybit: false }));
+        return;
+      }
+
+      // Add connection to backend
+      const connectionId = `marcel_${Date.now()}`;
+      const addResult = await bybitApi.addConnection({
+        connectionId,
+        name: apiCredentials.bybit.name,
+        apiKey: apiCredentials.bybit.apiKey,
+        secretKey: apiCredentials.bybit.secretKey,
+        testnet: apiCredentials.bybit.testnet,
+        markets: apiCredentials.bybit.markets
+      });
+
+      if (!addResult.success) {
+        alert(`Failed to add connection: ${addResult.message}`);
+        setIsTesting(prev => ({ ...prev, bybit: false }));
+        return;
+      }
+
+      // Create connection object for frontend state
       const newConnection: BybitConnection = {
-        id: Date.now().toString(),
+        id: connectionId,
         name: apiCredentials.bybit.name,
         apiKey: '****' + apiCredentials.bybit.apiKey.slice(-4),
         secretKey: '****hidden',
         testnet: apiCredentials.bybit.testnet,
         markets: { ...apiCredentials.bybit.markets },
         status: 'Active',
-        balance: {
-          total: Math.random() * 10000 + 1000,
-          available: Math.random() * 8000 + 800,
-          balanceHistory: [
-            { time: '00:00', value: Math.random() * 1000 + 2000 },
-            { time: '04:00', value: Math.random() * 1000 + 2000 },
-            { time: '08:00', value: Math.random() * 1000 + 2000 },
-            { time: '12:00', value: Math.random() * 1000 + 2000 },
-            { time: '16:00', value: Math.random() * 1000 + 2000 }
-          ]
-        },
-        createdAt: new Date().toLocaleDateString('en-US', { 
-          month: 'short', 
-          day: 'numeric', 
-          year: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit'
-        }),
-        performance: {
-          dailyChange: (Math.random() - 0.5) * 10,
-          weeklyChange: (Math.random() - 0.3) * 25,
-          monthlyChange: (Math.random() - 0.2) * 50
-        }
+        balance: addResult.data?.balance || null,
+        positions: addResult.data?.positions || [],
+        createdAt: new Date().toISOString(),
+        connectionData: addResult.data
       };
 
       setBybitConnections(prev => [newConnection, ...prev]);
       setSystemStatus(prev => ({ ...prev, bybit: true }));
       setIsTesting(prev => ({ ...prev, bybit: false }));
+      
+      // Save credentials locally for backup
+      const credentialsToSave = {
+        bybitConnections: [{
+          id: connectionId,
+          name: apiCredentials.bybit.name,
+          apiKey: apiCredentials.bybit.apiKey,
+          secretKey: apiCredentials.bybit.secretKey,
+          testnet: apiCredentials.bybit.testnet,
+          markets: apiCredentials.bybit.markets,
+          createdAt: new Date().toISOString()
+        }],
+        openai: {
+          apiKey: apiCredentials.openai.apiKey || '',
+          organization: apiCredentials.openai.organization || ''
+        }
+      };
+      
+      const saved = apiStorage.saveCredentials(credentialsToSave);
+      if (saved) {
+        setLastSaved(new Date().toLocaleTimeString());
+        setHasStoredCredentials(true);
+        setStorageInfo(apiStorage.getStorageInfo());
+      }
+
+      // Subscribe to WebSocket updates for this connection
+      websocketManager.subscribeToConnection(connectionId);
       
       // Reset form
       setApiCredentials(prev => ({
@@ -641,7 +560,7 @@ const App: React.FC = () => {
         bybit: {
           apiKey: '',
           secretKey: '',
-          testnet: true,
+          testnet: false,
           name: '',
           markets: {
             spot: false,
@@ -651,8 +570,13 @@ const App: React.FC = () => {
         }
       }));
       
-      alert('Bybit connection created successfully!');
-    }, 2000);
+      alert(`✅ ByBit connection '${newConnection.name}' successfully created with live data for user ${currentUser.name}!`);
+      
+    } catch (error) {
+      console.error('❌ Error creating ByBit connection:', error);
+      alert(`Failed to create connection: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setIsTesting(prev => ({ ...prev, bybit: false }));
+    }
   };
 
   const testOpenAIConnection = async () => {
@@ -661,14 +585,86 @@ const App: React.FC = () => {
       return;
     }
 
+    if (backendStatus !== 'connected') {
+      alert('Backend not connected. Please check if the backend server is running.');
+      return;
+    }
+
     setIsTesting(prev => ({ ...prev, openai: true }));
     
-    // Simulate API test
-    setTimeout(() => {
+    try {
+      // Test connection using real OpenAI API
+      console.log('🔄 Testing OpenAI connection...');
+      const testResult = await openaiApi.testConnection(
+        apiCredentials.openai.apiKey,
+        apiCredentials.openai.organization
+      );
+
+      if (!testResult.success) {
+        alert(`OpenAI connection test failed: ${testResult.error || testResult.message}`);
+        setIsTesting(prev => ({ ...prev, openai: false }));
+        return;
+      }
+
+      // Add connection to backend
+      const connectionId = `openai_${Date.now()}`;
+      const addResult = await openaiApi.addConnection({
+        connectionId,
+        apiKey: apiCredentials.openai.apiKey,
+        organization: apiCredentials.openai.organization
+      });
+
+      if (!addResult.success) {
+        alert(`Failed to add OpenAI connection: ${addResult.message}`);
+        setIsTesting(prev => ({ ...prev, openai: false }));
+        return;
+      }
+
+      // Update frontend state with new connection
+      setOpenaiConnections(prev => [addResult.data, ...prev]);
       setSystemStatus(prev => ({ ...prev, openai: true }));
       setIsTesting(prev => ({ ...prev, openai: false }));
-      alert('OpenAI connection successful!');
-    }, 1500);
+      
+      // Save credentials locally for backup
+      const credentialsToSave = {
+        bybitConnections: bybitConnections.map(conn => ({
+          id: conn.id,
+          name: conn.name,
+          apiKey: 'stored_encrypted',
+          secretKey: 'stored_encrypted',
+          testnet: conn.testnet,
+          markets: conn.markets,
+          createdAt: conn.createdAt
+        })),
+        openai: {
+          apiKey: apiCredentials.openai.apiKey,
+          organization: apiCredentials.openai.organization
+        }
+      };
+      
+      const saved = apiStorage.saveCredentials(credentialsToSave);
+      if (saved) {
+        setLastSaved(new Date().toLocaleTimeString());
+        setHasStoredCredentials(true);
+        setStorageInfo(apiStorage.getStorageInfo());
+      }
+      
+      // Reset form
+      setApiCredentials(prev => ({
+        ...prev,
+        openai: {
+          apiKey: '',
+          organization: ''
+        }
+      }));
+      
+      alert(`✅ OpenAI connection successfully created with live usage data for user ${currentUser.name}!`);
+      
+    } catch (error) {
+      console.error('❌ Error creating OpenAI connection:', error);
+      alert(`Failed to create OpenAI connection: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setIsTesting(prev => ({ ...prev, openai: false }));
+    }
   };
 
   const deleteBybitConnection = (id: string) => {
@@ -690,9 +686,32 @@ const App: React.FC = () => {
   };
 
   const saveApiSettings = () => {
-    // In real app: save to backend/localStorage
-    setLastSaved(new Date().toLocaleTimeString());
-    alert('API settings saved successfully!');
+    const credentialsToSave = {
+      bybitConnections: bybitConnections.map(conn => ({
+        id: conn.id,
+        name: conn.name,
+        apiKey: 'stored_encrypted', // Al encrypted opgeslagen
+        secretKey: 'stored_encrypted', // Al encrypted opgeslagen  
+        testnet: conn.testnet,
+        markets: conn.markets,
+        createdAt: conn.createdAt
+      })),
+      openai: {
+        apiKey: apiCredentials.openai.apiKey || '',
+        organization: apiCredentials.openai.organization || ''
+      }
+    };
+    
+    const saved = apiStorage.saveCredentials(credentialsToSave);
+    if (saved) {
+      const saveTime = new Date().toLocaleTimeString();
+      setLastSaved(saveTime);
+      setHasStoredCredentials(true);
+      setStorageInfo(apiStorage.getStorageInfo());
+      alert(`API settings safely saved for user ${currentUser.name} at ${saveTime}!`);
+    } else {
+      alert('Error saving API settings. Please try again.');
+    }
   };
 
   const updateBybitCredentials = (field: string, value: string | boolean) => {
@@ -723,11 +742,23 @@ const App: React.FC = () => {
     }));
   };
 
-  const totalPnL = mockTrades
-    .filter(trade => trade.status === 'OPEN')
-    .reduce((sum, trade) => sum + trade.pnl, 0);
-
-  const totalValue = bybitConnections.reduce((sum, conn) => sum + conn.balance.total, 0);
+  // Calculate values from live data
+  const totalPnL = livePositions.reduce((sum, position) => sum + (position.pnl || 0), 0);
+  const totalValue = bybitConnections.reduce((sum, conn) => sum + (conn.balance?.total || 0), 0);
+  const activePositions = livePositions.filter(p => p.status === 'OPEN').length;
+  
+  // Advanced calculations for dashboard
+  const availableBalance = bybitConnections.reduce((sum, conn) => sum + (conn.balance?.available || 0), 0);
+  const totalCoins = bybitConnections.reduce((sum, conn) => sum + (conn.balance?.coins?.length || 0), 0);
+  const winningPositions = livePositions.filter(p => p.pnl > 0).length;
+  const losingPositions = livePositions.filter(p => p.pnl < 0).length;
+  const winRate = activePositions > 0 ? ((winningPositions / activePositions) * 100) : 0;
+  const largestGain = livePositions.length > 0 ? Math.max(...livePositions.map(p => p.pnl)) : 0;
+  const largestLoss = livePositions.length > 0 ? Math.min(...livePositions.map(p => p.pnl)) : 0;
+  const avgPositionSize = livePositions.length > 0 ? livePositions.reduce((sum, p) => sum + p.amount, 0) / livePositions.length : 0;
+  const totalVolume = livePositions.reduce((sum, p) => sum + (p.amount * p.currentPrice), 0);
+  const dailyPnLChange = totalPnL >= 0 ? '+' + totalPnL.toFixed(2) : totalPnL.toFixed(2);
+  const portfolioChange = totalValue > 0 ? ((totalPnL / totalValue) * 100) : 0;
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -790,13 +821,43 @@ const App: React.FC = () => {
                       : 'text-gray-300 hover:text-white hover:bg-white/5 hover:shadow-lg hover:shadow-white/10'
                   }`}
                 >
-                  {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                  {tab === 'api' ? 'API' : tab.charAt(0).toUpperCase() + tab.slice(1)}
                 </button>
               ))}
             </div>
           </div>
           
           <div className="flex items-center space-x-4">
+            {/* ByBit Portfolio Value */}
+            <div className="flex items-center space-x-2 bg-black/50 backdrop-blur-xl rounded-lg px-3 py-2 border border-yellow-600/30 shadow-lg shadow-black/20">
+              <span className="text-yellow-400">💰</span>
+              <span className="text-sm font-medium tracking-wider text-yellow-300">
+                ${totalValue.toLocaleString()}
+              </span>
+            </div>
+
+            {/* OpenAI Credits */}
+            {openaiConnections.length > 0 && (
+              <div className="flex items-center space-x-2 bg-black/50 backdrop-blur-xl rounded-lg px-3 py-2 border border-green-600/30 shadow-lg shadow-black/20">
+                <span className="text-green-400">🤖</span>
+                <span className="text-sm font-medium tracking-wider text-green-300">
+                  ${openaiConnections[0]?.subscription?.remainingCredits?.toFixed(2) || '0.00'} credits
+                </span>
+              </div>
+            )}
+
+            {/* Storage Status Indicator */}
+            <div className="flex items-center space-x-2 bg-black/50 backdrop-blur-xl rounded-lg px-3 py-2 border border-blue-600/30 shadow-lg shadow-black/20">
+              <div className={`w-2 h-2 rounded-full shadow-lg ${
+                hasStoredCredentials ? 'bg-blue-400 shadow-blue-400/50' : 'bg-gray-400 shadow-gray-400/50'
+              }`}></div>
+              <span className={`text-sm font-medium tracking-wider ${
+                hasStoredCredentials ? 'text-blue-300' : 'text-gray-300'
+              }`}>
+                {hasStoredCredentials ? `💾 ${currentUser.name}` : '💾 NO DATA'}
+              </span>
+            </div>
+            
             <button
               onClick={handleRefresh}
               className={`p-2 rounded-lg bg-black/50 backdrop-blur-xl border border-gray-600/30 hover:border-yellow-400/40 hover:bg-yellow-400/10 transition-all duration-300 shadow-lg shadow-black/30 ${
@@ -805,9 +866,29 @@ const App: React.FC = () => {
             >
               <span className="text-yellow-400 text-lg">🔄</span>
             </button>
-            <div className="flex items-center space-x-2 bg-black/50 backdrop-blur-xl rounded-lg px-3 py-2 border border-green-600/30 shadow-lg shadow-black/20">
-              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse shadow-lg shadow-green-400/50"></div>
-              <span className="text-green-300 text-sm font-medium tracking-wider">LIVE</span>
+            <div className={`flex items-center space-x-2 bg-black/50 backdrop-blur-xl rounded-lg px-3 py-2 border shadow-lg shadow-black/20 ${
+              backendStatus === 'connected' 
+                ? 'border-green-600/30' 
+                : backendStatus === 'connecting'
+                ? 'border-yellow-600/30'
+                : 'border-red-600/30'
+            }`}>
+              <div className={`w-2 h-2 rounded-full shadow-lg ${
+                backendStatus === 'connected' 
+                  ? 'bg-green-400 shadow-green-400/50 animate-pulse' 
+                  : backendStatus === 'connecting'
+                  ? 'bg-yellow-400 shadow-yellow-400/50 animate-pulse'
+                  : 'bg-red-400 shadow-red-400/50'
+              }`}></div>
+              <span className={`text-sm font-medium tracking-wider ${
+                backendStatus === 'connected' 
+                  ? 'text-green-300' 
+                  : backendStatus === 'connecting'
+                  ? 'text-yellow-300'
+                  : 'text-red-300'
+              }`}>
+                {backendStatus === 'connected' ? 'LIVE DATA' : backendStatus === 'connecting' ? 'CONNECTING' : 'OFFLINE'}
+              </span>
             </div>
           </div>
         </div>
@@ -817,14 +898,67 @@ const App: React.FC = () => {
       <main className="relative z-10 max-w-7xl mx-auto p-6">
         {currentTab === 'dashboard' && (
           <div className="space-y-8">
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* Stats Grid - Expanded to 5 columns with live data */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
               <StatCard
                 title="Portfolio Value"
                 value={`$${totalValue.toLocaleString()}`}
-                change="+2.4% today"
-                changeType="positive"
+                change={`${portfolioChange >= 0 ? '+' : ''}${portfolioChange.toFixed(2)}% today`}
+                changeType={portfolioChange >= 0 ? "positive" : "negative"}
                 icon="💰"
+              />
+              <StatCard
+                title="Available Balance"
+                value={`$${availableBalance.toLocaleString()}`}
+                change={`${totalCoins} assets`}
+                changeType="positive"
+                icon="💳"
+              />
+              <StatCard
+                title="Total PnL"
+                value={`$${totalPnL.toFixed(2)}`}
+                change={`${dailyPnLChange} today`}
+                changeType={totalPnL >= 0 ? "positive" : "negative"}
+                icon="📈"
+              />
+              <StatCard
+                title="Active Positions"
+                value={activePositions.toString()}
+                change={`${winRate.toFixed(1)}% win rate`}
+                changeType={winRate >= 50 ? "positive" : "negative"}
+                icon="🎯"
+              />
+              <StatCard
+                title="Total Volume"
+                value={`$${totalVolume.toLocaleString()}`}
+                change={`${livePositions.length} positions`}
+                changeType="positive"
+                icon="📊"
+              />
+            </div>
+
+            {/* Additional Advanced Stats Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <StatCard
+                title="Largest Gain"
+                value={`$${largestGain.toFixed(2)}`}
+                change={`Best performer`}
+                changeType={largestGain >= 0 ? "positive" : "negative"}
+                icon="🚀"
+              />
+              <StatCard
+                title="Largest Loss"
+                value={`$${largestLoss.toFixed(2)}`}
+                change={`Worst performer`}
+                changeType={largestLoss >= 0 ? "positive" : "negative"}
+                icon="📉"
+              />
+              <StatCard
+                title="Avg Position Size"
+                value={`${avgPositionSize.toFixed(2)}`}
+                change={`Per position`}
+                changeType="positive"
+                icon="⚖️"
               />
               <StatCard
                 title="Active Connections"
@@ -832,20 +966,6 @@ const App: React.FC = () => {
                 change={`${bybitConnections.length} total`}
                 changeType="positive"
                 icon="🔗"
-              />
-              <StatCard
-                title="Total PnL"
-                value={`$${totalPnL.toFixed(2)}`}
-                change="+15.8% this week"
-                changeType="positive"
-                icon="📈"
-              />
-              <StatCard
-                title="AI Strategies"
-                value={mockStrategies.filter(s => s.status === 'ACTIVE').length.toString()}
-                change="2 running"
-                changeType="positive"
-                icon="🤖"
               />
             </div>
 
@@ -883,8 +1003,8 @@ const App: React.FC = () => {
                   RECENT TRADES
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {mockTrades.slice(0, 3).map((trade) => (
-                    <TradeCard key={trade.id} trade={trade} />
+                  {livePositions.slice(0, 3).map((position) => (
+                    <TradeCard key={position.id} trade={position} />
                   ))}
                 </div>
               </div>
@@ -935,10 +1055,10 @@ const App: React.FC = () => {
                     </thead>
                     <tbody>
                       {(() => {
-                        let currentData = [];
-                        if (tradeTab === 'Open Positions') currentData = openPositions;
-                        else if (tradeTab === 'Open Orders') currentData = openOrders;
-                        else if (tradeTab === 'Closed Trades') currentData = closedTrades;
+                        let currentData: Position[] = [];
+                        if (tradeTab === 'Open Positions') currentData = livePositions.filter(p => p.status === 'OPEN');
+                        else if (tradeTab === 'Open Orders') currentData = livePositions.filter(p => p.status === 'PENDING');
+                        else if (tradeTab === 'Closed Trades') currentData = livePositions.filter(p => p.status === 'CLOSED');
 
                         return currentData.map((trade, idx) => (
                           <tr key={idx} className="hover:bg-gradient-to-r hover:from-gray-900/50 hover:to-black/50 transition-all duration-300 border-b border-gray-800/30">
@@ -1002,10 +1122,10 @@ const App: React.FC = () => {
                 </div>
 
                 {(() => {
-                  let currentData = [];
-                  if (tradeTab === 'Open Positions') currentData = openPositions;
-                  else if (tradeTab === 'Open Orders') currentData = openOrders;
-                  else if (tradeTab === 'Closed Trades') currentData = closedTrades;
+                  let currentData: Position[] = [];
+                  if (tradeTab === 'Open Positions') currentData = livePositions.filter(p => p.status === 'OPEN');
+                  else if (tradeTab === 'Open Orders') currentData = livePositions.filter(p => p.status === 'PENDING');
+                  else if (tradeTab === 'Closed Trades') currentData = livePositions.filter(p => p.status === 'CLOSED');
 
                   return currentData.length === 0 && (
                     <div className="py-16 text-center">
@@ -1050,8 +1170,35 @@ const App: React.FC = () => {
                 <span>Total Balance: <span className="text-white font-bold">${totalValue.toLocaleString()}</span></span>
                 <span>•</span>
                 <span>Active: <span className="text-green-300 font-bold">{bybitConnections.filter(c => c.status === 'Active').length}</span></span>
+                <span>•</span>
+                <span>User: <span className="text-blue-300 font-bold">{currentUser.name}</span></span>
               </div>
             </div>
+            
+            {/* Storage Status Info */}
+            {storageInfo && (
+              <div className="relative group">
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-400/10 to-blue-600/10 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
+                <div className="relative bg-gradient-to-br from-gray-900 to-black p-4 rounded-xl border border-blue-500/30 shadow-2xl shadow-black/50">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <span className="text-2xl">💾</span>
+                      <div>
+                        <h4 className="font-bold text-blue-300">Veilige Opslag Status</h4>
+                        <p className="text-sm text-gray-400">
+                          {storageInfo.bybitConnectionsCount} Bybit connecties • {storageInfo.hasOpenAI ? 'OpenAI geconfigureerd' : 'Geen OpenAI'} • 
+                          Laatste opslag: {new Date(storageInfo.lastSaved).toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <div className="w-3 h-3 bg-green-400 rounded-full shadow-lg shadow-green-400/50"></div>
+                      <span className="text-green-300 text-sm font-bold uppercase tracking-wider">ENCRYPTED</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             
             {/* Existing Bybit Connections */}
             <div className="relative group">
@@ -1069,9 +1216,9 @@ const App: React.FC = () => {
                           <span className="text-xl">{getStatusIcon(connection.status)}</span>
                           <div>
                             <div className="flex items-center space-x-2">
-                              <span className="text-white font-bold text-base">{connection.name}</span>
+                              <span className="text-white font-bold text-xl tracking-wide drop-shadow-lg">{connection.name}</span>
                               {connection.testnet && (
-                                <span className="px-2 py-1 text-xs bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 rounded">Testnet</span>
+                                <span className="px-2 py-1 text-xs bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 rounded font-medium">Testnet</span>
                               )}
                             </div>
                             <div className="flex items-center space-x-2 text-xs text-gray-400">
@@ -1099,31 +1246,26 @@ const App: React.FC = () => {
                       
                       <div className="flex items-center space-x-6">
                         <div className="text-right">
-                          <div className="text-white font-bold">${connection.balance.total.toLocaleString()}</div>
-                          <div className="text-xs text-gray-400">Available: ${connection.balance.available.toLocaleString()}</div>
+                          <div className="text-white font-bold">
+                            ${connection.balance ? connection.balance.total.toLocaleString() : '0.00'}
+                          </div>
+                          <div className="text-xs text-gray-400">
+                            Available: ${connection.balance ? connection.balance.available.toLocaleString() : '0.00'}
+                          </div>
                           <div className="flex items-center space-x-1 text-xs">
-                            <span className={connection.performance.dailyChange >= 0 ? 'text-green-400' : 'text-red-400'}>
-                              {connection.performance.dailyChange >= 0 ? '+' : ''}{connection.performance.dailyChange.toFixed(1)}%
-                            </span>
-                            <span className="text-gray-500">24h</span>
+                            <span className="text-blue-400">LIVE</span>
+                            <span className="text-gray-500">Data</span>
                           </div>
                         </div>
                         
-                        {connection.status === 'Active' && (
+                        {connection.status === 'Active' && connection.balance && (
                           <div className="w-16 h-8 relative cursor-pointer" onClick={() => {
                             setSelectedConnection(connection);
                             setShowConnectionDetails(true);
                           }}>
-                            <svg width="64" height="32" viewBox="0 0 64 32" className="text-green-400 hover:text-green-300 transition-colors">
-                              <polyline
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="1.5"
-                                points={connection.balance.balanceHistory.map((point, i) => 
-                                  `${(i / (connection.balance.balanceHistory.length - 1)) * 60 + 2},${30 - (point.value / Math.max(...connection.balance.balanceHistory.map(p => p.value))) * 26}`
-                                ).join(' ')}
-                              />
-                            </svg>
+                            <div className="text-center text-xs text-green-400 font-bold">
+                              📊 LIVE
+                            </div>
                           </div>
                         )}
                         
@@ -1171,6 +1313,121 @@ const App: React.FC = () => {
                       </div>
                     </div>
                   ))}
+                </div>
+              </div>
+            </div>
+            
+            {/* OpenAI Connections Overview */}
+            <div className="relative group">
+              <div className="absolute inset-0 bg-gradient-to-br from-green-400/10 to-green-600/10 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
+              <div className="relative bg-gradient-to-br from-black to-gray-900 p-6 rounded-xl border border-gray-600/30 hover:border-green-400/40 transition-all duration-300 shadow-2xl shadow-black/50">
+                <h3 className="text-xl font-bold mb-6 bg-gradient-to-r from-green-400 to-white bg-clip-text text-transparent drop-shadow-lg">
+                  🤖 OPENAI CONNECTIONS ({openaiConnections.length})
+                </h3>
+                
+                <div className="space-y-4">
+                  {openaiConnections.length > 0 ? (
+                    openaiConnections.map((connection) => (
+                      <div key={connection.connectionId} className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-900 to-black rounded-lg border border-gray-700/40 hover:border-green-400/30 transition-all group/item">
+                        <div className="flex items-center space-x-4">
+                          <div className="flex items-center space-x-3">
+                            <span className="text-xl">🤖</span>
+                            <div>
+                              <div className="flex items-center space-x-2">
+                                <span className="text-white font-bold text-base">OpenAI API</span>
+                                <span className="px-2 py-1 text-xs bg-green-500/20 text-green-300 border border-green-500/40 rounded">{connection.subscription.plan}</span>
+                              </div>
+                              <div className="flex items-center space-x-2 text-xs text-gray-400">
+                                <span>Credits: ${connection.subscription.remainingCredits.toFixed(2)} / ${connection.subscription.creditLimit}</span>
+                                <span>•</span>
+                                <span>{connection.subscription.status}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center space-x-6">
+                          <div className="text-right">
+                            <div className="text-white font-bold">${connection.usage.month.cost.toFixed(2)}</div>
+                            <div className="text-xs text-gray-400">This month</div>
+                            <div className="flex items-center space-x-1 text-xs">
+                              <span className={connection.usage.trends.daily >= 0 ? 'text-green-400' : 'text-red-400'}>
+                                {connection.usage.trends.daily >= 0 ? '+' : ''}{connection.usage.trends.daily.toFixed(1)}%
+                              </span>
+                              <span className="text-gray-500">daily</span>
+                            </div>
+                          </div>
+                          
+                          {/* Usage percentage bar */}
+                          <div className="w-16 h-8 relative">
+                            <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+                              <div 
+                                className={`h-full transition-all duration-300 ${
+                                  connection.subscription.usagePercentage > 80 ? 'bg-red-400' : 
+                                  connection.subscription.usagePercentage > 60 ? 'bg-yellow-400' : 'bg-green-400'
+                                }`}
+                                style={{ width: `${Math.min(connection.subscription.usagePercentage, 100)}%` }}
+                              />
+                            </div>
+                            <div className="text-center text-xs text-gray-400 mt-1">
+                              {connection.subscription.usagePercentage.toFixed(0)}%
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center space-x-2">
+                            <a
+                              href="https://platform.openai.com/account/billing/overview"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-2 hover:bg-green-400/10 rounded transition-all"
+                              title="View OpenAI Billing"
+                            >
+                              <span className="text-green-400">💳</span>
+                            </a>
+                            
+                            <button
+                              onClick={() => openaiApi.removeConnection(connection.connectionId).then(() => {
+                                setOpenaiConnections(prev => prev.filter(c => c.connectionId !== connection.connectionId));
+                                alert('OpenAI connection removed');
+                              })}
+                              className="p-2 hover:bg-red-400/10 rounded transition-all"
+                              title="Remove Connection"
+                            >
+                              <span className="text-red-400">🗑️</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8">
+                      <div className="text-gray-400 text-lg">No OpenAI connections found</div>
+                      <div className="text-green-400/70 text-sm mt-2">Add your OpenAI API key below to get started</div>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Quick Actions */}
+                <div className="mt-6 flex gap-4">
+                  <a
+                    href="https://platform.openai.com/account/billing/payment-methods"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center space-x-2 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 shadow-lg hover:shadow-green-400/30"
+                  >
+                    <span>💳</span>
+                    <span>Buy Credits</span>
+                  </a>
+                  
+                  <a
+                    href="https://platform.openai.com/account/usage"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 shadow-lg hover:shadow-blue-400/30"
+                  >
+                    <span>📊</span>
+                    <span>View Usage</span>
+                  </a>
                 </div>
               </div>
             </div>
@@ -1365,6 +1622,7 @@ const App: React.FC = () => {
               </div>
             </div>
 
+
             {/* Coming Soon Services */}
             <div className="relative group">
               <div className="absolute inset-0 bg-gradient-to-br from-gray-500/10 to-gray-600/10 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
@@ -1467,60 +1725,40 @@ const App: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="text-sm text-gray-400">Performance</label>
-                  <div className="grid grid-cols-3 gap-2 mt-2">
+                  <label className="text-sm text-gray-400">Live Data Status</label>
+                  <div className="grid grid-cols-2 gap-2 mt-2">
                     <div className="text-center p-2 bg-gray-900/50 rounded">
-                      <div className="text-xs text-gray-500">24h</div>
-                      <div className={selectedConnection.performance.dailyChange >= 0 ? 'text-green-400' : 'text-red-400'}>
-                        {selectedConnection.performance.dailyChange >= 0 ? '+' : ''}{selectedConnection.performance.dailyChange.toFixed(1)}%
+                      <div className="text-xs text-gray-500">Positions</div>
+                      <div className="text-green-400">
+                        {selectedConnection.positions?.length || 0}
                       </div>
                     </div>
                     <div className="text-center p-2 bg-gray-900/50 rounded">
-                      <div className="text-xs text-gray-500">7d</div>
-                      <div className={selectedConnection.performance.weeklyChange >= 0 ? 'text-green-400' : 'text-red-400'}>
-                        {selectedConnection.performance.weeklyChange >= 0 ? '+' : ''}{selectedConnection.performance.weeklyChange.toFixed(1)}%
-                      </div>
-                    </div>
-                    <div className="text-center p-2 bg-gray-900/50 rounded">
-                      <div className="text-xs text-gray-500">30d</div>
-                      <div className={selectedConnection.performance.monthlyChange >= 0 ? 'text-green-400' : 'text-red-400'}>
-                        {selectedConnection.performance.monthlyChange >= 0 ? '+' : ''}{selectedConnection.performance.monthlyChange.toFixed(1)}%
+                      <div className="text-xs text-gray-500">Status</div>
+                      <div className="text-blue-400">
+                        LIVE
                       </div>
                     </div>
                   </div>
                 </div>
                 
                 <div>
-                  <label className="text-sm text-gray-400 mb-3 block">Balance (24h)</label>
+                  <label className="text-sm text-gray-400 mb-3 block">Live Balance</label>
                   <div className="bg-gray-900 rounded-lg p-4 border border-gray-700/40">
                     <div className="text-2xl font-bold text-white mb-2">
-                      ${selectedConnection.balance.total.toLocaleString()}
+                      ${selectedConnection.balance ? selectedConnection.balance.total.toLocaleString() : '0.00'}
                     </div>
                     <div className="text-sm text-gray-400 mb-4">
-                      Available: ${selectedConnection.balance.available.toLocaleString()}
+                      Available: ${selectedConnection.balance ? selectedConnection.balance.available.toLocaleString() : '0.00'}
+                    </div>
+                    <div className="text-sm text-gray-400 mb-4">
+                      In Order: ${selectedConnection.balance ? selectedConnection.balance.inOrder.toLocaleString() : '0.00'}
                     </div>
                     
-                    <div className="h-20 relative">
-                      <svg width="100%" height="80" viewBox="0 0 300 80" className="text-green-400">
-                        <defs>
-                          <linearGradient id="balanceGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                            <stop offset="0%" stopColor="currentColor" stopOpacity="0.3"/>
-                            <stop offset="100%" stopColor="currentColor" stopOpacity="0.1"/>
-                          </linearGradient>
-                        </defs>
-                        <polyline
-                          fill="url(#balanceGradient)"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          points={`0,80 ${selectedConnection.balance.balanceHistory.map((point, i) => 
-                            `${(i / (selectedConnection.balance.balanceHistory.length - 1)) * 300},${80 - (point.value / Math.max(...selectedConnection.balance.balanceHistory.map(p => p.value))) * 60}`
-                          ).join(' ')} 300,80`}
-                        />
-                      </svg>
-                      <div className="absolute bottom-0 left-0 right-0 flex justify-between text-xs text-gray-500">
-                        {selectedConnection.balance.balanceHistory.map((point, i) => (
-                          <span key={i}>{point.time}</span>
-                        ))}
+                    <div className="h-20 relative flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-green-400 text-2xl mb-2">📊</div>
+                        <div className="text-sm text-gray-400">Live Data from ByBit API</div>
                       </div>
                     </div>
                   </div>
