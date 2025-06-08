@@ -16,7 +16,10 @@
     "test:coverage": "vitest --coverage",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,css,md}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,css,md}\"",
-    "analyze": "vite-bundle-analyzer"
+    "analyze": "vite-bundle-analyzer",
+    "start": "cd backend && node server.js",
+    "heroku-postbuild": "npm run build && cd backend && npm install",
+    "install:all": "npm install && cd backend && npm install"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.3.0",
@@ -77,5 +80,9 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/MarcelCryptoAI/YellowOnBlackBot.git"
+  },
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=7.0.0"
   }
 }

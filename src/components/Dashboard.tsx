@@ -1,7 +1,8 @@
 // Dashboard.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Position } from '../services/api';
+import { coinsService } from '../services/coinsService';
 
 interface Strategy {
   id: string;
@@ -102,6 +103,56 @@ export const Dashboard: React.FC = () => {
   const context = useOutletContext<OutletContext>();
   const { livePositions, totalValue, totalPnL, activePositions } = context;
   const [showWidgetConfig, setShowWidgetConfig] = useState(false);
+  const [availableCoins, setAvailableCoins] = useState<string[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshProgress, setRefreshProgress] = useState('');
+  const [showProgress, setShowProgress] = useState(false);
+
+  // Load available coins on component mount
+  useEffect(() => {
+    const loadCoins = async () => {
+      try {
+        console.log('🔄 Loading coins for dashboard...');
+        // Clear old cache first
+        localStorage.removeItem('cached_perpetual_coins');
+        localStorage.removeItem('bybit_copy_trading_contracts');
+        
+        // Force refresh to get new copy trading list
+        const symbols = await coinsService.getSymbols(true, (progress) => {
+          console.log(progress);
+        });
+        setAvailableCoins(symbols);
+        console.log('✅ Dashboard loaded', symbols.length, 'copy trading contracts');
+        
+        // Check if data needs refresh (24h+)
+        if (coinsService.needsRefresh()) {
+          console.log('⚠️ Coin data is older than 24h, consider refreshing');
+        }
+      } catch (error) {
+        console.error('❌ Dashboard: Error loading coins:', error);
+        // Fallback to basic coins
+        const fallbackCoins = [
+          'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'AVAXUSDT', 'ARBUSDT', 
+          'INJUSDT', 'SUIUSDT', 'DOGEUSDT', 'ADAUSDT', 'MATICUSDT'
+        ];
+        setAvailableCoins(fallbackCoins);
+      }
+    };
+
+    loadCoins();
+    
+    // Auto-refresh check every hour
+    const interval = setInterval(() => {
+      if (coinsService.needsRefresh()) {
+        console.log('⏰ Auto-refresh: Coin data is older than 24h');
+        // Auto refresh silently
+        loadCoins();
+      }
+    }, 60 * 60 * 1000); // Check every hour
+
+    return () => clearInterval(interval);
+  }, []);
+
   const [widgetConfig, setWidgetConfig] = useState<WidgetConfig>({
     totalPortfolio: true,
     todaysPnL: true,
@@ -139,22 +190,71 @@ export const Dashboard: React.FC = () => {
     setWidgetConfig(prev => ({ ...prev, [widget]: !prev[widget] }));
   };
 
+  const refreshData = async () => {
+    setIsRefreshing(true);
+    setShowProgress(true);
+    setRefreshProgress('🔄 Starting refresh...');
+    
+    try {
+      console.log('🔄 Force refreshing coin data from Bybit...');
+      
+      // Force fetch fresh data with progress updates
+      const symbols = await coinsService.getSymbols(true, (progress) => {
+        setRefreshProgress(progress);
+        console.log(progress);
+      });
+      
+      setAvailableCoins(symbols);
+      setRefreshProgress(`✅ Successfully loaded ${symbols.length} coins!`);
+      
+      console.log('🎉 Dashboard refresh completed:', symbols.length, 'coins');
+      
+      // Hide progress after 2 seconds
+      setTimeout(() => {
+        setShowProgress(false);
+        setRefreshProgress('');
+      }, 2000);
+      
+    } catch (error: any) {
+      console.error('❌ Error refreshing dashboard:', error);
+      setRefreshProgress(`❌ Error: ${error.message}`);
+      
+      // Hide progress after 3 seconds
+      setTimeout(() => {
+        setShowProgress(false);
+        setRefreshProgress('');
+      }, 3000);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   const portfolioChange = totalValue > 0 ? ((totalPnL / totalValue) * 100) : 0;
 
   return (
     <div className="space-y-8">
-      {/* Header with Widget Config Button */}
+      {/* Header with Action Buttons */}
       <div className="flex items-center justify-between">
         <h2 className="text-3xl font-bold bg-gradient-to-r from-white via-gray-200 to-yellow-400 bg-clip-text text-transparent drop-shadow-lg">
           📊 DASHBOARD
         </h2>
-        <button
-          onClick={() => setShowWidgetConfig(true)}
-          className="flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 shadow-lg"
-        >
-          <span>⚙️</span>
-          <span>Configure Widgets</span>
-        </button>
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={refreshData}
+            disabled={isRefreshing}
+            className="flex items-center space-x-2 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 disabled:from-gray-600 disabled:to-gray-500 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 shadow-lg"
+          >
+            <span className={isRefreshing ? 'animate-spin' : ''}>🔄</span>
+            <span>{isRefreshing ? 'Refreshing...' : 'Refresh Data'}</span>
+          </button>
+          <button
+            onClick={() => setShowWidgetConfig(true)}
+            className="flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 shadow-lg"
+          >
+            <span>⚙️</span>
+            <span>Configure Widgets</span>
+          </button>
+        </div>
       </div>
 
       {/* Stats Grid */}
@@ -195,6 +295,13 @@ export const Dashboard: React.FC = () => {
             icon="📊"
           />
         )}
+        <StatCard
+          title="Copy Trading Contracts"
+          value={availableCoins.length.toString()}
+          change={`USDT Contracts ${isRefreshing ? '🔄' : '✅'}`}
+          changeType="positive"
+          icon="📋"
+        />
       </div>
 
       {/* Chart Widget */}
@@ -364,6 +471,39 @@ export const Dashboard: React.FC = () => {
                   💾 Save Configuration
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Progress Modal */}
+      {showProgress && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-gradient-to-b from-gray-900 to-black p-8 rounded-xl border border-gray-600/30 shadow-2xl max-w-md w-full mx-4">
+            <div className="text-center">
+              <div className="text-4xl mb-4">
+                {isRefreshing ? (
+                  <span className="animate-spin">🔄</span>
+                ) : refreshProgress.includes('✅') ? (
+                  <span>✅</span>
+                ) : (
+                  <span>❌</span>
+                )}
+              </div>
+              <h3 className="text-xl font-bold text-white mb-4">
+                {isRefreshing ? 'Refreshing Coin Data' : 'Refresh Complete'}
+              </h3>
+              <div className="bg-gray-900/50 p-4 rounded-lg mb-4">
+                <p className="text-gray-300 text-sm">{refreshProgress}</p>
+              </div>
+              {isRefreshing && (
+                <div className="w-full bg-gray-700 rounded-full h-2 mb-4">
+                  <div className="bg-gradient-to-r from-blue-500 to-green-500 h-2 rounded-full animate-pulse" style={{width: '100%'}}></div>
+                </div>
+              )}
+              <p className="text-xs text-gray-400">
+                Fetching all USDT perpetual coins from Bybit API
+              </p>
             </div>
           </div>
         </div>

@@ -100,16 +100,16 @@ const ApiConfigPage: React.FC = () => {
       const bybitResponse = await bybitApi.getConnections();
       if (bybitResponse.success) {
         const connections = bybitResponse.connections.map(conn => ({
-          id: conn.connectionId,
-          name: conn.metadata?.name || 'ByBit Connection',
+          id: conn.connection_id,
+          name: conn.name || 'ByBit Connection',
           apiKey: '****LIVE',
           secretKey: '****hidden',
-          testnet: conn.metadata?.testnet || false,
-          markets: conn.metadata?.markets || { spot: true, usdtPerpetual: false, inverseUsd: false },
+          testnet: conn.testnet || false,
+          markets: conn.markets || { spot: true, usdtPerpetual: false, inverseUsd: false },
           status: conn.data ? 'Active' as const : 'Error' as const,
           balance: conn.data?.balance || null,
           positions: conn.data?.positions || [],
-          createdAt: conn.metadata?.createdAt || new Date().toISOString(),
+          createdAt: conn.last_updated || new Date().toISOString(),
         }));
         setBybitConnections(connections);
       }

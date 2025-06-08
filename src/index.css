@@ -8,3 +8,36 @@ body {
   color: #ffffff;
   font-family: system-ui, -apple-system, sans-serif;
 }
+
+/* Custom slider styles */
+.slider {
+  -webkit-appearance: none;
+  appearance: none;
+  outline: none;
+  opacity: 0.9;
+  transition: opacity 0.2s;
+}
+
+.slider:hover {
+  opacity: 1;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  background: #eab308;
+  cursor: pointer;
+  border-radius: 50%;
+  box-shadow: 0 0 10px rgba(234, 179, 8, 0.5);
+}
+
+.slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  background: #eab308;
+  cursor: pointer;
+  border-radius: 50%;
+  box-shadow: 0 0 10px rgba(234, 179, 8, 0.5);
+}

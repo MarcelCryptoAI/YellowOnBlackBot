@@ -7,7 +7,7 @@ const API_BASE_URL = 'http://localhost:8000/api';
 // API Client setup
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
+  timeout: 30000, // Increased to 30 seconds for heavy market data calls
   headers: {
     'Content-Type': 'application/json',
   },
@@ -308,6 +308,25 @@ export const bybitApi = {
     const response = await apiClient.get('/portfolio/summary');
     return response.data;
   },
+
+  // Create new trade
+  createTrade: async (tradeData: {
+    connectionId: string;
+    symbol: string;
+    side: 'buy' | 'sell';
+    orderType: 'market' | 'limit';
+    quantity: number;
+    price?: number;
+    leverage?: number;
+    marginMode?: 'isolated' | 'cross';
+    reduceOnly?: boolean;
+    timeInForce?: 'GTC' | 'IOC' | 'FOK';
+    takeProfitPrice?: number;
+    stopLossPrice?: number;
+  }) => {
+    const response = await apiClient.post('/trading/create-order', tradeData);
+    return response.data;
+  },
 };
 
 // OpenAI API functions
@@ -365,6 +384,72 @@ export const openaiApi = {
   },
 };
 
+// Coins API
+export const coinsApi = {
+  // Get all USDT perpetual coins
+  getPerpetualCoins: async (forceRefresh = false) => {
+    try {
+      console.log('🔄 Fetching perpetual coins from backend...');
+      const url = forceRefresh ? '/coins/perpetuals?refresh=true' : '/coins/perpetuals';
+      const response = await apiClient.get(url);
+      console.log('✅ Perpetual coins fetched:', response.data.data?.total || 0, 'coins');
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Failed to fetch perpetual coins:', error.message);
+      throw error;
+    }
+  },
+
+  // Get leverage limits for a specific symbol
+  getLeverageLimits: async (symbol: string) => {
+    try {
+      const response = await apiClient.get(`/coins/${symbol}/leverage`);
+      return response.data;
+    } catch (error: any) {
+      console.error(`❌ Failed to get leverage limits for ${symbol}:`, error.message);
+      // Return default limits if API fails
+      return {
+        success: true,
+        symbol: symbol,
+        leverage: { min: 1, max: 25 }
+      };
+    }
+  },
+
+  // Cache management for coins
+  getCachedCoins: () => {
+    try {
+      const cached = localStorage.getItem('cached_perpetual_coins');
+      if (cached) {
+        const data = JSON.parse(cached);
+        const cacheAge = Date.now() - data.timestamp;
+        // Cache valid for 1 hour
+        if (cacheAge < 3600000) {
+          console.log('📦 Using cached coins data');
+          return data.coins;
+        }
+      }
+      return null;
+    } catch (error) {
+      console.error('Error reading cached coins:', error);
+      return null;
+    }
+  },
+
+  setCachedCoins: (coins: string[]) => {
+    try {
+      const data = {
+        coins: coins,
+        timestamp: Date.now()
+      };
+      localStorage.setItem('cached_perpetual_coins', JSON.stringify(data));
+      console.log('💾 Cached', coins.length, 'coins');
+    } catch (error) {
+      console.error('Error caching coins:', error);
+    }
+  }
+};
+
 // Health check
 export const healthCheck = async () => {
   try {
@@ -386,6 +471,7 @@ export const websocketManager = new WebSocketManager();
 export default {
   bybitApi,
   openaiApi,
+  coinsApi,
   healthCheck,
   websocketManager,
 };

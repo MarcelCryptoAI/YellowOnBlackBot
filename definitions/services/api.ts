@@ -11,15 +11,17 @@ import {
 } from '../types';
 
 class ApiService {
-  private static baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
-  private static timeout = 10000; // 10 seconds timeout
+  private static baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:3000/api';
+  private static timeout = 200000; // 200 seconden timeout
 
-  // Generic API call method with error handling
+  // Generic API call method with error handling and custom timeout
   private static async apiCall<T>(
     endpoint: string,
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
     const url = `${this.baseUrl}${endpoint}`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
     const defaultOptions: RequestInit = {
       headers: {
@@ -28,35 +30,49 @@ class ApiService {
         'X-Client': 'crypto-trading-bot',
         ...options.headers,
       },
-      signal: AbortSignal.timeout(this.timeout),
+      signal: controller.signal,
       ...options,
     };
 
     try {
       const response = await fetch(url, defaultOptions);
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
       const data = await response.json();
-
       return {
         success: true,
         data,
         timestamp: new Date().toISOString()
       };
-    } catch (error) {
+    } catch (error: any) {
+      clearTimeout(timeoutId);
       console.error(`API call failed for ${endpoint}:`, error);
 
       return {
         success: false,
         data: null as any,
-        error: error instanceof Error ? error.message : 'Unknown error occurred',
+        error: error.name === 'AbortError'
+          ? `Request timed out after ${this.timeout}ms`
+          : error.message || 'Unknown error occurred',
         timestamp: new Date().toISOString()
       };
     }
   }
+
+  // Voorbeeldmethode
+  static async getTrades(): Promise<ApiResponse<Trade[]>> {
+    return this.apiCall<Trade[]>('/trades', { method: 'GET' });
+  }
+
+  // … overige endpoint-methodes …
+}
+
+export default ApiService;
+
 
   // Bybit API Integration
   static async testBybitConnection(credentials: BybitCredentials): Promise<boolean> {
