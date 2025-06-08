@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FaEye, FaEyeSlash, FaSync } from 'react-icons/fa';
-import { bybitApi, healthCheck } from '../services/api';
+import { bybitApi, healthCheck, ConnectionData, Position, OrderHistory } from '../services/api';
 
 // Utility function for currency formatting
 function toCurrency(v: number) {
@@ -17,31 +17,51 @@ interface Trade {
   currentPrice: number;
   pnl: number;
   pnlPercent: number;
-  status: 'OPEN' | 'CLOSED' | 'PENDING';
+  status: 'OPEN' | 'CLOSED' | 'PENDING' | 'CANCELLED';
   exchange: string;
   timestamp: string;
 }
 
 interface BybitConnection {
-  id: string;
+  connectionId: string;
   name: string;
   status: string;
-  balance: {
-    total: number;
-    available: number;
-    inOrder: number;
-    coins: Array<{
-      coin: string;
-      walletBalance: number;
-      availableBalance: number;
-      locked: number;
-    }>;
-  } | null;
-  positions: Trade[];
+  data: ConnectionData;
+  metadata: {
+    name: string;
+    created_at: string;
+  };
 }
 
+// Calculate time difference for display
+const getTimeAgo = (timestamp: string) => {
+  const now = new Date();
+  const tradeTime = new Date(timestamp);
+  const diffMs = now.getTime() - tradeTime.getTime();
+  const diffMinutes = Math.floor(diffMs / (1000 * 60));
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  
+  if (diffMinutes < 60) {
+    return `${diffMinutes}m ago`;
+  } else if (diffHours < 24) {
+    return `${diffHours}h ago`;
+  } else {
+    return `${diffDays}d ago`;
+  }
+};
+
+// Format date for display
+const formatOpenDate = (timestamp: string) => {
+  const date = new Date(timestamp);
+  return {
+    date: date.toLocaleDateString([], { month: 'short', day: 'numeric' }),
+    time: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  };
+};
+
 // Trade Card Component
-const TradeCard: React.FC<{ trade: Trade }> = ({ trade }) => (
+const TradeCard: React.FC<{ trade: Trade; showOpenDate?: boolean }> = ({ trade, showOpenDate = false }) => (
   <div className="relative group">
     <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-yellow-400/5 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
     <div className="relative bg-gradient-to-br from-black to-gray-900 p-5 rounded-xl border border-gray-600/30 hover:border-white/30 transition-all duration-300 shadow-2xl shadow-black/50 hover:shadow-white/10">
@@ -62,12 +82,39 @@ const TradeCard: React.FC<{ trade: Trade }> = ({ trade }) => (
             ? 'text-yellow-300 bg-gradient-to-r from-yellow-500/20 to-yellow-400/20 border border-yellow-500/40 shadow-yellow-400/20'
             : trade.status === 'PENDING'
             ? 'text-blue-300 bg-gradient-to-r from-blue-500/20 to-blue-400/20 border border-blue-500/40 shadow-blue-400/20'
+            : trade.status === 'CANCELLED'
+            ? 'text-red-300 bg-gradient-to-r from-red-500/20 to-red-400/20 border border-red-500/40 shadow-red-400/20'
             : 'text-gray-300 bg-gradient-to-r from-gray-600/20 to-gray-500/20 border border-gray-500/40 shadow-gray-400/20'
         }`}>
           {trade.status}
         </span>
       </div>
 
+      {/* Open Date Section */}
+      {showOpenDate && (
+        <div className="mb-4 p-3 bg-gray-800/30 rounded-lg border border-gray-600/30">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-400 uppercase tracking-wider text-xs font-medium mb-1">Opened</p>
+              <div className="flex items-center space-x-2">
+                <span className="text-white font-medium text-sm">
+                  {formatOpenDate(trade.timestamp).date}
+                </span>
+                <span className="text-gray-400 text-xs">
+                  {formatOpenDate(trade.timestamp).time}
+                </span>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-gray-400 uppercase tracking-wider text-xs font-medium mb-1">Duration</p>
+              <span className="text-yellow-300 font-medium text-sm">
+                {getTimeAgo(trade.timestamp)}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+      
       <div className="grid grid-cols-2 gap-4 text-sm">
         <div className="space-y-1">
           <p className="text-gray-400 uppercase tracking-wider text-xs font-medium">Entry</p>
@@ -113,116 +160,70 @@ const TradeCard: React.FC<{ trade: Trade }> = ({ trade }) => (
 // Main TradesPage Component
 const TradesPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState('Open Positions');
-  const [accounts, setAccounts] = useState([]);
-  const [balances, setBalances] = useState({});
+  const [connections, setConnections] = useState<BybitConnection[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [showBalances, setShowBalances] = useState(true);
+  const [allPositions, setAllPositions] = useState<Position[]>([]);
+  const [allOrderHistory, setAllOrderHistory] = useState<OrderHistory[]>([]);
 
-  // Mock accounts data (same as your script)
-  const mockAccounts = [
-    {
-      id: 1,
-      name: "Crypto Opulence - Spot",
-      broker: "ByBit Spot",
-      status: "active",
-      type: "spot",
-      balance: 15420.50,
-      available: 14250.30,
-      performance24h: +12.5,
-      trades: 156,
-      winRate: 73.2
-    },
-    {
-      id: 2,
-      name: "Crypto Opulence - USDT",
-      broker: "ByBit USDT",
-      status: "active", 
-      type: "futures",
-      balance: 25840.75,
-      available: 22100.45,
-      performance24h: +8.7,
-      trades: 89,
-      winRate: 68.5
-    },
-    {
-      id: 3,
-      name: "Lt. Aldo Raine - USDT",
-      broker: "ByBit USDT",
-      status: "active",
-      type: "futures", 
-      balance: 8950.25,
-      available: 7800.00,
-      performance24h: -2.1,
-      trades: 45,
-      winRate: 55.6
+  // Get open positions, orders, and closed trades from all connections
+  const openPositions = allPositions.filter(pos => pos.status === 'OPEN');
+  const openOrders = allPositions.filter(pos => pos.status === 'PENDING');
+  const closedTrades = allOrderHistory.filter(order => order.status === 'CLOSED');
+
+  // Fetch live ByBit data
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      console.log('🔄 Fetching live ByBit connections...');
+      const response = await bybitApi.getConnections();
+      
+      if (response.success) {
+        // Map the response to match our interface
+        const mappedConnections: BybitConnection[] = response.connections.map(conn => ({
+          connectionId: conn.connectionId || conn.connection_id,
+          name: conn.metadata?.name || conn.name || 'Unknown Connection',
+          status: conn.status || 'active',
+          data: conn.data,
+          metadata: conn.metadata || { name: conn.name || 'Unknown', created_at: new Date().toISOString() }
+        }));
+        setConnections(mappedConnections);
+        
+        // Combine all positions and order history from all connections
+        const allPos: Position[] = [];
+        const allOrders: OrderHistory[] = [];
+        
+        response.connections.forEach(conn => {
+          if (conn.data?.positions) {
+            allPos.push(...conn.data.positions);
+          }
+          if (conn.data?.orderHistory) {
+            allOrders.push(...conn.data.orderHistory);
+          }
+        });
+        
+        setAllPositions(allPos);
+        setAllOrderHistory(allOrders);
+        
+        console.log('✅ Loaded', response.connections.length, 'connections with', allPos.length, 'positions');
+      } else {
+        console.error('❌ Failed to fetch connections');
+      }
+    } catch (error) {
+      console.error('❌ Error fetching data:', error);
     }
-  ];
+    setLoading(false);
+  };
 
   useEffect(() => {
-    async function fetchData() {
-      setLoading(true);
-      try {
-        // Try CCXT API first, then fallback to mock data
-        try {
-          const balancesRes = await axios.get("http://localhost:5000/api/ccxt/balances");
-          if (balancesRes.data.success && balancesRes.data.balances.length > 0) {
-            const accountsData = balancesRes.data.balances.map(balance => ({
-              id: balance.accountId,
-              name: balance.accountName,
-              broker: 'ByBit',
-              status: 'active' as const,
-              type: balance.accountType as 'spot' | 'futures'
-            }));
-            setAccounts(accountsData);
-
-            const balanceMap = {};
-            balancesRes.data.balances.forEach(balance => {
-              balanceMap[balance.accountId] = balance.total;
-            });
-            setBalances(balanceMap);
-            
-            console.log("✅ Using CCXT API data");
-          } else {
-            throw new Error("No CCXT data available");
-          }
-        } catch (apiError) {
-          console.log("Using mock data for accounts demo");
-          setAccounts(mockAccounts);
-          let bal = {};
-          mockAccounts.forEach(acc => {
-            bal[acc.id] = acc.balance;
-          });
-          setBalances(bal);
-        }
-      } catch {
-        setAccounts(mockAccounts);
-        let bal = {};
-        mockAccounts.forEach(acc => {
-          bal[acc.id] = acc.balance;
-        });
-        setBalances(bal);
-      }
-      setLoading(false);
-    }
     fetchData();
   }, []);
 
   // Refresh data function
   const handleRefresh = async () => {
     setRefreshing(true);
-    try {
-      const balancesRes = await axios.get("http://localhost:5000/api/ccxt/balances");
-      if (balancesRes.data.success && balancesRes.data.balances.length > 0) {
-        const balanceMap = {};
-        balancesRes.data.balances.forEach(balance => {
-          balanceMap[balance.accountId] = balance.total;
-        });
-        setBalances(balanceMap);
-        console.log("✅ Refreshed CCXT balance data");
-      }
-    } catch (error) {
-      console.error('Error refreshing data:', error);
-    }
+    await fetchData();
     setRefreshing(false);
   };
 
@@ -235,10 +236,12 @@ const TradesPage: React.FC = () => {
   const currentData = tabs.find(tab => tab.name === activeTab)?.data || [];
 
   // Calculate totals using real balance data
-  const totalBalance = Object.values(balances).reduce((a, b) => +a + +b, 0);
+  const totalBalance = connections.reduce((sum, conn) => {
+    return sum + (conn.data?.balance?.total || 0);
+  }, 0);
   const totalPnL = openPositions.reduce((sum, trade) => sum + trade.pnl, 0);
   const totalValue = totalBalance + totalPnL;
-  const activeAccounts = accounts.filter(acc => acc.status === "active");
+  const activeConnections = connections.filter(conn => conn.status === "active");
 
   return (
     <div className="p-6 space-y-6">
@@ -247,7 +250,7 @@ const TradesPage: React.FC = () => {
         <div className="flex items-center space-x-4">
           <h1 className="text-3xl font-bold text-white">Trading Dashboard</h1>
           <div className="flex items-center space-x-2 text-sm text-gray-400">
-            <span>{activeAccounts.length} accounts connected</span>
+            <span>{activeConnections.length} connections active</span>
           </div>
         </div>
         <div className="flex items-center space-x-3">
@@ -269,30 +272,35 @@ const TradesPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Account Balances Section */}
-      {accounts.length > 0 && (
+      {/* Connection Balances Section */}
+      {connections.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-          {accounts.map((account) => (
-            <div key={account.id} className="relative group">
+          {connections.map((connection) => (
+            <div key={connection.connectionId} className="relative group">
               <div className="absolute inset-0 bg-gradient-to-br from-blue-400/10 to-blue-600/10 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
               <div className="relative bg-gradient-to-br from-black to-gray-900 p-4 rounded-xl border border-gray-600/30 hover:border-blue-400/40 transition-all duration-300 shadow-2xl shadow-black/50">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-bold text-white text-sm truncate">{account.name}</h3>
+                  <h3 className="font-bold text-white text-sm truncate">{connection.metadata?.name || 'ByBit Connection'}</h3>
                   <span className={`text-xs px-2 py-1 rounded-full ${
-                    account.status === 'active' 
+                    connection.status === 'active' 
                       ? 'bg-green-500/20 text-green-300 border border-green-500/30'
                       : 'bg-gray-500/20 text-gray-300 border border-gray-500/30'
                   }`}>
-                    {account.status}
+                    {connection.status}
                   </span>
                 </div>
-                <div className="text-xs text-gray-400 mb-3">{account.broker} • {account.type}</div>
+                <div className="text-xs text-gray-400 mb-3">ByBit • Live</div>
                 <div className="text-lg font-bold text-white">
-                  {showBalances ? toCurrency(balances[account.id] || 0) : '●●●●●'}
+                  {showBalances ? toCurrency(connection.data?.balance?.total || 0) : '●●●●●'}
                 </div>
                 {showBalances && totalBalance > 0 && (
                   <div className="text-xs text-gray-400 mt-1">
-                    {((balances[account.id] || 0) / totalBalance * 100).toFixed(1)}% of total
+                    {((connection.data?.balance?.total || 0) / totalBalance * 100).toFixed(1)}% of total
+                  </div>
+                )}
+                {connection.data?.balance && (
+                  <div className="text-xs text-gray-500 mt-1">
+                    {connection.data.balance.coins?.length || 0} assets
                   </div>
                 )}
               </div>
@@ -389,9 +397,15 @@ const TradesPage: React.FC = () => {
       {/* Trades Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
         {currentData.length > 0 ? (
-          currentData.map((trade) => (
-            <TradeCard key={trade.id} trade={trade} />
-          ))
+          activeTab === 'Open Positions' ? (
+            currentData.map((trade) => (
+              <TradeCard key={trade.id} trade={trade} showOpenDate={true} />
+            ))
+          ) : (
+            currentData.map((trade) => (
+              <TradeCard key={trade.id} trade={trade} />
+            ))
+          )
         ) : (
           <div className="col-span-full">
             <div className="relative group">
@@ -416,8 +430,12 @@ const TradesPage: React.FC = () => {
           <span>📋</span>
           <span>Set Order</span>
         </button>
-        <button className="bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 text-white px-6 py-3 rounded-lg font-medium transition-all duration-300 shadow-lg hover:shadow-purple-400/30 flex items-center space-x-2">
-          <span>🔄</span>
+        <button 
+          onClick={handleRefresh}
+          disabled={refreshing || loading}
+          className="bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 disabled:opacity-50 text-white px-6 py-3 rounded-lg font-medium transition-all duration-300 shadow-lg hover:shadow-purple-400/30 flex items-center space-x-2"
+        >
+          <span className={refreshing ? 'animate-spin' : ''}>🔄</span>
           <span>Refresh Data</span>
         </button>
         <button className="bg-gradient-to-r from-gray-600 to-gray-500 hover:from-gray-500 hover:to-gray-400 text-white px-6 py-3 rounded-lg font-medium transition-all duration-300 shadow-lg hover:shadow-gray-400/30 flex items-center space-x-2">

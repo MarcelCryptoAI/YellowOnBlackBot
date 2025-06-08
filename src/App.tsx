@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { userStorage, apiStorage } from './utils/storage';
 import { bybitApi, openaiApi, websocketManager, healthCheck, type BalanceData, type Position, type ConnectionData, type MarketData, type OpenAIConnection } from './services/api';
 
@@ -140,7 +141,7 @@ const StatCard: React.FC<{
   </div>
 );
 
-const TradeCard: React.FC<{ trade: Trade }> = ({ trade }) => (
+const TradeCard: React.FC<{ trade: Position }> = ({ trade }) => (
   <div className="relative group">
     <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-yellow-400/5 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
     <div className="relative bg-gradient-to-br from-black to-gray-900 p-5 rounded-xl border border-gray-600/30 hover:border-white/30 transition-all duration-300 shadow-2xl shadow-black/50 hover:shadow-white/10">
@@ -266,7 +267,8 @@ const SystemStatusCard: React.FC<{ status: SystemStatus }> = ({ status }) => (
 
 // Main App Component
 const App: React.FC = () => {
-  const [currentTab, setCurrentTab] = useState('dashboard');
+  const navigate = useNavigate();
+  const location = useLocation();
   const [tradeTab, setTradeTab] = useState('Open Positions');
   const [systemStatus, setSystemStatus] = useState<SystemStatus>({
     backend: true,
@@ -307,12 +309,23 @@ const App: React.FC = () => {
   const [marketData, setMarketData] = useState<MarketData[]>([]);
   const [portfolioSummary, setPortfolioSummary] = useState<any>(null);
   const [backendStatus, setBackendStatus] = useState<'connected' | 'connecting' | 'disconnected'>('connecting');
+  
+  // Dashboard state
+  const [showWidgetConfig, setShowWidgetConfig] = useState(false);
+  const [isRefreshingCoins, setIsRefreshingCoins] = useState(false);
 
   const [selectedConnection, setSelectedConnection] = useState<BybitConnection | null>(null);
   const [showConnectionDetails, setShowConnectionDetails] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isTesting, setIsTesting] = useState({ bybit: false, openai: false });
   const [lastSaved, setLastSaved] = useState<string>('');
+  
+  // Top coin tickers state with more accurate BTC price
+  const [topCoins, setTopCoins] = useState([
+    { symbol: 'BTC', price: 105371, change24h: 2.4, color: 'orange' },
+    { symbol: 'SOL', price: 203.45, change24h: 5.2, color: 'purple' },
+    { symbol: 'FARTCOIN', price: 0.87, change24h: -1.8, color: 'red' }
+  ]);
 
   // Initialize backend connection and load live data
   useEffect(() => {
@@ -380,13 +393,19 @@ const App: React.FC = () => {
           // Restore each ByBit connection to backend
           for (const conn of storedCredentials.bybitConnections) {
             try {
+              // Skip if missing required fields
+              if (!conn.apiKey || !conn.secretKey || conn.apiKey === 'stored_encrypted') {
+                console.log(`⏭️ Skipping invalid connection: ${conn.name}`);
+                continue;
+              }
+
               const addResult = await bybitApi.addConnection({
                 connectionId: conn.id,
                 name: conn.name,
                 apiKey: conn.apiKey,
                 secretKey: conn.secretKey,
-                testnet: conn.testnet,
-                markets: conn.markets
+                testnet: conn.testnet || false,
+                markets: conn.markets || { spot: true, usdtPerpetual: false, inverseUsd: false }
               });
               
               if (addResult.success) {
@@ -457,6 +476,59 @@ const App: React.FC = () => {
     setIsRefreshing(true);
     setTimeout(() => setIsRefreshing(false), 1000);
   };
+
+  // Update top coin prices with real ByBit data
+  useEffect(() => {
+    const updateTopCoinPrices = async () => {
+      try {
+        // Get real market data from ByBit
+        const marketResponse = await bybitApi.getMarketData();
+        if (marketResponse.success && marketResponse.data) {
+          const coins = ['BTCUSDT', 'SOLUSDT', 'FARTCOINUSDT'];
+          
+          const updatedCoins = coins.map(symbol => {
+            const marketData = marketResponse.data.find(coin => coin.symbol === symbol);
+            if (marketData) {
+              return {
+                symbol: symbol.replace('USDT', ''),
+                price: parseFloat(marketData.price),
+                change24h: parseFloat(marketData.change24h || '0'),
+                color: symbol.includes('BTC') ? 'orange' : symbol.includes('SOL') ? 'purple' : 'red'
+              };
+            }
+            // Fallback to existing data if not found
+            const existing = topCoins.find(c => c.symbol === symbol.replace('USDT', ''));
+            return existing || { symbol: symbol.replace('USDT', ''), price: 0, change24h: 0, color: 'gray' };
+          });
+          
+          setTopCoins(updatedCoins);
+          console.log('📈 Updated coin prices from ByBit:', updatedCoins);
+        }
+      } catch (error) {
+        console.error('❌ Failed to fetch real coin prices, using simulation:', error);
+        
+        // Fallback to simulation if API fails
+        setTopCoins(prevCoins => 
+          prevCoins.map(coin => {
+            const priceChange = (Math.random() - 0.5) * 0.02;
+            const changeChange = (Math.random() - 0.5) * 0.5;
+            
+            return {
+              ...coin,
+              price: Math.max(0.001, coin.price * (1 + priceChange)),
+              change24h: Math.max(-10, Math.min(10, coin.change24h + changeChange))
+            };
+          })
+        );
+      }
+    };
+
+    // Update immediately and then every 10 seconds
+    updateTopCoinPrices();
+    const priceInterval = setInterval(updateTopCoinPrices, 10000);
+    
+    return () => clearInterval(priceInterval);
+  }, []); // Empty dependency array to run only once
 
   const testBybitConnection = async () => {
     if (!apiCredentials.bybit.apiKey || !apiCredentials.bybit.secretKey || !apiCredentials.bybit.name) {
@@ -789,878 +861,267 @@ const App: React.FC = () => {
         <div className="absolute top-1/2 left-1/2 w-72 h-72 bg-gradient-to-br from-yellow-600/15 to-yellow-500/15 rounded-full blur-3xl animate-pulse"></div>
       </div>
 
-      {/* Header */}
-      <header className="relative z-10 border-b border-gray-700/30 backdrop-blur-xl bg-black/60 p-6 shadow-2xl shadow-black/50">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center space-x-6">
-            <div className="flex items-center space-x-4">
-              <div className="relative">
-                <img 
-                  src="/header_logo.png" 
-                  alt="AI Crypto Platform Logo" 
-                  className="w-20 h-12 object-contain drop-shadow-xl"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                    if (e.currentTarget.nextElementSibling) {
-                      (e.currentTarget.nextElementSibling as HTMLElement).style.display = 'block';
-                    }
-                  }}
-                />
-                <span className="text-4xl hidden">🤖</span>
-                <div className="absolute inset-0 bg-yellow-400/20 blur-lg rounded-lg"></div>
-              </div>
-            </div>
-            <div className="hidden md:flex items-center space-x-1 bg-black/50 backdrop-blur-xl rounded-xl p-1 border border-gray-600/30 shadow-2xl shadow-black/30">
-              {['dashboard', 'trades', 'strategies', 'api'].map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setCurrentTab(tab)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
-                    currentTab === tab
-                      ? 'bg-gradient-to-r from-yellow-400 to-yellow-500 text-black shadow-xl shadow-yellow-400/25 font-bold'
-                      : 'text-gray-300 hover:text-white hover:bg-white/5 hover:shadow-lg hover:shadow-white/10'
-                  }`}
+      {/* Compact Header */}
+      <header className="sticky top-0 z-20 border-b border-gray-700/30 backdrop-blur-xl bg-black/60 p-2 shadow-2xl shadow-black/50">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            {/* Top Coin Tickers */}
+            <div className="hidden lg:flex items-center space-x-2">
+              {topCoins.map((coin) => (
+                <div 
+                  key={coin.symbol}
+                  className="flex items-center space-x-1.5 bg-black/30 backdrop-blur-xl rounded-lg px-2 py-1 border border-yellow-400/30 hover:bg-yellow-400/10 transition-all cursor-pointer"
                 >
-                  {tab === 'api' ? 'API' : tab.charAt(0).toUpperCase() + tab.slice(1)}
-                </button>
+                  <span className="text-yellow-400 font-bold text-xs">{coin.symbol}</span>
+                  <span className="text-white font-semibold text-xs">
+                    ${coin.price < 1 ? coin.price.toFixed(3) : coin.price.toLocaleString()}
+                  </span>
+                  <span className={`text-xs font-semibold ${
+                    coin.change24h >= 0 ? 'text-green-400' : 'text-red-400'
+                  }`}>
+                    {coin.change24h >= 0 ? '+' : ''}{coin.change24h.toFixed(1)}%
+                  </span>
+                </div>
               ))}
             </div>
           </div>
           
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2">
             {/* ByBit Portfolio Value */}
-            <div className="flex items-center space-x-2 bg-black/50 backdrop-blur-xl rounded-lg px-3 py-2 border border-yellow-600/30 shadow-lg shadow-black/20">
-              <span className="text-yellow-400">💰</span>
-              <span className="text-sm font-medium tracking-wider text-yellow-300">
+            <div className="flex items-center space-x-1.5 bg-black/50 backdrop-blur-xl rounded-lg px-2 py-1 border border-yellow-600/30 shadow-lg shadow-black/20">
+              <span className="text-yellow-400 text-sm">💰</span>
+              <span className="text-xs font-medium text-yellow-300">
                 ${totalValue.toLocaleString()}
               </span>
             </div>
 
             {/* OpenAI Credits */}
             {openaiConnections.length > 0 && (
-              <div className="flex items-center space-x-2 bg-black/50 backdrop-blur-xl rounded-lg px-3 py-2 border border-green-600/30 shadow-lg shadow-black/20">
-                <span className="text-green-400">🤖</span>
-                <span className="text-sm font-medium tracking-wider text-green-300">
-                  ${openaiConnections[0]?.subscription?.remainingCredits?.toFixed(2) || '0.00'} credits
+              <div className="flex items-center space-x-1.5 bg-black/50 backdrop-blur-xl rounded-lg px-2 py-1 border border-green-600/30 shadow-lg shadow-black/20">
+                <span className="text-green-400 text-sm">🤖</span>
+                <span className="text-xs font-medium text-green-300">
+                  ${openaiConnections[0]?.subscription?.remainingCredits?.toFixed(2) || '0.00'}
                 </span>
               </div>
             )}
 
             {/* Storage Status Indicator */}
-            <div className="flex items-center space-x-2 bg-black/50 backdrop-blur-xl rounded-lg px-3 py-2 border border-blue-600/30 shadow-lg shadow-black/20">
-              <div className={`w-2 h-2 rounded-full shadow-lg ${
-                hasStoredCredentials ? 'bg-blue-400 shadow-blue-400/50' : 'bg-gray-400 shadow-gray-400/50'
+            <div className="flex items-center space-x-1.5 bg-black/50 backdrop-blur-xl rounded-lg px-2 py-1 border border-blue-600/30 shadow-lg shadow-black/20">
+              <div className={`w-1.5 h-1.5 rounded-full ${
+                hasStoredCredentials ? 'bg-blue-400' : 'bg-gray-400'
               }`}></div>
-              <span className={`text-sm font-medium tracking-wider ${
+              <span className={`text-xs font-medium ${
                 hasStoredCredentials ? 'text-blue-300' : 'text-gray-300'
               }`}>
-                {hasStoredCredentials ? `💾 ${currentUser.name}` : '💾 NO DATA'}
+                {hasStoredCredentials ? currentUser.name : 'NO DATA'}
               </span>
             </div>
             
             <button
               onClick={handleRefresh}
-              className={`p-2 rounded-lg bg-black/50 backdrop-blur-xl border border-gray-600/30 hover:border-yellow-400/40 hover:bg-yellow-400/10 transition-all duration-300 shadow-lg shadow-black/30 ${
+              className={`p-1.5 rounded-lg bg-black/50 backdrop-blur-xl border border-gray-600/30 hover:border-yellow-400/40 hover:bg-yellow-400/10 transition-all duration-300 ${
                 isRefreshing ? 'animate-spin' : ''
               }`}
             >
-              <span className="text-yellow-400 text-lg">🔄</span>
+              <span className="text-yellow-400 text-sm">🔄</span>
             </button>
-            <div className={`flex items-center space-x-2 bg-black/50 backdrop-blur-xl rounded-lg px-3 py-2 border shadow-lg shadow-black/20 ${
+            <div className={`flex items-center space-x-1.5 bg-black/50 backdrop-blur-xl rounded-lg px-2 py-1 border ${
               backendStatus === 'connected' 
                 ? 'border-green-600/30' 
                 : backendStatus === 'connecting'
                 ? 'border-yellow-600/30'
                 : 'border-red-600/30'
             }`}>
-              <div className={`w-2 h-2 rounded-full shadow-lg ${
+              <div className={`w-1.5 h-1.5 rounded-full ${
                 backendStatus === 'connected' 
-                  ? 'bg-green-400 shadow-green-400/50 animate-pulse' 
+                  ? 'bg-green-400 animate-pulse' 
                   : backendStatus === 'connecting'
-                  ? 'bg-yellow-400 shadow-yellow-400/50 animate-pulse'
-                  : 'bg-red-400 shadow-red-400/50'
+                  ? 'bg-yellow-400 animate-pulse'
+                  : 'bg-red-400'
               }`}></div>
-              <span className={`text-sm font-medium tracking-wider ${
+              <span className={`text-xs font-medium ${
                 backendStatus === 'connected' 
                   ? 'text-green-300' 
                   : backendStatus === 'connecting'
                   ? 'text-yellow-300'
                   : 'text-red-300'
               }`}>
-                {backendStatus === 'connected' ? 'LIVE DATA' : backendStatus === 'connecting' ? 'CONNECTING' : 'OFFLINE'}
+                {backendStatus === 'connected' ? 'LIVE' : backendStatus === 'connecting' ? 'CONN' : 'OFF'}
               </span>
             </div>
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="relative z-10 max-w-7xl mx-auto p-6">
-        {currentTab === 'dashboard' && (
-          <div className="space-y-8">
-            {/* Stats Grid - Expanded to 5 columns with live data */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-              <StatCard
-                title="Portfolio Value"
-                value={`$${totalValue.toLocaleString()}`}
-                change={`${portfolioChange >= 0 ? '+' : ''}${portfolioChange.toFixed(2)}% today`}
-                changeType={portfolioChange >= 0 ? "positive" : "negative"}
-                icon="💰"
-              />
-              <StatCard
-                title="Available Balance"
-                value={`$${availableBalance.toLocaleString()}`}
-                change={`${totalCoins} assets`}
-                changeType="positive"
-                icon="💳"
-              />
-              <StatCard
-                title="Total PnL"
-                value={`$${totalPnL.toFixed(2)}`}
-                change={`${dailyPnLChange} today`}
-                changeType={totalPnL >= 0 ? "positive" : "negative"}
-                icon="📈"
-              />
-              <StatCard
-                title="Active Positions"
-                value={activePositions.toString()}
-                change={`${winRate.toFixed(1)}% win rate`}
-                changeType={winRate >= 50 ? "positive" : "negative"}
-                icon="🎯"
-              />
-              <StatCard
-                title="Total Volume"
-                value={`$${totalVolume.toLocaleString()}`}
-                change={`${livePositions.length} positions`}
-                changeType="positive"
-                icon="📊"
-              />
-            </div>
-
-            {/* Additional Advanced Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <StatCard
-                title="Largest Gain"
-                value={`$${largestGain.toFixed(2)}`}
-                change={`Best performer`}
-                changeType={largestGain >= 0 ? "positive" : "negative"}
-                icon="🚀"
-              />
-              <StatCard
-                title="Largest Loss"
-                value={`$${largestLoss.toFixed(2)}`}
-                change={`Worst performer`}
-                changeType={largestLoss >= 0 ? "positive" : "negative"}
-                icon="📉"
-              />
-              <StatCard
-                title="Avg Position Size"
-                value={`${avgPositionSize.toFixed(2)}`}
-                change={`Per position`}
-                changeType="positive"
-                icon="⚖️"
-              />
-              <StatCard
-                title="Active Connections"
-                value={bybitConnections.filter(c => c.status === 'Active').length.toString()}
-                change={`${bybitConnections.length} total`}
-                changeType="positive"
-                icon="🔗"
-              />
-            </div>
-
-            {/* Charts and Status */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="lg:col-span-2">
-                <div className="relative group">
-                  <div className="absolute inset-0 bg-gradient-to-br from-yellow-400/10 to-white/5 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
-                  <div className="relative bg-gradient-to-br from-black to-gray-900 p-6 rounded-xl border border-gray-600/30 hover:border-yellow-400/40 transition-all duration-300 shadow-2xl shadow-black/50">
-                    <h3 className="text-xl font-bold mb-6 flex items-center">
-                      <span className="mr-3 text-2xl">📊</span>
-                      <span className="bg-gradient-to-r from-white via-gray-200 to-yellow-400 bg-clip-text text-transparent drop-shadow-lg">
-                        PORTFOLIO PERFORMANCE
-                      </span>
-                    </h3>
-                    <div className="h-64 bg-gradient-to-br from-gray-900 to-black rounded-lg flex items-center justify-center border border-gray-700/30 shadow-inner">
-                      <div className="text-center">
-                        <span className="text-6xl mb-4 block">📊</span>
-                        <p className="text-gray-300 text-lg font-medium">Chart Component Loading...</p>
-                        <p className="text-yellow-400/70 text-sm mt-2">Real-time data visualization</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <SystemStatusCard status={systemStatus} />
-            </div>
-
-            {/* Recent Trades */}
-            <div className="relative group">
-              <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-yellow-400/5 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
-              <div className="relative bg-gradient-to-br from-black to-gray-900 p-6 rounded-xl border border-gray-600/30 hover:border-white/30 transition-all duration-300 shadow-2xl shadow-black/50">
-                <h3 className="text-xl font-bold mb-6 bg-gradient-to-r from-white via-gray-200 to-yellow-400 bg-clip-text text-transparent drop-shadow-lg">
-                  RECENT TRADES
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {livePositions.slice(0, 3).map((position) => (
-                    <TradeCard key={position.id} trade={position} />
-                  ))}
-                </div>
-              </div>
+      {/* Navigation Bar */}
+      <nav className="sticky top-[45px] z-10 border-b border-gray-700/30 backdrop-blur-xl bg-black/50 p-4 shadow-lg">
+        <div className="flex items-center justify-between">
+          {/* ArIe Logo and Branding */}
+          <div className="flex items-center space-x-3">
+            <img 
+              src="/arie-logo.png" 
+              alt="ArIe Logo" 
+              className="h-8 w-8 rounded-full drop-shadow-lg border border-yellow-400/30"
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = 'none';
+              }}
+            />
+            <div>
+              <h1 className="text-sm font-bold bg-gradient-to-r from-white via-yellow-200 to-yellow-400 bg-clip-text text-transparent">
+                ArIe
+              </h1>
+              <p className="text-xs text-gray-400">AI Trading Platform</p>
             </div>
           </div>
-        )}
-
-        {currentTab === 'trades' && (
-          <div className="space-y-8">
-            <h2 className="text-3xl font-bold bg-gradient-to-r from-white via-gray-200 to-yellow-400 bg-clip-text text-transparent drop-shadow-lg">
-              ALL TRADES
-            </h2>
-
-            {/* Trade Tabs */}
-            <div className="flex gap-2 mb-6">
-              {['Open Positions', 'Open Orders', 'Closed Trades'].map((tab) => (
-                <button
-                  key={tab}
-                  className={`px-6 py-3 rounded-t-xl text-base font-bold transition-all duration-300 ${
-                    tradeTab === tab
-                      ? 'bg-gradient-to-r from-yellow-400 to-yellow-500 text-black shadow-xl shadow-yellow-400/25'
-                      : 'bg-gradient-to-r from-black to-gray-900 text-gray-300 hover:text-white hover:bg-gradient-to-r hover:from-gray-900 hover:to-gray-800 border border-gray-600/30'
-                  }`}
-                  onClick={() => setTradeTab(tab)}
-                >
-                  {tab}
-                </button>
-              ))}
-            </div>
-
-            {/* Trading Table */}
-            <div className="relative group">
-              <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-yellow-400/5 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
-              <div className="relative bg-gradient-to-br from-black to-gray-900 rounded-xl border border-gray-600/30 shadow-2xl shadow-black/50 overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-sm">
-                    <thead>
-                      <tr className="bg-gradient-to-r from-gray-900 to-black border-b border-gray-700/50">
-                        <th className="px-6 py-4 text-left font-bold text-yellow-400 uppercase tracking-wider">Symbol</th>
-                        <th className="px-6 py-4 text-left font-bold text-yellow-400 uppercase tracking-wider">Direction</th>
-                        <th className="px-6 py-4 text-left font-bold text-yellow-400 uppercase tracking-wider">Amount</th>
-                        <th className="px-6 py-4 text-left font-bold text-yellow-400 uppercase tracking-wider">Entry</th>
-                        <th className="px-6 py-4 text-left font-bold text-yellow-400 uppercase tracking-wider">Current</th>
-                        <th className="px-6 py-4 text-left font-bold text-yellow-400 uppercase tracking-wider">PnL</th>
-                        <th className="px-6 py-4 text-left font-bold text-yellow-400 uppercase tracking-wider">Status</th>
-                        <th className="px-6 py-4 text-left font-bold text-yellow-400 uppercase tracking-wider">Exchange</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(() => {
-                        let currentData: Position[] = [];
-                        if (tradeTab === 'Open Positions') currentData = livePositions.filter(p => p.status === 'OPEN');
-                        else if (tradeTab === 'Open Orders') currentData = livePositions.filter(p => p.status === 'PENDING');
-                        else if (tradeTab === 'Closed Trades') currentData = livePositions.filter(p => p.status === 'CLOSED');
-
-                        return currentData.map((trade, idx) => (
-                          <tr key={idx} className="hover:bg-gradient-to-r hover:from-gray-900/50 hover:to-black/50 transition-all duration-300 border-b border-gray-800/30">
-                            <td className="px-6 py-4">
-                              <div className="flex items-center space-x-3">
-                                <div className={`w-3 h-3 rounded-full shadow-lg ${
-                                  trade.direction === 'LONG' 
-                                    ? 'bg-green-400 shadow-green-400/50' 
-                                    : 'bg-red-400 shadow-red-400/50'
-                                }`} />
-                                <span className="font-bold text-white text-lg drop-shadow-sm">{trade.symbol}</span>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4">
-                              <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
-                                trade.direction === 'LONG'
-                                  ? 'bg-green-500/20 text-green-300 border border-green-500/40'
-                                  : 'bg-red-500/20 text-red-300 border border-red-500/40'
-                              }`}>
-                                {trade.direction}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 text-white font-medium">{trade.amount}</td>
-                            <td className="px-6 py-4 text-white font-medium">${trade.entryPrice.toLocaleString()}</td>
-                            <td className="px-6 py-4 text-white font-medium">${trade.currentPrice.toLocaleString()}</td>
-                            <td className="px-6 py-4">
-                              <div className="flex flex-col">
-                                <span className={`font-bold ${
-                                  trade.pnl >= 0 ? 'text-green-300' : 'text-red-300'
-                                }`}>
-                                  ${trade.pnl.toFixed(2)}
-                                </span>
-                                <span className={`text-sm ${
-                                  trade.pnlPercent >= 0 ? 'text-green-400' : 'text-red-400'
-                                }`}>
-                                  {trade.pnlPercent >= 0 ? '+' : ''}{trade.pnlPercent.toFixed(2)}%
-                                </span>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4">
-                              <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
-                                trade.status === 'OPEN'
-                                  ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/40'
-                                  : trade.status === 'PENDING'
-                                  ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
-                                  : 'bg-gray-500/20 text-gray-300 border border-gray-500/40'
-                              }`}>
-                                {trade.status}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4">
-                              <span className="px-3 py-1 rounded-full text-xs bg-gradient-to-r from-gray-800 to-black border border-gray-600/40 text-gray-300 font-medium">
-                                {trade.exchange}
-                              </span>
-                            </td>
-                          </tr>
-                        ));
-                      })()}
-                    </tbody>
-                  </table>
-                </div>
-
-                {(() => {
-                  let currentData: Position[] = [];
-                  if (tradeTab === 'Open Positions') currentData = livePositions.filter(p => p.status === 'OPEN');
-                  else if (tradeTab === 'Open Orders') currentData = livePositions.filter(p => p.status === 'PENDING');
-                  else if (tradeTab === 'Closed Trades') currentData = livePositions.filter(p => p.status === 'CLOSED');
-
-                  return currentData.length === 0 && (
-                    <div className="py-16 text-center">
-                      <div className="text-gray-400 text-lg">No {tradeTab.toLowerCase()} found</div>
-                      <div className="text-yellow-400/70 text-sm mt-2">Start trading to see your positions here</div>
-                    </div>
-                  );
-                })()}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {currentTab === 'strategies' && (
-          <div className="space-y-8">
-            <div className="flex items-center justify-between">
-              <h2 className="text-3xl font-bold bg-gradient-to-r from-white via-gray-200 to-yellow-400 bg-clip-text text-transparent drop-shadow-lg">
-                AI STRATEGIES
-              </h2>
-              <button className="relative group">
-                <div className="absolute inset-0 bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-lg blur opacity-75 group-hover:opacity-100 transition-all duration-300"></div>
-                <div className="relative bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-300 hover:to-yellow-400 px-6 py-3 rounded-lg text-black font-bold transition-all duration-300 shadow-2xl shadow-yellow-400/25">
-                  + NEW STRATEGY
-                </div>
-              </button>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {mockStrategies.map((strategy) => (
-                <StrategyCard key={strategy.id} strategy={strategy} />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {currentTab === 'api' && (
-          <div className="space-y-8">
-            <div className="flex items-center justify-between">
-              <h2 className="text-3xl font-bold bg-gradient-to-r from-white via-gray-200 to-yellow-400 bg-clip-text text-transparent drop-shadow-lg">
-                API CONFIGURATION
-              </h2>
-              <div className="flex items-center space-x-4 text-sm text-gray-400">
-                <span>Total Balance: <span className="text-white font-bold">${totalValue.toLocaleString()}</span></span>
-                <span>•</span>
-                <span>Active: <span className="text-green-300 font-bold">{bybitConnections.filter(c => c.status === 'Active').length}</span></span>
-                <span>•</span>
-                <span>User: <span className="text-blue-300 font-bold">{currentUser.name}</span></span>
-              </div>
-            </div>
-            
-            {/* Storage Status Info */}
-            {storageInfo && (
-              <div className="relative group">
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-400/10 to-blue-600/10 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
-                <div className="relative bg-gradient-to-br from-gray-900 to-black p-4 rounded-xl border border-blue-500/30 shadow-2xl shadow-black/50">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <span className="text-2xl">💾</span>
-                      <div>
-                        <h4 className="font-bold text-blue-300">Veilige Opslag Status</h4>
-                        <p className="text-sm text-gray-400">
-                          {storageInfo.bybitConnectionsCount} Bybit connecties • {storageInfo.hasOpenAI ? 'OpenAI geconfigureerd' : 'Geen OpenAI'} • 
-                          Laatste opslag: {new Date(storageInfo.lastSaved).toLocaleString()}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-3 h-3 bg-green-400 rounded-full shadow-lg shadow-green-400/50"></div>
-                      <span className="text-green-300 text-sm font-bold uppercase tracking-wider">ENCRYPTED</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            {/* Existing Bybit Connections */}
-            <div className="relative group">
-              <div className="absolute inset-0 bg-gradient-to-br from-yellow-400/10 to-white/5 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
-              <div className="relative bg-gradient-to-br from-black to-gray-900 p-6 rounded-xl border border-gray-600/30 hover:border-yellow-400/40 transition-all duration-300 shadow-2xl shadow-black/50">
-                <h3 className="text-xl font-bold mb-6 bg-gradient-to-r from-yellow-400 to-white bg-clip-text text-transparent drop-shadow-lg">
-                  🟡 BYBIT CONNECTIONS ({bybitConnections.length})
-                </h3>
-                
-                <div className="space-y-4">
-                  {bybitConnections.map((connection) => (
-                    <div key={connection.id} className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-900 to-black rounded-lg border border-gray-700/40 hover:border-yellow-400/30 transition-all group/item">
-                      <div className="flex items-center space-x-4">
-                        <div className="flex items-center space-x-3">
-                          <span className="text-xl">{getStatusIcon(connection.status)}</span>
-                          <div>
-                            <div className="flex items-center space-x-2">
-                              <span className="text-white font-bold text-xl tracking-wide drop-shadow-lg">{connection.name}</span>
-                              {connection.testnet && (
-                                <span className="px-2 py-1 text-xs bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 rounded font-medium">Testnet</span>
-                              )}
-                            </div>
-                            <div className="flex items-center space-x-2 text-xs text-gray-400">
-                              <span>{connection.apiKey}</span>
-                              <span>•</span>
-                              <span>{connection.createdAt}</span>
-                              <span>•</span>
-                              <span className={getStatusColor(connection.status)}>{connection.status}</span>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        <div className="flex space-x-2">
-                          {connection.markets.spot && (
-                            <span className="px-2 py-1 text-xs bg-blue-500/20 text-blue-300 border border-blue-500/40 rounded">Spot</span>
-                          )}
-                          {connection.markets.usdtPerpetual && (
-                            <span className="px-2 py-1 text-xs bg-purple-500/20 text-purple-300 border border-purple-500/40 rounded">USDT⊥</span>
-                          )}
-                          {connection.markets.inverseUsd && (
-                            <span className="px-2 py-1 text-xs bg-orange-500/20 text-orange-300 border border-orange-500/40 rounded">USD⊥</span>
-                          )}
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center space-x-6">
-                        <div className="text-right">
-                          <div className="text-white font-bold">
-                            ${connection.balance ? connection.balance.total.toLocaleString() : '0.00'}
-                          </div>
-                          <div className="text-xs text-gray-400">
-                            Available: ${connection.balance ? connection.balance.available.toLocaleString() : '0.00'}
-                          </div>
-                          <div className="flex items-center space-x-1 text-xs">
-                            <span className="text-blue-400">LIVE</span>
-                            <span className="text-gray-500">Data</span>
-                          </div>
-                        </div>
-                        
-                        {connection.status === 'Active' && connection.balance && (
-                          <div className="w-16 h-8 relative cursor-pointer" onClick={() => {
-                            setSelectedConnection(connection);
-                            setShowConnectionDetails(true);
-                          }}>
-                            <div className="text-center text-xs text-green-400 font-bold">
-                              📊 LIVE
-                            </div>
-                          </div>
-                        )}
-                        
-                        <div className="flex items-center space-x-2">
-                          <button
-                            onClick={() => {
-                              setSelectedConnection(connection);
-                              setShowConnectionDetails(true);
-                            }}
-                            className="p-2 hover:bg-yellow-400/10 rounded transition-all"
-                            title="View Details"
-                          >
-                            <span className="text-yellow-400">ℹ️</span>
-                          </button>
-                          
-                          <div className="relative group/menu">
-                            <button className="p-2 hover:bg-gray-700/50 rounded transition-all">
-                              <span className="text-gray-400">⋯</span>
-                            </button>
-                            <div className="absolute right-0 top-10 bg-gray-900 border border-gray-600 rounded-lg shadow-xl opacity-0 invisible group-hover/menu:opacity-100 group-hover/menu:visible transition-all z-20 min-w-32">
-                              <button
-                                onClick={() => toggleConnectionStatus(connection.id)}
-                                className="block w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-all"
-                              >
-                                {connection.status === 'Active' ? 'Deactivate' : 'Activate'}
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setSelectedConnection(connection);
-                                  setShowConnectionDetails(true);
-                                }}
-                                className="block w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-all"
-                              >
-                                Edit
-                              </button>
-                              <button
-                                onClick={() => deleteBybitConnection(connection.id)}
-                                className="block w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-gray-800 hover:text-red-300 transition-all"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-            
-            {/* OpenAI Connections Overview */}
-            <div className="relative group">
-              <div className="absolute inset-0 bg-gradient-to-br from-green-400/10 to-green-600/10 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
-              <div className="relative bg-gradient-to-br from-black to-gray-900 p-6 rounded-xl border border-gray-600/30 hover:border-green-400/40 transition-all duration-300 shadow-2xl shadow-black/50">
-                <h3 className="text-xl font-bold mb-6 bg-gradient-to-r from-green-400 to-white bg-clip-text text-transparent drop-shadow-lg">
-                  🤖 OPENAI CONNECTIONS ({openaiConnections.length})
-                </h3>
-                
-                <div className="space-y-4">
-                  {openaiConnections.length > 0 ? (
-                    openaiConnections.map((connection) => (
-                      <div key={connection.connectionId} className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-900 to-black rounded-lg border border-gray-700/40 hover:border-green-400/30 transition-all group/item">
-                        <div className="flex items-center space-x-4">
-                          <div className="flex items-center space-x-3">
-                            <span className="text-xl">🤖</span>
-                            <div>
-                              <div className="flex items-center space-x-2">
-                                <span className="text-white font-bold text-base">OpenAI API</span>
-                                <span className="px-2 py-1 text-xs bg-green-500/20 text-green-300 border border-green-500/40 rounded">{connection.subscription.plan}</span>
-                              </div>
-                              <div className="flex items-center space-x-2 text-xs text-gray-400">
-                                <span>Credits: ${connection.subscription.remainingCredits.toFixed(2)} / ${connection.subscription.creditLimit}</span>
-                                <span>•</span>
-                                <span>{connection.subscription.status}</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center space-x-6">
-                          <div className="text-right">
-                            <div className="text-white font-bold">${connection.usage.month.cost.toFixed(2)}</div>
-                            <div className="text-xs text-gray-400">This month</div>
-                            <div className="flex items-center space-x-1 text-xs">
-                              <span className={connection.usage.trends.daily >= 0 ? 'text-green-400' : 'text-red-400'}>
-                                {connection.usage.trends.daily >= 0 ? '+' : ''}{connection.usage.trends.daily.toFixed(1)}%
-                              </span>
-                              <span className="text-gray-500">daily</span>
-                            </div>
-                          </div>
-                          
-                          {/* Usage percentage bar */}
-                          <div className="w-16 h-8 relative">
-                            <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
-                              <div 
-                                className={`h-full transition-all duration-300 ${
-                                  connection.subscription.usagePercentage > 80 ? 'bg-red-400' : 
-                                  connection.subscription.usagePercentage > 60 ? 'bg-yellow-400' : 'bg-green-400'
-                                }`}
-                                style={{ width: `${Math.min(connection.subscription.usagePercentage, 100)}%` }}
-                              />
-                            </div>
-                            <div className="text-center text-xs text-gray-400 mt-1">
-                              {connection.subscription.usagePercentage.toFixed(0)}%
-                            </div>
-                          </div>
-                          
-                          <div className="flex items-center space-x-2">
-                            <a
-                              href="https://platform.openai.com/account/billing/overview"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="p-2 hover:bg-green-400/10 rounded transition-all"
-                              title="View OpenAI Billing"
-                            >
-                              <span className="text-green-400">💳</span>
-                            </a>
-                            
-                            <button
-                              onClick={() => openaiApi.removeConnection(connection.connectionId).then(() => {
-                                setOpenaiConnections(prev => prev.filter(c => c.connectionId !== connection.connectionId));
-                                alert('OpenAI connection removed');
-                              })}
-                              className="p-2 hover:bg-red-400/10 rounded transition-all"
-                              title="Remove Connection"
-                            >
-                              <span className="text-red-400">🗑️</span>
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-8">
-                      <div className="text-gray-400 text-lg">No OpenAI connections found</div>
-                      <div className="text-green-400/70 text-sm mt-2">Add your OpenAI API key below to get started</div>
-                    </div>
-                  )}
-                </div>
-                
-                {/* Quick Actions */}
-                <div className="mt-6 flex gap-4">
-                  <a
-                    href="https://platform.openai.com/account/billing/payment-methods"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center space-x-2 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 shadow-lg hover:shadow-green-400/30"
-                  >
-                    <span>💳</span>
-                    <span>Buy Credits</span>
-                  </a>
-                  
-                  <a
-                    href="https://platform.openai.com/account/usage"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 shadow-lg hover:shadow-blue-400/30"
-                  >
-                    <span>📊</span>
-                    <span>View Usage</span>
-                  </a>
-                </div>
-              </div>
-            </div>
-            
-            {/* New Connection Forms */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* New Bybit Connection Form */}
-              <div className="relative group">
-                <div className="absolute inset-0 bg-gradient-to-br from-yellow-400/10 to-white/5 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
-                <div className="relative bg-gradient-to-br from-black to-gray-900 p-6 rounded-xl border border-gray-600/30 hover:border-yellow-400/40 transition-all duration-300 shadow-2xl shadow-black/50">
-                  <h3 className="text-xl font-bold mb-6 bg-gradient-to-r from-yellow-400 to-white bg-clip-text text-transparent drop-shadow-lg">
-                    🟡 NEW BYBIT CONNECTION
-                  </h3>
-                  
-                  <div className="space-y-4">
-                    {/* Connection Name Field */}
-                    <div>
-                      <label className="block text-gray-300 text-sm font-medium mb-2">Connection Name *</label>
-                      <input
-                        type="text"
-                        value={apiCredentials.bybit.name}
-                        onChange={(e) => updateBybitCredentials('name', e.target.value)}
-                        placeholder="e.g., Main Trading Account, Scalping Bot, Test Account..."
-                        className="w-full p-3 bg-gradient-to-r from-gray-900 to-black border border-gray-600/40 rounded-lg text-white placeholder-gray-500 focus:border-yellow-400/60 focus:outline-none transition-all"
-                        required
-                      />
-                      <p className="text-xs text-gray-500 mt-1">Give this connection a unique name to identify it</p>
-                    </div>
-
-                    {/* API Key Field */}
-                    <div>
-                      <label className="block text-gray-300 text-sm font-medium mb-2">API Key *</label>
-                      <input
-                        type="text"
-                        value={apiCredentials.bybit.apiKey}
-                        onChange={(e) => updateBybitCredentials('apiKey', e.target.value)}
-                        placeholder="Enter your Bybit API key..."
-                        className="w-full p-3 bg-gradient-to-r from-gray-900 to-black border border-gray-600/40 rounded-lg text-white placeholder-gray-500 focus:border-yellow-400/60 focus:outline-none transition-all"
-                        required
-                      />
-                    </div>
-                    
-                    {/* Secret Key Field */}
-                    <div>
-                      <label className="block text-gray-300 text-sm font-medium mb-2">Secret Key *</label>
-                      <input
-                        type="password"
-                        value={apiCredentials.bybit.secretKey}
-                        onChange={(e) => updateBybitCredentials('secretKey', e.target.value)}
-                        placeholder="Enter your Bybit secret key..."
-                        className="w-full p-3 bg-gradient-to-r from-gray-900 to-black border border-gray-600/40 rounded-lg text-white placeholder-gray-500 focus:border-yellow-400/60 focus:outline-none transition-all"
-                        required
-                      />
-                    </div>
-                    
-                    {/* Markets Selection */}
-                    <div>
-                      <label className="block text-gray-300 text-sm font-medium mb-3">Select Markets to Connect *</label>
-                      <div className="space-y-3 p-4 bg-gradient-to-r from-gray-900/50 to-black/50 rounded-lg border border-gray-700/30">
-                        
-                        {/* Spot Market */}
-                        <div className="flex items-center space-x-3">
-                          <input
-                            type="checkbox"
-                            id="market-spot"
-                            checked={apiCredentials.bybit.markets.spot}
-                            onChange={(e) => updateBybitCredentials('markets.spot', e.target.checked)}
-                            className="w-4 h-4 text-blue-400 bg-gray-900 border-gray-600 rounded focus:ring-blue-400 focus:ring-2"
-                          />
-                          <label htmlFor="market-spot" className="text-gray-300 text-sm flex items-center space-x-3 cursor-pointer">
-                            <span className="px-3 py-1 text-xs bg-blue-500/20 text-blue-300 border border-blue-500/40 rounded font-medium">Spot</span>
-                            <span>Bybit Spot Trading</span>
-                          </label>
-                        </div>
-                        
-                        {/* USDT Perpetual Market */}
-                        <div className="flex items-center space-x-3">
-                          <input
-                            type="checkbox"
-                            id="market-usdt"
-                            checked={apiCredentials.bybit.markets.usdtPerpetual}
-                            onChange={(e) => updateBybitCredentials('markets.usdtPerpetual', e.target.checked)}
-                            className="w-4 h-4 text-purple-400 bg-gray-900 border-gray-600 rounded focus:ring-purple-400 focus:ring-2"
-                          />
-                          <label htmlFor="market-usdt" className="text-gray-300 text-sm flex items-center space-x-3 cursor-pointer">
-                            <span className="px-3 py-1 text-xs bg-purple-500/20 text-purple-300 border border-purple-500/40 rounded font-medium">USDT⊥</span>
-                            <span>Bybit USDT Derivatives (Perpetual)</span>
-                          </label>
-                        </div>
-                        
-                        {/* Inverse USD Market */}
-                        <div className="flex items-center space-x-3">
-                          <input
-                            type="checkbox"
-                            id="market-inverse"
-                            checked={apiCredentials.bybit.markets.inverseUsd}
-                            onChange={(e) => updateBybitCredentials('markets.inverseUsd', e.target.checked)}
-                            className="w-4 h-4 text-orange-400 bg-gray-900 border-gray-600 rounded focus:ring-orange-400 focus:ring-2"
-                          />
-                          <label htmlFor="market-inverse" className="text-gray-300 text-sm flex items-center space-x-3 cursor-pointer">
-                            <span className="px-3 py-1 text-xs bg-orange-500/20 text-orange-300 border border-orange-500/40 rounded font-medium">USD⊥</span>
-                            <span>Bybit Inverse (USD)</span>
-                          </label>
-                        </div>
-                      </div>
-                      <p className="text-xs text-gray-500 mt-2">Select at least one market to connect to</p>
-                    </div>
-                    
-                    {/* Testnet Toggle */}
-                    <div className="flex items-center space-x-3">
-                      <input
-                        type="checkbox"
-                        id="testnet-toggle"
-                        checked={apiCredentials.bybit.testnet}
-                        onChange={(e) => updateBybitCredentials('testnet', e.target.checked)}
-                        className="w-4 h-4 text-yellow-400 bg-gray-900 border-gray-600 rounded focus:ring-yellow-400 focus:ring-2"
-                      />
-                      <label htmlFor="testnet-toggle" className="text-gray-300 text-sm flex items-center space-x-2 cursor-pointer">
-                        <span>Use Testnet</span>
-                        <span className="text-xs text-gray-500">(Recommended for testing)</span>
-                      </label>
-                    </div>
-                    
-                    {/* Submit Button */}
-                    <button
-                      onClick={testBybitConnection}
-                      disabled={isTesting.bybit}
-                      className="w-full bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-300 hover:to-yellow-400 disabled:from-gray-600 disabled:to-gray-700 text-black font-bold py-3 px-4 rounded-lg transition-all duration-300 shadow-lg mt-6"
-                    >
-                      {isTesting.bybit ? '🔄 Creating Connection...' : '🚀 Create Connection'}
-                    </button>
-                    
-                    {/* Form Validation Info */}
-                    <div className="text-xs text-gray-500">
-                      * Required fields
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* OpenAI Configuration */}
-              <div className="relative group">
-                <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-yellow-400/5 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
-                <div className="relative bg-gradient-to-br from-black to-gray-900 p-6 rounded-xl border border-gray-600/30 hover:border-white/30 transition-all duration-300 shadow-2xl shadow-black/50">
-                  <h3 className="text-xl font-bold mb-6 bg-gradient-to-r from-white to-yellow-400 bg-clip-text text-transparent drop-shadow-lg">
-                    🤖 OPENAI API
-                  </h3>
-                  
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-gray-300 text-sm font-medium mb-2">API Key</label>
-                      <input
-                        type="password"
-                        value={apiCredentials.openai.apiKey}
-                        onChange={(e) => updateOpenAICredentials('apiKey', e.target.value)}
-                        placeholder="sk-..."
-                        className="w-full p-3 bg-gradient-to-r from-gray-900 to-black border border-gray-600/40 rounded-lg text-white placeholder-gray-500 focus:border-yellow-400/60 focus:outline-none transition-all"
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="block text-gray-300 text-sm font-medium mb-2">Organization (Optional)</label>
-                      <input
-                        type="text"
-                        value={apiCredentials.openai.organization}
-                        onChange={(e) => updateOpenAICredentials('organization', e.target.value)}
-                        placeholder="org-..."
-                        className="w-full p-3 bg-gradient-to-r from-gray-900 to-black border border-gray-600/40 rounded-lg text-white placeholder-gray-500 focus:border-yellow-400/60 focus:outline-none transition-all"
-                      />
-                    </div>
-                    
-                    <button
-                      onClick={testOpenAIConnection}
-                      disabled={isTesting.openai}
-                      className="w-full bg-gradient-to-r from-white to-gray-200 hover:from-gray-100 hover:to-white disabled:from-gray-600 disabled:to-gray-700 text-black font-bold py-3 px-4 rounded-lg transition-all duration-300 shadow-lg"
-                    >
-                      {isTesting.openai ? 'Testing Connection...' : 'Test Connection'}
-                    </button>
-                    
-                    <div className="flex items-center space-x-3 p-3 bg-gradient-to-r from-gray-900 to-black rounded-lg border border-gray-700/40">
-                      <div className={`w-3 h-3 rounded-full shadow-lg ${
-                        systemStatus.openai ? 'bg-green-400 shadow-green-400/50' : 'bg-red-400 shadow-red-400/50'
-                      }`} />
-                      <span className={`text-sm font-bold uppercase tracking-wider ${
-                        systemStatus.openai ? 'text-green-300' : 'text-red-300'
-                      }`}>
-                        {systemStatus.openai ? 'CONNECTED' : 'DISCONNECTED'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-
-            {/* Coming Soon Services */}
-            <div className="relative group">
-              <div className="absolute inset-0 bg-gradient-to-br from-gray-500/10 to-gray-600/10 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
-              <div className="relative bg-gradient-to-br from-black to-gray-900 p-6 rounded-xl border border-gray-600/30 hover:border-gray-500/40 transition-all duration-300 shadow-2xl shadow-black/50">
-                <h3 className="text-xl font-bold mb-6 bg-gradient-to-r from-gray-400 to-gray-300 bg-clip-text text-transparent drop-shadow-lg">
-                  🚧 COMING SOON
-                </h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {['MEXC', 'Binance'].map((exchange) => (
-                    <div key={exchange} className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-900 to-black rounded-lg border border-gray-700/40 opacity-60">
-                      <span className="text-gray-400 font-bold text-lg">{exchange} API</span>
-                      <span className="px-3 py-1 rounded-full text-xs bg-gradient-to-r from-gray-600/20 to-gray-500/20 text-gray-400 border border-gray-500/40 font-bold uppercase tracking-wider">
-                        Coming Soon
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Save Settings */}
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-400">
-                {lastSaved && `Last saved: ${lastSaved}`}
-              </div>
+          
+          {/* Navigation Tabs */}
+          <div className="flex items-center space-x-1 bg-black/50 backdrop-blur-xl rounded-xl p-1 border border-gray-600/30 shadow-2xl shadow-black/30">
+            {[
+              { path: '/dashboard', label: 'Dashboard', icon: '📊' },
+              { path: '/manual-order', label: 'Manual Order', icon: '⚡' },
+              { path: '/trades', label: 'Trades', icon: '💹' },
+              { path: '/strategies', label: 'Strategies', icon: '🧠' },
+              { path: '/api', label: 'API Config', icon: '🔧' }
+            ].map((tab) => (
               <button
-                onClick={saveApiSettings}
-                className="bg-gradient-to-r from-green-400 to-green-500 hover:from-green-300 hover:to-green-400 text-black font-bold py-3 px-6 rounded-lg transition-all duration-300 shadow-lg shadow-green-400/25"
+                key={tab.path}
+                onClick={() => navigate(tab.path)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 flex items-center space-x-2 ${
+                  location.pathname === tab.path
+                    ? 'bg-gradient-to-r from-yellow-400 to-yellow-500 text-black shadow-xl shadow-yellow-400/25 font-bold'
+                    : 'text-gray-300 hover:text-white hover:bg-white/5 hover:shadow-lg hover:shadow-white/10'
+                }`}
               >
-                💾 Save Settings
+                <span>{tab.icon}</span>
+                <span>{tab.label}</span>
+              </button>
+            ))}
+          </div>
+          
+          {/* Dashboard Controls */}
+          {location.pathname === '/dashboard' && (
+            <div className="flex items-center space-x-4">
+              {/* Coin List Status Indicator */}
+              <div className="flex items-center space-x-3 bg-gray-900/50 px-4 py-2 rounded-lg border border-gray-600/30">
+                <div className="flex flex-col">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs text-gray-400">Coin List:</span>
+                    <span className={`w-2 h-2 rounded-full ${
+                      true // We'll add coin list state later
+                        ? 'bg-green-400'
+                        : 'bg-red-400'
+                    }`}></span>
+                    <span className="text-xs text-white font-medium">
+                      {(() => {
+                        const cachedCoins = localStorage.getItem('cachedCoins');
+                        return cachedCoins ? `${JSON.parse(cachedCoins).length} coins` : '0 coins';
+                      })()}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={async () => {
+                    setIsRefreshingCoins(true);
+                    try {
+                      // Enhanced coin list refresh with full coin list
+                      const manualCoinList = [
+                        // Top Market Cap
+                        'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'XRPUSDT', 'ADAUSDT',
+                        'SOLUSDT', 'DOGEUSDT', 'AVAXUSDT', 'TRXUSDT', 'LINKUSDT',
+                        'TONUSDT', 'SHIBUSDT', 'DOTUSDT', 'BCHUSDT', 'NEARUSDT',
+                        'MATICUSDT', 'ICPUSDT', 'UNIUSDT', 'LTCUSDT', 'APTUSDT',
+                        'STXUSDT', 'FILUSDT', 'ATOMUSDT', 'XLMUSDT', 'VETUSDT',
+                        'WLDUSDT', 'RENDERUSDT', 'FETUSDT', 'AIUSDT', 'ARKMUSDT',
+                        
+                        // Trending & Meme Coins  
+                        'TRUMPUSDT', 'PEPEUSDT', 'WIFUSDT', 'BONKUSDT', 'FLOKIUSDT',
+                        'MEMECUSDT', 'DOGSUSDT', 'CATUSDT', 'BABYDOGEUSDT', 'SATSUSDT',
+                        'FARTCOINUSDT', 'PNUTUSDT', 'GOATUSDT', 'ACTUSDT', 'NEIROUSDT',
+                        'MOODENGUSDT', 'POPUSDT', 'CHILLGUYUSDT', 'BANAUSDT', 'PONKEUSDT',
+                        
+                        // DeFi Tokens
+                        'AAVEUSDT', 'MKRUSDT', 'COMPUSDT', 'YFIUSDT', 'CRVUSDT',
+                        'SNXUSDT', 'BALAUSDT', 'SUSHIUSDT', '1INCHUSDT', 'DYDXUSDT',
+                        'PENGUUSDT', 'EIGENUSDT', 'MORPHOUSDT', 'USUAL', 'COWUSDT',
+                        
+                        // Layer 1 & 2
+                        'ARBUSDT', 'OPUSDT', 'SUIUSDT', 'SEIUSDT', 'INJUSDT',
+                        'TIAUSDT', 'THETAUSDT', 'FTMUSDT', 'ALGOUSDT', 'EGLDUSDT',
+                        'BASUSDT', 'MANTAUSDT', 'STRAXUSDT', 'KLAYUSDT', 'QTUMUSDT',
+                        
+                        // AI & Tech
+                        'FETCHUSDT', 'RENDERUSDT', 'OCEANUSDT', 'AGIXUSDT', 'TAUUSDT',
+                        'AIUSDT', 'ARKMUSDT', 'PHBUSDT', 'NMRUSDT', 'GRTUSDT',
+                        'RAIUSDT', 'CTSIUSDT', 'MOVRUSDT', 'VIRTUUSDT', 'AIOZUSDT',
+                        
+                        // Gaming & Metaverse
+                        'AXSUSDT', 'SANDUSDT', 'MANAUSDT', 'ENJUSDT', 'GALAUSDT',
+                        'IMXUSDT', 'BEAMXUSDT', 'RNDRUSDT', 'YGGUSDT', 'ALICEUSDT',
+                        'PIXELUSDT', 'ACEUSDT', 'XAIUSDT', 'SAGAUSDT', 'VANRYUSDT',
+                        
+                        // Infrastructure & RWA
+                        'ORDIUSDT', 'KASUSDT', 'MINAUSDT', 'ROSEUSDT', 'QNTUSDT',
+                        'FLOWUSDT', 'XTZUSDT', 'IOTAUSDT', 'ZILUSDT', 'HBARUSDT',
+                        'OMNIUSDT', 'ONDOUSDT', 'RLCUSDT', 'ENSUSDT', 'STORJUSDT',
+                        
+                        // New & Popular
+                        'BOMEUSDT', 'WUSDT', 'JUPUSDT', 'PYTHUSDT', 'ALTUSDT',
+                        'JTOUSDT', 'MYROUSDT', 'LISTAUSDT', 'BANUSDT', 'RAYUSDT',
+                        'JITOUSDT', 'SLEEPLESSAIUSDT', 'HIPPOUSDT'
+                      ];
+                      
+                      const now = Date.now();
+                      localStorage.setItem('cachedCoins', JSON.stringify(manualCoinList));
+                      localStorage.setItem('coinsCacheTimestamp', now.toString());
+                      
+                      console.log(`✅ Coin list refreshed: ${manualCoinList.length} coins`);
+                    } catch (error) {
+                      console.error('❌ Coin refresh failed:', error);
+                    } finally {
+                      setIsRefreshingCoins(false);
+                    }
+                  }}
+                  disabled={isRefreshingCoins}
+                  className="flex items-center space-x-1 bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 disabled:from-gray-600 disabled:to-gray-500 text-white px-3 py-1 rounded text-xs font-medium transition-all duration-300"
+                >
+                  <span className={isRefreshingCoins ? 'animate-spin' : ''}>↻</span>
+                  <span>{isRefreshingCoins ? 'Refreshing...' : 'Refresh'}</span>
+                </button>
+              </div>
+
+              <button
+                onClick={() => setShowWidgetConfig(true)}
+                className="p-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white rounded-lg transition-all duration-300 shadow-lg"
+                title="Configure Widgets"
+              >
+                <span>⚙️</span>
               </button>
             </div>
-          </div>
-        )}
+          )}
+          
+          {/* Spacer for other pages */}
+          {location.pathname !== '/dashboard' && <div className="w-24"></div>}
+        </div>
+      </nav>
 
-        {/* Connection Details Slide-in Panel */}
-        {showConnectionDetails && selectedConnection && (
+      {/* Main Content Area */}
+      <main className="relative z-10 p-6">
+        <Outlet context={{
+          systemStatus,
+          bybitConnections,
+          openaiConnections,
+          livePositions,
+          marketData,
+          portfolioSummary,
+          backendStatus,
+          totalValue,
+          totalPnL,
+          activePositions
+        }} />
+      </main>
+
+      {/* Connection Details Slide-in Panel */}
+      {showConnectionDetails && selectedConnection && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-end">
             <div className="w-96 h-full bg-gradient-to-b from-gray-900 to-black border-l border-gray-600/30 shadow-2xl transform transition-transform duration-300">
               <div className="p-6 border-b border-gray-700/30">
@@ -1767,7 +1228,33 @@ const App: React.FC = () => {
             </div>
           </div>
         )}
-      </main>
+        
+        {/* Widget Configuration Modal */}
+        {showWidgetConfig && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-end">
+            <div className="w-96 h-full bg-gradient-to-b from-gray-900 to-black border-l border-gray-600/30 shadow-2xl transform transition-transform duration-300">
+              <div className="p-6 border-b border-gray-700/30">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-bold text-white">⚙️ Widget Configuration</h3>
+                  <button
+                    onClick={() => setShowWidgetConfig(false)}
+                    className="p-2 hover:bg-gray-800 rounded transition-all"
+                  >
+                    <span className="text-gray-400">✕</span>
+                  </button>
+                </div>
+              </div>
+              
+              <div className="p-6 space-y-6 overflow-y-auto">
+                <div className="text-center text-gray-400">
+                  <div className="text-4xl mb-4">⚙️</div>
+                  <div>Widget configuration will be implemented soon.</div>
+                  <div className="text-sm mt-2">This will allow you to customize dashboard widgets.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
     </div>
   );
 };

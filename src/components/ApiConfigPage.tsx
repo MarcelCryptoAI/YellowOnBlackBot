@@ -1,11 +1,38 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useOutletContext } from 'react-router-dom';
+import { bybitApi, openaiApi, type BalanceData, type Position, type OpenAIConnection } from '../services/api';
+import { userStorage, apiStorage } from '../utils/storage';
 
 // Types
+interface BybitConnection {
+  id: string;
+  name: string;
+  apiKey: string;
+  secretKey: string;
+  testnet: boolean;
+  markets: {
+    spot: boolean;
+    usdtPerpetual: boolean;
+    inverseUsd: boolean;
+  };
+  status: 'Active' | 'Inactive' | 'Testing' | 'Error';
+  balance: BalanceData | null;
+  positions?: Position[];
+  createdAt: string;
+  lastUpdated?: string;
+}
+
 interface ApiCredentials {
   bybit: {
     apiKey: string;
     secretKey: string;
     testnet: boolean;
+    name: string;
+    markets: {
+      spot: boolean;
+      usdtPerpetual: boolean;
+      inverseUsd: boolean;
+    };
   };
   openai: {
     apiKey: string;
@@ -13,323 +40,893 @@ interface ApiCredentials {
   };
 }
 
-interface SystemStatus {
-  backend: boolean;
-  frontend: boolean;
-  openai: boolean;
-  bybit: boolean;
-  mexc: boolean;
-  binance: boolean;
+interface OutletContext {
+  systemStatus: any;
+  bybitConnections: BybitConnection[];
+  openaiConnections: OpenAIConnection[];
+  backendStatus: string;
+  totalValue: number;
 }
 
-interface ApiConfigPageProps {
-  apiCredentials: ApiCredentials;
-  systemStatus: SystemStatus;
-  isTestingBybit: boolean;
-  isTestingOpenAI: boolean;
-  lastSaved: string;
-  onUpdateBybitCredentials: (field: string, value: string | boolean) => void;
-  onUpdateOpenAICredentials: (field: string, value: string) => void;
-  onTestBybitConnection: () => void;
-  onTestOpenAIConnection: () => void;
-  onSaveApiSettings: () => void;
-}
+const ApiConfigPage: React.FC = () => {
+  const context = useOutletContext<OutletContext>();
+  const { systemStatus, backendStatus, totalValue } = context;
+  
+  const [currentUser] = useState(() => userStorage.getCurrentUser());
+  const [hasStoredCredentials, setHasStoredCredentials] = useState(false);
+  const [storageInfo, setStorageInfo] = useState<any>(null);
+  const [bybitConnections, setBybitConnections] = useState<BybitConnection[]>([]);
+  const [openaiConnections, setOpenaiConnections] = useState<OpenAIConnection[]>([]);
+  const [selectedConnection, setSelectedConnection] = useState<BybitConnection | null>(null);
+  const [showConnectionDetails, setShowConnectionDetails] = useState(false);
+  const [isTesting, setIsTesting] = useState({ bybit: false, openai: false });
+  const [lastSaved, setLastSaved] = useState<string>('');
 
-const ApiConfigPage: React.FC<ApiConfigPageProps> = ({
-  apiCredentials,
-  systemStatus,
-  isTestingBybit,
-  isTestingOpenAI,
-  lastSaved,
-  onUpdateBybitCredentials,
-  onUpdateOpenAICredentials,
-  onTestBybitConnection,
-  onTestOpenAIConnection,
-  onSaveApiSettings
-}) => {
-  const [showSecrets, setShowSecrets] = useState({
-    bybitApiKey: false,
-    bybitSecret: false,
-    openaiKey: false
+  const [apiCredentials, setApiCredentials] = useState<ApiCredentials>({
+    bybit: {
+      apiKey: '',
+      secretKey: '',
+      testnet: false,
+      name: '',
+      markets: {
+        spot: false,
+        usdtPerpetual: false,
+        inverseUsd: false,
+      },
+    },
+    openai: {
+      apiKey: '',
+      organization: '',
+    },
   });
 
-  const toggleSecret = (field: keyof typeof showSecrets) => {
-    setShowSecrets(prev => ({ ...prev, [field]: !prev[field] }));
+  // Load data on mount
+  useEffect(() => {
+    loadStoredData();
+    loadConnections();
+  }, []);
+
+  const loadStoredData = () => {
+    const storedCredentials = apiStorage.loadCredentials();
+    if (storedCredentials) {
+      setHasStoredCredentials(true);
+      setStorageInfo(apiStorage.getStorageInfo());
+    }
+  };
+
+  const loadConnections = async () => {
+    try {
+      // Load ByBit connections
+      const bybitResponse = await bybitApi.getConnections();
+      if (bybitResponse.success) {
+        const connections = bybitResponse.connections.map(conn => ({
+          id: conn.connectionId,
+          name: conn.metadata?.name || 'ByBit Connection',
+          apiKey: '****LIVE',
+          secretKey: '****hidden',
+          testnet: conn.metadata?.testnet || false,
+          markets: conn.metadata?.markets || { spot: true, usdtPerpetual: false, inverseUsd: false },
+          status: conn.data ? 'Active' as const : 'Error' as const,
+          balance: conn.data?.balance || null,
+          positions: conn.data?.positions || [],
+          createdAt: conn.metadata?.createdAt || new Date().toISOString(),
+        }));
+        setBybitConnections(connections);
+      }
+
+      // Load OpenAI connections
+      const openaiResponse = await openaiApi.getConnections();
+      if (openaiResponse.success) {
+        setOpenaiConnections(openaiResponse.connections);
+      }
+    } catch (error) {
+      console.error('Failed to load connections:', error);
+    }
+  };
+
+  const testBybitConnection = async () => {
+    if (!apiCredentials.bybit.apiKey || !apiCredentials.bybit.secretKey || !apiCredentials.bybit.name) {
+      alert('Please enter API Key, Secret Key and Connection Name for Bybit');
+      return;
+    }
+
+    if (!Object.values(apiCredentials.bybit.markets).some(Boolean)) {
+      alert('Please select at least one market to connect to');
+      return;
+    }
+
+    if (backendStatus !== 'connected') {
+      alert('Backend not connected. Please check if the backend server is running.');
+      return;
+    }
+
+    setIsTesting(prev => ({ ...prev, bybit: true }));
+    
+    try {
+      // Test connection
+      const testResult = await bybitApi.testConnection(
+        apiCredentials.bybit.apiKey,
+        apiCredentials.bybit.secretKey,
+        apiCredentials.bybit.testnet
+      );
+
+      if (!testResult.success) {
+        alert(`Connection test failed: ${testResult.error || testResult.message}`);
+        return;
+      }
+
+      // Add connection
+      const connectionId = `${currentUser.name}_${Date.now()}`;
+      const addResult = await bybitApi.addConnection({
+        connectionId,
+        name: apiCredentials.bybit.name,
+        apiKey: apiCredentials.bybit.apiKey,
+        secretKey: apiCredentials.bybit.secretKey,
+        testnet: apiCredentials.bybit.testnet,
+        markets: apiCredentials.bybit.markets
+      });
+
+      if (!addResult.success) {
+        alert(`Failed to add connection: ${addResult.message}`);
+        return;
+      }
+
+      // Save credentials locally
+      const credentialsToSave = {
+        bybitConnections: [{
+          id: connectionId,
+          name: apiCredentials.bybit.name,
+          apiKey: apiCredentials.bybit.apiKey,
+          secretKey: apiCredentials.bybit.secretKey,
+          testnet: apiCredentials.bybit.testnet,
+          markets: apiCredentials.bybit.markets,
+          createdAt: new Date().toISOString()
+        }],
+        openai: {
+          apiKey: apiCredentials.openai.apiKey || '',
+          organization: apiCredentials.openai.organization || ''
+        }
+      };
+      
+      const saved = apiStorage.saveCredentials(credentialsToSave);
+      if (saved) {
+        setLastSaved(new Date().toLocaleTimeString());
+        setHasStoredCredentials(true);
+        setStorageInfo(apiStorage.getStorageInfo());
+      }
+
+      // Reset form
+      setApiCredentials(prev => ({
+        ...prev,
+        bybit: {
+          apiKey: '',
+          secretKey: '',
+          testnet: false,
+          name: '',
+          markets: {
+            spot: false,
+            usdtPerpetual: false,
+            inverseUsd: false,
+          },
+        }
+      }));
+      
+      alert(`✅ ByBit connection '${apiCredentials.bybit.name}' successfully created!`);
+      loadConnections(); // Reload connections
+      
+    } catch (error) {
+      console.error('Error creating ByBit connection:', error);
+      alert(`Failed to create connection: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsTesting(prev => ({ ...prev, bybit: false }));
+    }
+  };
+
+  const testOpenAIConnection = async () => {
+    if (!apiCredentials.openai.apiKey) {
+      alert('Please enter API Key for OpenAI');
+      return;
+    }
+
+    if (backendStatus !== 'connected') {
+      alert('Backend not connected. Please check if the backend server is running.');
+      return;
+    }
+
+    setIsTesting(prev => ({ ...prev, openai: true }));
+    
+    try {
+      const testResult = await openaiApi.testConnection(
+        apiCredentials.openai.apiKey,
+        apiCredentials.openai.organization
+      );
+
+      if (!testResult.success) {
+        alert(`OpenAI connection test failed: ${testResult.error || testResult.message}`);
+        return;
+      }
+
+      const connectionId = `openai_${Date.now()}`;
+      const addResult = await openaiApi.addConnection({
+        connectionId,
+        apiKey: apiCredentials.openai.apiKey,
+        organization: apiCredentials.openai.organization
+      });
+
+      if (!addResult.success) {
+        alert(`Failed to add OpenAI connection: ${addResult.message}`);
+        return;
+      }
+
+      // Reset form
+      setApiCredentials(prev => ({
+        ...prev,
+        openai: {
+          apiKey: '',
+          organization: ''
+        }
+      }));
+      
+      alert('✅ OpenAI connection successfully created!');
+      loadConnections(); // Reload connections
+      
+    } catch (error) {
+      console.error('Error creating OpenAI connection:', error);
+      alert(`Failed to create OpenAI connection: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsTesting(prev => ({ ...prev, openai: false }));
+    }
+  };
+
+  const deleteBybitConnection = async (id: string) => {
+    if (confirm('Are you sure you want to delete this connection?')) {
+      try {
+        await bybitApi.removeConnection(id);
+        setBybitConnections(prev => prev.filter(conn => conn.id !== id));
+        if (selectedConnection?.id === id) {
+          setSelectedConnection(null);
+          setShowConnectionDetails(false);
+        }
+      } catch (error) {
+        console.error('Failed to delete connection:', error);
+        alert('Failed to delete connection');
+      }
+    }
+  };
+
+  const toggleConnectionStatus = (id: string) => {
+    setBybitConnections(prev => prev.map(conn => 
+      conn.id === id 
+        ? { ...conn, status: conn.status === 'Active' ? 'Inactive' : 'Active' as const }
+        : conn
+    ));
+  };
+
+  const updateBybitCredentials = (field: string, value: string | boolean) => {
+    if (field.startsWith('markets.')) {
+      const marketField = field.split('.')[1];
+      setApiCredentials(prev => ({
+        ...prev,
+        bybit: { 
+          ...prev.bybit, 
+          markets: { 
+            ...prev.bybit.markets, 
+            [marketField]: value 
+          }
+        }
+      }));
+    } else {
+      setApiCredentials(prev => ({
+        ...prev,
+        bybit: { ...prev.bybit, [field]: value }
+      }));
+    }
+  };
+
+  const updateOpenAICredentials = (field: string, value: string) => {
+    setApiCredentials(prev => ({
+      ...prev,
+      openai: { ...prev.openai, [field]: value }
+    }));
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'Active': return '🟢';
+      case 'Inactive': return '🔴';
+      case 'Testing': return '🟡';
+      case 'Error': return '🔴';
+      default: return '⚫';
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'Active': return 'text-green-300';
+      case 'Inactive': return 'text-gray-400';
+      case 'Testing': return 'text-yellow-300';
+      case 'Error': return 'text-red-300';
+      default: return 'text-gray-500';
+    }
   };
 
   return (
-    <div className="p-6 space-y-8">
-      {/* Header */}
-      <div className="relative group">
-        <div className="absolute inset-0 bg-gradient-to-br from-yellow-400/10 to-yellow-600/10 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
-        <div className="relative bg-gradient-to-br from-black to-gray-900 p-6 rounded-xl border border-gray-600/30 hover:border-yellow-400/40 transition-all duration-300 shadow-2xl shadow-black/50">
-          <h1 className="text-3xl font-bold flex items-center">
-            <span className="mr-4 text-4xl">🔧</span>
-            <span className="bg-gradient-to-r from-white via-gray-200 to-yellow-400 bg-clip-text text-transparent drop-shadow-lg">
-              API CONFIGURATION
-            </span>
-          </h1>
-          <p className="text-gray-400 mt-2">Configure your exchange and AI service connections</p>
-          {lastSaved && (
-            <p className="text-green-300 text-sm mt-2">✅ Last saved: {lastSaved}</p>
-          )}
+    <div className="space-y-8">
+      <div className="flex items-center justify-between">
+        <h2 className="text-3xl font-bold bg-gradient-to-r from-white via-gray-200 to-yellow-400 bg-clip-text text-transparent drop-shadow-lg">
+          API CONFIGURATION
+        </h2>
+        <div className="flex items-center space-x-4 text-sm text-gray-400">
+          <span>Total Balance: <span className="text-white font-bold">${totalValue.toLocaleString()}</span></span>
+          <span>•</span>
+          <span>Active: <span className="text-green-300 font-bold">{bybitConnections.filter(c => c.status === 'Active').length}</span></span>
+          <span>•</span>
+          <span>User: <span className="text-blue-300 font-bold">{currentUser.name}</span></span>
         </div>
       </div>
-
-      {/* System Status Overview */}
+      
+      {/* Storage Status Info */}
+      {storageInfo && (
+        <div className="relative group">
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-400/10 to-blue-600/10 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
+          <div className="relative bg-gradient-to-br from-gray-900 to-black p-4 rounded-xl border border-blue-500/30 shadow-2xl shadow-black/50">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <span className="text-2xl">💾</span>
+                <div>
+                  <h4 className="font-bold text-blue-300">Veilige Opslag Status</h4>
+                  <p className="text-sm text-gray-400">
+                    {storageInfo.bybitConnectionsCount} Bybit connecties • {storageInfo.hasOpenAI ? 'OpenAI geconfigureerd' : 'Geen OpenAI'} • 
+                    Laatste opslag: {new Date(storageInfo.lastSaved).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 bg-green-400 rounded-full shadow-lg shadow-green-400/50"></div>
+                <span className="text-green-300 text-sm font-bold uppercase tracking-wider">ENCRYPTED</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Existing Bybit Connections */}
       <div className="relative group">
-        <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-yellow-400/5 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
-        <div className="relative bg-gradient-to-br from-black to-gray-900 p-6 rounded-xl border border-gray-600/30 hover:border-white/30 transition-all duration-300 shadow-2xl shadow-black/50">
-          <h3 className="text-xl font-bold mb-6 flex items-center">
-            <span className="mr-3 text-2xl">🛡️</span>
-            <span className="bg-gradient-to-r from-white via-gray-200 to-yellow-400 bg-clip-text text-transparent drop-shadow-lg">
-              SYSTEM STATUS
-            </span>
+        <div className="absolute inset-0 bg-gradient-to-br from-yellow-400/10 to-white/5 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
+        <div className="relative bg-gradient-to-br from-black to-gray-900 p-6 rounded-xl border border-gray-600/30 hover:border-yellow-400/40 transition-all duration-300 shadow-2xl shadow-black/50">
+          <h3 className="text-xl font-bold mb-6 bg-gradient-to-r from-yellow-400 to-white bg-clip-text text-transparent drop-shadow-lg">
+            🟡 BYBIT CONNECTIONS ({bybitConnections.length})
           </h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            {Object.entries(systemStatus).map(([key, value]) => (
-              <div key={key} className="flex items-center justify-between p-3 rounded-lg bg-gradient-to-r from-gray-900 to-black border border-gray-700/40 shadow-inner">
-                <span className="text-gray-200 capitalize font-medium tracking-wide">{key}</span>
-                <div className="flex items-center space-x-3">
-                  <span className="text-lg">{value ? '✅' : '❌'}</span>
-                  <span className={`text-sm font-bold uppercase tracking-wider ${
-                    value ? 'text-green-300' : 'text-red-300'
-                  }`}>
-                    {value ? 'ONLINE' : 'OFFLINE'}
-                  </span>
+          
+          <div className="space-y-4">
+            {bybitConnections.map((connection) => (
+              <div key={connection.id} className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-900 to-black rounded-lg border border-gray-700/40 hover:border-yellow-400/30 transition-all group/item">
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-3">
+                    <span className="text-xl">{getStatusIcon(connection.status)}</span>
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-white font-bold text-xl tracking-wide drop-shadow-lg">{connection.name}</span>
+                        {connection.testnet && (
+                          <span className="px-2 py-1 text-xs bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 rounded font-medium">Testnet</span>
+                        )}
+                      </div>
+                      <div className="flex items-center space-x-2 text-xs text-gray-400">
+                        <span>{connection.apiKey}</span>
+                        <span>•</span>
+                        <span>{new Date(connection.createdAt).toLocaleDateString()}</span>
+                        <span>•</span>
+                        <span className={getStatusColor(connection.status)}>{connection.status}</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex space-x-2">
+                    {connection.markets.spot && (
+                      <span className="px-2 py-1 text-xs bg-blue-500/20 text-blue-300 border border-blue-500/40 rounded">Spot</span>
+                    )}
+                    {connection.markets.usdtPerpetual && (
+                      <span className="px-2 py-1 text-xs bg-purple-500/20 text-purple-300 border border-purple-500/40 rounded">USDT⊥</span>
+                    )}
+                    {connection.markets.inverseUsd && (
+                      <span className="px-2 py-1 text-xs bg-orange-500/20 text-orange-300 border border-orange-500/40 rounded">USD⊥</span>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="flex items-center space-x-6">
+                  <div className="text-right">
+                    <div className="text-white font-bold">
+                      ${connection.balance ? connection.balance.total.toLocaleString() : '0.00'}
+                    </div>
+                    <div className="text-xs text-gray-400">
+                      Available: ${connection.balance ? connection.balance.available.toLocaleString() : '0.00'}
+                    </div>
+                    <div className="flex items-center space-x-1 text-xs">
+                      <span className="text-blue-400">LIVE</span>
+                      <span className="text-gray-500">Data</span>
+                    </div>
+                  </div>
+                  
+                  {connection.status === 'Active' && connection.balance && (
+                    <div className="w-16 h-8 relative cursor-pointer" onClick={() => {
+                      setSelectedConnection(connection);
+                      setShowConnectionDetails(true);
+                    }}>
+                      <div className="text-center text-xs text-green-400 font-bold">
+                        📊 LIVE
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => {
+                        setSelectedConnection(connection);
+                        setShowConnectionDetails(true);
+                      }}
+                      className="p-2 hover:bg-yellow-400/10 rounded transition-all"
+                      title="View Details"
+                    >
+                      <span className="text-yellow-400">ℹ️</span>
+                    </button>
+                    
+                    <div className="relative group/menu">
+                      <button className="p-2 hover:bg-gray-700/50 rounded transition-all">
+                        <span className="text-gray-400">⋯</span>
+                      </button>
+                      <div className="absolute right-0 top-10 bg-gray-900 border border-gray-600 rounded-lg shadow-xl opacity-0 invisible group-hover/menu:opacity-100 group-hover/menu:visible transition-all z-20 min-w-32">
+                        <button
+                          onClick={() => toggleConnectionStatus(connection.id)}
+                          className="block w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-all"
+                        >
+                          {connection.status === 'Active' ? 'Deactivate' : 'Activate'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSelectedConnection(connection);
+                            setShowConnectionDetails(true);
+                          }}
+                          className="block w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-all"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => deleteBybitConnection(connection.id)}
+                          className="block w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-gray-800 hover:text-red-300 transition-all"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             ))}
           </div>
         </div>
       </div>
-
+      
+      {/* OpenAI Connections Overview */}
+      <div className="relative group">
+        <div className="absolute inset-0 bg-gradient-to-br from-green-400/10 to-green-600/10 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
+        <div className="relative bg-gradient-to-br from-black to-gray-900 p-6 rounded-xl border border-gray-600/30 hover:border-green-400/40 transition-all duration-300 shadow-2xl shadow-black/50">
+          <h3 className="text-xl font-bold mb-6 bg-gradient-to-r from-green-400 to-white bg-clip-text text-transparent drop-shadow-lg">
+            🤖 OPENAI CONNECTIONS ({openaiConnections.length})
+          </h3>
+          
+          <div className="space-y-4">
+            {openaiConnections.length > 0 ? (
+              openaiConnections.map((connection) => (
+                <div key={connection.connectionId} className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-900 to-black rounded-lg border border-gray-700/40 hover:border-green-400/30 transition-all group/item">
+                  <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-3">
+                      <span className="text-xl">🤖</span>
+                      <div>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-white font-bold text-base">OpenAI API</span>
+                          <span className="px-2 py-1 text-xs bg-green-500/20 text-green-300 border border-green-500/40 rounded">{connection.subscription.plan}</span>
+                        </div>
+                        <div className="flex items-center space-x-2 text-xs text-gray-400">
+                          <span>Credits: ${connection.subscription.remainingCredits.toFixed(2)} / ${connection.subscription.creditLimit}</span>
+                          <span>•</span>
+                          <span>{connection.subscription.status}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center space-x-6">
+                    <div className="text-right">
+                      <div className="text-white font-bold">${connection.usage.month.cost.toFixed(2)}</div>
+                      <div className="text-xs text-gray-400">This month</div>
+                      <div className="flex items-center space-x-1 text-xs">
+                        <span className={connection.usage.trends.daily >= 0 ? 'text-green-400' : 'text-red-400'}>
+                          {connection.usage.trends.daily >= 0 ? '+' : ''}{connection.usage.trends.daily.toFixed(1)}%
+                        </span>
+                        <span className="text-gray-500">daily</span>
+                      </div>
+                    </div>
+                    
+                    {/* Usage percentage bar */}
+                    <div className="w-16 h-8 relative">
+                      <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full transition-all duration-300 ${
+                            connection.subscription.usagePercentage > 80 ? 'bg-red-400' : 
+                            connection.subscription.usagePercentage > 60 ? 'bg-yellow-400' : 'bg-green-400'
+                          }`}
+                          style={{ width: `${Math.min(connection.subscription.usagePercentage, 100)}%` }}
+                        />
+                      </div>
+                      <div className="text-center text-xs text-gray-400 mt-1">
+                        {connection.subscription.usagePercentage.toFixed(0)}%
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <a
+                        href="https://platform.openai.com/account/billing/overview"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2 hover:bg-green-400/10 rounded transition-all"
+                        title="View OpenAI Billing"
+                      >
+                        <span className="text-green-400">💳</span>
+                      </a>
+                      
+                      <button
+                        onClick={() => openaiApi.removeConnection(connection.connectionId).then(() => {
+                          setOpenaiConnections(prev => prev.filter(c => c.connectionId !== connection.connectionId));
+                          alert('OpenAI connection removed');
+                        })}
+                        className="p-2 hover:bg-red-400/10 rounded transition-all"
+                        title="Remove Connection"
+                      >
+                        <span className="text-red-400">🗑️</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-8">
+                <div className="text-gray-400 text-lg">No OpenAI connections found</div>
+                <div className="text-green-400/70 text-sm mt-2">Add your OpenAI API key below to get started</div>
+              </div>
+            )}
+          </div>
+          
+          {/* Quick Actions */}
+          <div className="mt-6 flex gap-4">
+            <a
+              href="https://platform.openai.com/account/billing/payment-methods"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center space-x-2 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 shadow-lg hover:shadow-green-400/30"
+            >
+              <span>💳</span>
+              <span>Buy Credits</span>
+            </a>
+            
+            <a
+              href="https://platform.openai.com/account/usage"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 shadow-lg hover:shadow-blue-400/30"
+            >
+              <span>📊</span>
+              <span>View Usage</span>
+            </a>
+          </div>
+        </div>
+      </div>
+      
+      {/* New Connection Forms */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* ByBit Configuration */}
+        {/* New Bybit Connection Form */}
         <div className="relative group">
-          <div className="absolute inset-0 bg-gradient-to-br from-orange-400/10 to-orange-600/10 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
-          <div className="relative bg-gradient-to-br from-black to-gray-900 p-6 rounded-xl border border-gray-600/30 hover:border-orange-400/40 transition-all duration-300 shadow-2xl shadow-black/50">
-            <div className="flex items-center mb-6">
-              <img src="/bybit-logo.png" alt="ByBit" className="w-8 h-8 mr-3" onError={(e) => {
-                (e.target as HTMLImageElement).style.display = 'none';
-              }} />
-              <h3 className="text-xl font-bold text-white">ByBit Configuration</h3>
-              <div className={`ml-auto w-3 h-3 rounded-full ${
-                systemStatus.bybit ? 'bg-green-400 shadow-green-400/50' : 'bg-red-400 shadow-red-400/50'
-              } shadow-lg`}></div>
-            </div>
-
+          <div className="absolute inset-0 bg-gradient-to-br from-yellow-400/10 to-white/5 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
+          <div className="relative bg-gradient-to-br from-black to-gray-900 p-6 rounded-xl border border-gray-600/30 hover:border-yellow-400/40 transition-all duration-300 shadow-2xl shadow-black/50">
+            <h3 className="text-xl font-bold mb-6 bg-gradient-to-r from-yellow-400 to-white bg-clip-text text-transparent drop-shadow-lg">
+              🟡 NEW BYBIT CONNECTION
+            </h3>
+            
             <div className="space-y-4">
-              {/* API Key */}
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-300 uppercase tracking-wider">
-                  🔑 API Key
-                </label>
-                <div className="relative">
-                  <input
-                    type={showSecrets.bybitApiKey ? "text" : "password"}
-                    placeholder="Enter your ByBit API Key"
-                    value={apiCredentials.bybit.apiKey}
-                    onChange={(e) => onUpdateBybitCredentials('apiKey', e.target.value)}
-                    className="w-full bg-gradient-to-r from-gray-900 to-black border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:border-orange-400 focus:ring-2 focus:ring-orange-400/20 transition-all duration-300 pr-12"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => toggleSecret('bybitApiKey')}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-orange-400 transition-colors duration-200"
-                  >
-                    {showSecrets.bybitApiKey ? '🙈' : '👁️'}
-                  </button>
-                </div>
+              {/* Connection Name Field */}
+              <div>
+                <label className="block text-gray-300 text-sm font-medium mb-2">Connection Name *</label>
+                <input
+                  type="text"
+                  value={apiCredentials.bybit.name}
+                  onChange={(e) => updateBybitCredentials('name', e.target.value)}
+                  placeholder="e.g., Main Trading Account, Scalping Bot, Test Account..."
+                  className="w-full p-3 bg-gradient-to-r from-gray-900 to-black border border-gray-600/40 rounded-lg text-white placeholder-gray-500 focus:border-yellow-400/60 focus:outline-none transition-all"
+                  required
+                />
+                <p className="text-xs text-gray-500 mt-1">Give this connection a unique name to identify it</p>
               </div>
 
-              {/* Secret Key */}
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-300 uppercase tracking-wider">
-                  🔐 Secret Key
-                </label>
-                <div className="relative">
-                  <input
-                    type={showSecrets.bybitSecret ? "text" : "password"}
-                    placeholder="Enter your ByBit Secret Key"
-                    value={apiCredentials.bybit.secretKey}
-                    onChange={(e) => onUpdateBybitCredentials('secretKey', e.target.value)}
-                    className="w-full bg-gradient-to-r from-gray-900 to-black border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:border-orange-400 focus:ring-2 focus:ring-orange-400/20 transition-all duration-300 pr-12"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => toggleSecret('bybitSecret')}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-orange-400 transition-colors duration-200"
-                  >
-                    {showSecrets.bybitSecret ? '🙈' : '👁️'}
-                  </button>
-                </div>
+              {/* API Key Field */}
+              <div>
+                <label className="block text-gray-300 text-sm font-medium mb-2">API Key *</label>
+                <input
+                  type="text"
+                  value={apiCredentials.bybit.apiKey}
+                  onChange={(e) => updateBybitCredentials('apiKey', e.target.value)}
+                  placeholder="Enter your Bybit API key..."
+                  className="w-full p-3 bg-gradient-to-r from-gray-900 to-black border border-gray-600/40 rounded-lg text-white placeholder-gray-500 focus:border-yellow-400/60 focus:outline-none transition-all"
+                  required
+                />
               </div>
-
+              
+              {/* Secret Key Field */}
+              <div>
+                <label className="block text-gray-300 text-sm font-medium mb-2">Secret Key *</label>
+                <input
+                  type="password"
+                  value={apiCredentials.bybit.secretKey}
+                  onChange={(e) => updateBybitCredentials('secretKey', e.target.value)}
+                  placeholder="Enter your Bybit secret key..."
+                  className="w-full p-3 bg-gradient-to-r from-gray-900 to-black border border-gray-600/40 rounded-lg text-white placeholder-gray-500 focus:border-yellow-400/60 focus:outline-none transition-all"
+                  required
+                />
+              </div>
+              
+              {/* Markets Selection */}
+              <div>
+                <label className="block text-gray-300 text-sm font-medium mb-3">Select Markets to Connect *</label>
+                <div className="space-y-3 p-4 bg-gradient-to-r from-gray-900/50 to-black/50 rounded-lg border border-gray-700/30">
+                  
+                  {/* Spot Market */}
+                  <div className="flex items-center space-x-3">
+                    <input
+                      type="checkbox"
+                      id="market-spot"
+                      checked={apiCredentials.bybit.markets.spot}
+                      onChange={(e) => updateBybitCredentials('markets.spot', e.target.checked)}
+                      className="w-4 h-4 text-blue-400 bg-gray-900 border-gray-600 rounded focus:ring-blue-400 focus:ring-2"
+                    />
+                    <label htmlFor="market-spot" className="text-gray-300 text-sm flex items-center space-x-3 cursor-pointer">
+                      <span className="px-3 py-1 text-xs bg-blue-500/20 text-blue-300 border border-blue-500/40 rounded font-medium">Spot</span>
+                      <span>Bybit Spot Trading</span>
+                    </label>
+                  </div>
+                  
+                  {/* USDT Perpetual Market */}
+                  <div className="flex items-center space-x-3">
+                    <input
+                      type="checkbox"
+                      id="market-usdt"
+                      checked={apiCredentials.bybit.markets.usdtPerpetual}
+                      onChange={(e) => updateBybitCredentials('markets.usdtPerpetual', e.target.checked)}
+                      className="w-4 h-4 text-purple-400 bg-gray-900 border-gray-600 rounded focus:ring-purple-400 focus:ring-2"
+                    />
+                    <label htmlFor="market-usdt" className="text-gray-300 text-sm flex items-center space-x-3 cursor-pointer">
+                      <span className="px-3 py-1 text-xs bg-purple-500/20 text-purple-300 border border-purple-500/40 rounded font-medium">USDT⊥</span>
+                      <span>Bybit USDT Derivatives (Perpetual)</span>
+                    </label>
+                  </div>
+                  
+                  {/* Inverse USD Market */}
+                  <div className="flex items-center space-x-3">
+                    <input
+                      type="checkbox"
+                      id="market-inverse"
+                      checked={apiCredentials.bybit.markets.inverseUsd}
+                      onChange={(e) => updateBybitCredentials('markets.inverseUsd', e.target.checked)}
+                      className="w-4 h-4 text-orange-400 bg-gray-900 border-gray-600 rounded focus:ring-orange-400 focus:ring-2"
+                    />
+                    <label htmlFor="market-inverse" className="text-gray-300 text-sm flex items-center space-x-3 cursor-pointer">
+                      <span className="px-3 py-1 text-xs bg-orange-500/20 text-orange-300 border border-orange-500/40 rounded font-medium">USD⊥</span>
+                      <span>Bybit Inverse (USD)</span>
+                    </label>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">Select at least one market to connect to</p>
+              </div>
+              
               {/* Testnet Toggle */}
-              <div className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-800 to-gray-900 rounded-lg border border-gray-700/50">
-                <div>
-                  <span className="text-white font-medium">Testnet Mode</span>
-                  <p className="text-gray-400 text-sm">Use ByBit testnet for safe testing</p>
-                </div>
-                <button
-                  onClick={() => onUpdateBybitCredentials('testnet', !apiCredentials.bybit.testnet)}
-                  className={`relative w-12 h-6 rounded-full transition-all duration-300 ${
-                    apiCredentials.bybit.testnet ? 'bg-orange-500' : 'bg-gray-600'
-                  }`}
-                >
-                  <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform duration-300 ${
-                    apiCredentials.bybit.testnet ? 'transform translate-x-6' : ''
-                  }`}></div>
-                </button>
+              <div className="flex items-center space-x-3">
+                <input
+                  type="checkbox"
+                  id="testnet-toggle"
+                  checked={apiCredentials.bybit.testnet}
+                  onChange={(e) => updateBybitCredentials('testnet', e.target.checked)}
+                  className="w-4 h-4 text-yellow-400 bg-gray-900 border-gray-600 rounded focus:ring-yellow-400 focus:ring-2"
+                />
+                <label htmlFor="testnet-toggle" className="text-gray-300 text-sm flex items-center space-x-2 cursor-pointer">
+                  <span>Use Testnet</span>
+                  <span className="text-xs text-gray-500">(Recommended for testing)</span>
+                </label>
               </div>
-
-              {/* Test Connection Button */}
+              
+              {/* Submit Button */}
               <button
-                onClick={onTestBybitConnection}
-                disabled={isTestingBybit || !apiCredentials.bybit.apiKey || !apiCredentials.bybit.secretKey}
-                className="w-full bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 disabled:from-gray-600 disabled:to-gray-500 text-white px-6 py-3 rounded-lg font-medium transition-all duration-300 shadow-lg hover:shadow-orange-400/30 flex items-center justify-center space-x-2"
+                onClick={testBybitConnection}
+                disabled={isTesting.bybit}
+                className="w-full bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-300 hover:to-yellow-400 disabled:from-gray-600 disabled:to-gray-700 text-black font-bold py-3 px-4 rounded-lg transition-all duration-300 shadow-lg mt-6"
               >
-                {isTestingBybit ? (
-                  <>
-                    <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full"></div>
-                    <span>Testing Connection...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>🔗</span>
-                    <span>Test ByBit Connection</span>
-                  </>
-                )}
+                {isTesting.bybit ? '🔄 Creating Connection...' : '🚀 Create Connection'}
               </button>
+              
+              {/* Form Validation Info */}
+              <div className="text-xs text-gray-500">
+                * Required fields
+              </div>
             </div>
           </div>
         </div>
 
         {/* OpenAI Configuration */}
         <div className="relative group">
-          <div className="absolute inset-0 bg-gradient-to-br from-green-400/10 to-green-600/10 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
-          <div className="relative bg-gradient-to-br from-black to-gray-900 p-6 rounded-xl border border-gray-600/30 hover:border-green-400/40 transition-all duration-300 shadow-2xl shadow-black/50">
-            <div className="flex items-center mb-6">
-              <div className="w-8 h-8 mr-3 bg-gradient-to-r from-green-400 to-green-500 rounded-lg flex items-center justify-center text-white font-bold">
-                AI
-              </div>
-              <h3 className="text-xl font-bold text-white">OpenAI Configuration</h3>
-              <div className={`ml-auto w-3 h-3 rounded-full ${
-                systemStatus.openai ? 'bg-green-400 shadow-green-400/50' : 'bg-red-400 shadow-red-400/50'
-              } shadow-lg`}></div>
-            </div>
-
+          <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-yellow-400/5 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
+          <div className="relative bg-gradient-to-br from-black to-gray-900 p-6 rounded-xl border border-gray-600/30 hover:border-white/30 transition-all duration-300 shadow-2xl shadow-black/50">
+            <h3 className="text-xl font-bold mb-6 bg-gradient-to-r from-white to-yellow-400 bg-clip-text text-transparent drop-shadow-lg">
+              🤖 OPENAI API
+            </h3>
+            
             <div className="space-y-4">
-              {/* API Key */}
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-300 uppercase tracking-wider">
-                  🤖 API Key
-                </label>
-                <div className="relative">
-                  <input
-                    type={showSecrets.openaiKey ? "text" : "password"}
-                    placeholder="sk-..."
-                    value={apiCredentials.openai.apiKey}
-                    onChange={(e) => onUpdateOpenAICredentials('apiKey', e.target.value)}
-                    className="w-full bg-gradient-to-r from-gray-900 to-black border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:border-green-400 focus:ring-2 focus:ring-green-400/20 transition-all duration-300 pr-12"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => toggleSecret('openaiKey')}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-green-400 transition-colors duration-200"
-                  >
-                    {showSecrets.openaiKey ? '🙈' : '👁️'}
-                  </button>
-                </div>
-              </div>
-
-              {/* Organization */}
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-300 uppercase tracking-wider">
-                  🏢 Organization (Optional)
-                </label>
+              <div>
+                <label className="block text-gray-300 text-sm font-medium mb-2">API Key</label>
                 <input
-                  type="text"
-                  placeholder="org-..."
-                  value={apiCredentials.openai.organization}
-                  onChange={(e) => onUpdateOpenAICredentials('organization', e.target.value)}
-                  className="w-full bg-gradient-to-r from-gray-900 to-black border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:border-green-400 focus:ring-2 focus:ring-green-400/20 transition-all duration-300"
+                  type="password"
+                  value={apiCredentials.openai.apiKey}
+                  onChange={(e) => updateOpenAICredentials('apiKey', e.target.value)}
+                  placeholder="sk-..."
+                  className="w-full p-3 bg-gradient-to-r from-gray-900 to-black border border-gray-600/40 rounded-lg text-white placeholder-gray-500 focus:border-yellow-400/60 focus:outline-none transition-all"
                 />
               </div>
-
-              {/* Model Information */}
-              <div className="p-4 bg-gradient-to-r from-gray-800 to-gray-900 rounded-lg border border-gray-700/50">
-                <h4 className="font-medium text-white mb-2">Available Models:</h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-300">GPT-4</span>
-                    <span className="text-green-300">High accuracy, higher cost</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-300">GPT-3.5 Turbo</span>
-                    <span className="text-yellow-300">Good balance, medium cost</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-300">GPT-3.5</span>
-                    <span className="text-blue-300">Fast response, low cost</span>
-                  </div>
-                </div>
+              
+              <div>
+                <label className="block text-gray-300 text-sm font-medium mb-2">Organization (Optional)</label>
+                <input
+                  type="text"
+                  value={apiCredentials.openai.organization}
+                  onChange={(e) => updateOpenAICredentials('organization', e.target.value)}
+                  placeholder="org-..."
+                  className="w-full p-3 bg-gradient-to-r from-gray-900 to-black border border-gray-600/40 rounded-lg text-white placeholder-gray-500 focus:border-yellow-400/60 focus:outline-none transition-all"
+                />
               </div>
-
-              {/* Test Connection Button */}
+              
               <button
-                onClick={onTestOpenAIConnection}
-                disabled={isTestingOpenAI || !apiCredentials.openai.apiKey}
-                className="w-full bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 disabled:from-gray-600 disabled:to-gray-500 text-white px-6 py-3 rounded-lg font-medium transition-all duration-300 shadow-lg hover:shadow-green-400/30 flex items-center justify-center space-x-2"
+                onClick={testOpenAIConnection}
+                disabled={isTesting.openai}
+                className="w-full bg-gradient-to-r from-white to-gray-200 hover:from-gray-100 hover:to-white disabled:from-gray-600 disabled:to-gray-700 text-black font-bold py-3 px-4 rounded-lg transition-all duration-300 shadow-lg"
               >
-                {isTestingOpenAI ? (
-                  <>
-                    <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full"></div>
-                    <span>Testing Connection...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>🤖</span>
-                    <span>Test OpenAI Connection</span>
-                  </>
-                )}
+                {isTesting.openai ? 'Testing Connection...' : 'Test Connection'}
               </button>
+              
+              <div className="flex items-center space-x-3 p-3 bg-gradient-to-r from-gray-900 to-black rounded-lg border border-gray-700/40">
+                <div className={`w-3 h-3 rounded-full shadow-lg ${
+                  systemStatus.openai ? 'bg-green-400 shadow-green-400/50' : 'bg-red-400 shadow-red-400/50'
+                }`} />
+                <span className={`text-sm font-bold uppercase tracking-wider ${
+                  systemStatus.openai ? 'text-green-300' : 'text-red-300'
+                }`}>
+                  {systemStatus.openai ? 'CONNECTED' : 'DISCONNECTED'}
+                </span>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       {/* Save Settings */}
-      <div className="flex justify-center pt-6">
-        <button
-          onClick={onSaveApiSettings}
-          className="bg-gradient-to-r from-yellow-600 to-yellow-500 hover:from-yellow-500 hover:to-yellow-400 text-black px-8 py-4 rounded-xl font-bold text-lg transition-all duration-300 shadow-2xl hover:shadow-yellow-400/30 flex items-center space-x-3"
-        >
-          <span className="text-2xl">💾</span>
-          <span>SAVE API SETTINGS</span>
-        </button>
+      <div className="flex items-center justify-between">
+        <div className="text-sm text-gray-400">
+          {lastSaved && `Last saved: ${lastSaved}`}
+        </div>
       </div>
 
-      {/* Security Notice */}
-      <div className="relative group">
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-400/10 to-blue-600/10 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
-        <div className="relative bg-gradient-to-br from-gray-900 to-black p-6 rounded-xl border border-blue-500/30 shadow-2xl shadow-black/50">
-          <div className="flex items-start space-x-4">
-            <div className="text-3xl">🔒</div>
-            <div>
-              <h4 className="font-bold text-blue-300 mb-2">Security Notice</h4>
-              <ul className="text-gray-300 text-sm space-y-1">
-                <li>• API keys are encrypted before being stored</li>
-                <li>• Never share your API keys with anyone</li>
-                <li>• Use testnet mode for development and testing</li>
-                <li>• Regularly rotate your API keys for security</li>
-                <li>• Set appropriate permissions on your exchange APIs</li>
-              </ul>
+      {/* Connection Details Slide-in Panel */}
+      {showConnectionDetails && selectedConnection && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-end">
+          <div className="w-96 h-full bg-gradient-to-b from-gray-900 to-black border-l border-gray-600/30 shadow-2xl transform transition-transform duration-300">
+            <div className="p-6 border-b border-gray-700/30">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold text-white">Account Information</h3>
+                <button
+                  onClick={() => setShowConnectionDetails(false)}
+                  className="p-2 hover:bg-gray-800 rounded transition-all"
+                >
+                  <span className="text-gray-400">✕</span>
+                </button>
+              </div>
+            </div>
+            
+            <div className="p-6 space-y-6 overflow-y-auto">
+              <div>
+                <label className="text-sm text-gray-400">Name</label>
+                <div className="text-white font-medium">{selectedConnection.name}</div>
+              </div>
+              
+              <div>
+                <label className="text-sm text-gray-400">Exchange</label>
+                <div className="flex items-center space-x-2">
+                  <span className="text-yellow-400">🟡</span>
+                  <span className="text-white font-medium">Bybit {selectedConnection.testnet ? 'Testnet' : 'Mainnet'}</span>
+                </div>
+              </div>
+              
+              <div>
+                <label className="text-sm text-gray-400">API Key</label>
+                <div className="text-white font-mono">{selectedConnection.apiKey}</div>
+              </div>
+              
+              <div>
+                <label className="text-sm text-gray-400">Creation Date</label>
+                <div className="text-white">{new Date(selectedConnection.createdAt).toLocaleDateString()}</div>
+              </div>
+              
+              <div>
+                <label className="text-sm text-gray-400">Status</label>
+                <div className="flex items-center space-x-2">
+                  <span className="text-xl">{getStatusIcon(selectedConnection.status)}</span>
+                  <span className={getStatusColor(selectedConnection.status)}>
+                    {selectedConnection.status}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm text-gray-400">Markets</label>
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {selectedConnection.markets.spot && (
+                    <span className="px-2 py-1 text-xs bg-blue-500/20 text-blue-300 border border-blue-500/40 rounded">Spot</span>
+                  )}
+                  {selectedConnection.markets.usdtPerpetual && (
+                    <span className="px-2 py-1 text-xs bg-purple-500/20 text-purple-300 border border-purple-500/40 rounded">USDT⊥</span>
+                  )}
+                  {selectedConnection.markets.inverseUsd && (
+                    <span className="px-2 py-1 text-xs bg-orange-500/20 text-orange-300 border border-orange-500/40 rounded">USD⊥</span>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm text-gray-400">Live Data Status</label>
+                <div className="grid grid-cols-2 gap-2 mt-2">
+                  <div className="text-center p-2 bg-gray-900/50 rounded">
+                    <div className="text-xs text-gray-500">Positions</div>
+                    <div className="text-green-400">
+                      {selectedConnection.positions?.length || 0}
+                    </div>
+                  </div>
+                  <div className="text-center p-2 bg-gray-900/50 rounded">
+                    <div className="text-xs text-gray-500">Status</div>
+                    <div className="text-blue-400">
+                      LIVE
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div>
+                <label className="text-sm text-gray-400 mb-3 block">Live Balance</label>
+                <div className="bg-gray-900 rounded-lg p-4 border border-gray-700/40">
+                  <div className="text-2xl font-bold text-white mb-2">
+                    ${selectedConnection.balance ? selectedConnection.balance.total.toLocaleString() : '0.00'}
+                  </div>
+                  <div className="text-sm text-gray-400 mb-4">
+                    Available: ${selectedConnection.balance ? selectedConnection.balance.available.toLocaleString() : '0.00'}
+                  </div>
+                  <div className="text-sm text-gray-400 mb-4">
+                    In Order: ${selectedConnection.balance ? selectedConnection.balance.inOrder.toLocaleString() : '0.00'}
+                  </div>
+                  
+                  <div className="h-20 relative flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="text-green-400 text-2xl mb-2">📊</div>
+                      <div className="text-sm text-gray-400">Live Data from ByBit API</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

@@ -290,6 +290,12 @@ export const bybitApi = {
     return response.data;
   },
 
+  // Get all available trading instruments/symbols
+  getInstruments: async (): Promise<{ success: boolean; data: Array<{ symbol: string; baseCoin: string; quoteCoin: string; status: string; contractType: string }> }> => {
+    const response = await apiClient.get('/market/instruments');
+    return response.data;
+  },
+
   // Get market data
   getMarketData: async (symbols?: string[]): Promise<{ success: boolean; data: MarketData[] }> => {
     const params = symbols ? { symbols: symbols.join(',') } : {};
