@@ -105,9 +105,37 @@ def get_live_account_data(api_key: str, secret_key: str):
         
         if balance_result["retCode"] == 0 and balance_result["result"]["list"]:
             account = balance_result["result"]["list"][0]
+            
+            # Log the raw account data for debugging
+            logger.info(f"Raw account data keys: {list(account.keys())}")
+            logger.info(f"TotalEquity: {account.get('totalEquity')}")
+            logger.info(f"TotalWalletBalance: {account.get('totalWalletBalance')}")
+            logger.info(f"TotalAvailableBalance: {account.get('totalAvailableBalance')}")
+            
+            # Handle different field names for UTA accounts
+            total_equity = float(account.get("totalEquity", "0") or account.get("totalWalletBalance", "0") or "0")
+            
+            # Try multiple fields for available balance
+            available = float(
+                account.get("totalAvailableBalance", "0") or 
+                account.get("availableBalance", "0") or
+                account.get("totalMarginBalance", "0") or
+                account.get("totalCashBalance", "0") or
+                "0"
+            )
+            
+            # Log for debugging
+            logger.info(f"Available balance candidates: totalAvailableBalance={account.get('totalAvailableBalance')}, availableBalance={account.get('availableBalance')}, totalMarginBalance={account.get('totalMarginBalance')}, totalCashBalance={account.get('totalCashBalance')}")
+            
+            # If available is still 0, try to calculate from equity minus used margin
+            if available == 0 and total_equity > 0:
+                used_margin = float(account.get("totalInitialMargin", "0") or account.get("totalUsedBalance", "0") or account.get("totalPositionMM", "0") or "0")
+                available = max(0, total_equity - used_margin)
+                logger.info(f"Calculated available: equity={total_equity} - margin={used_margin} = {available}")
+            
             balance_data = {
-                "total": float(account.get("totalEquity", "0") or "0"),
-                "available": float(account.get("totalAvailableBalance", "0") or "0"),
+                "total": total_equity,
+                "available": available,
                 "inOrder": float(account.get("totalUsedBalance", "0") or account.get("totalInitialMargin", "0") or "0"),
                 "coins": []
             }
@@ -115,15 +143,30 @@ def get_live_account_data(api_key: str, secret_key: str):
             # Process coin balances
             for coin in account.get("coin", []):
                 try:
-                    wallet_balance = float(coin.get("walletBalance", "0") or "0")
+                    # Handle different field names
+                    wallet_balance = float(coin.get("walletBalance", "0") or coin.get("equity", "0") or "0")
+                    
                     if wallet_balance > 0:
-                        available_balance = float(coin.get("availableToWithdraw", "0") or coin.get("availableBalance", "0") or coin.get("free", "0") or "0")
+                        # For UTA accounts, available balance might be in different fields
+                        available_balance = float(
+                            coin.get("availableToWithdraw", "0") or 
+                            coin.get("availableBalance", "0") or 
+                            coin.get("free", "0") or
+                            coin.get("availableToBorrow", "0") or
+                            "0"
+                        )
+                        
+                        # If still 0, calculate from wallet balance minus locked
+                        if available_balance == 0:
+                            locked = float(coin.get("locked", "0") or coin.get("totalOrderIM", "0") or coin.get("totalPositionIM", "0") or "0")
+                            available_balance = max(0, wallet_balance - locked)
+                        
                         balance_data["coins"].append({
                             "coin": coin.get("coin"),
                             "walletBalance": wallet_balance,
                             "availableBalance": available_balance,
                             "locked": wallet_balance - available_balance,
-                            "usdValue": float(coin.get("usdValue", "0") or "0")
+                            "usdValue": float(coin.get("usdValue", "0") or coin.get("equity", "0") or "0")
                         })
                 except ValueError as e:
                     logger.warning(f"Skipping coin {coin.get('coin')} due to conversion error: {e}")
@@ -283,6 +326,34 @@ async def health_check():
         "active_connections": len(connections_store),
         "mode": "LIVE"
     }
+
+@app.get("/api/debug/wallet/{connection_id}")
+async def debug_wallet(connection_id: str):
+    """Debug endpoint to see raw wallet data"""
+    try:
+        if connection_id not in connections_store:
+            raise HTTPException(status_code=404, detail="Connection not found")
+        
+        conn_data = connections_store[connection_id]
+        session = HTTP(
+            testnet=False,
+            api_key=conn_data.get("apiKey", ""),
+            api_secret=conn_data.get("secretKey", "")
+        )
+        
+        # Get raw wallet balance
+        balance_result = session.get_wallet_balance(accountType="UNIFIED")
+        
+        return {
+            "success": True,
+            "raw_response": balance_result,
+            "connection_name": conn_data.get("name"),
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Debug wallet error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/bybit/test-connection")
 async def test_bybit_connection(credentials: ByBitCredentials):

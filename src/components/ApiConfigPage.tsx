@@ -294,6 +294,25 @@ const ApiConfigPage: React.FC = () => {
     }
   };
 
+  const refreshBalance = async (connectionId: string) => {
+    try {
+      console.log('Refreshing balance for:', connectionId);
+      
+      // Get updated data for this specific connection
+      const response = await bybitApi.getConnection(connectionId);
+      
+      if (response.success && response.data) {
+        console.log('Updated balance data:', response.data);
+        
+        // Force reload all connections to reflect the update
+        await loadConnections();
+      }
+    } catch (error) {
+      console.error('Failed to refresh balance:', error);
+      alert('Failed to refresh balance. Please check the console for details.');
+    }
+  };
+
   const toggleConnectionStatus = (id: string) => {
     setBybitConnections(prev => prev.map(conn => 
       conn.id === id 
@@ -422,14 +441,23 @@ const ApiConfigPage: React.FC = () => {
                   </div>
                   
                   <div className="flex space-x-2">
-                    {connection.markets.spot && (
-                      <span className="px-2 py-1 text-xs bg-blue-500/20 text-blue-300 border border-blue-500/40 rounded">Spot</span>
-                    )}
-                    {connection.markets.usdtPerpetual && (
-                      <span className="px-2 py-1 text-xs bg-purple-500/20 text-purple-300 border border-purple-500/40 rounded">USDT⊥</span>
-                    )}
-                    {connection.markets.inverseUsd && (
-                      <span className="px-2 py-1 text-xs bg-orange-500/20 text-orange-300 border border-orange-500/40 rounded">USD⊥</span>
+                    {connection.name === 'Crypto Oppulence' ? (
+                      <>
+                        <span className="px-2 py-1 text-xs bg-gradient-to-r from-purple-500/20 to-blue-500/20 text-purple-300 border border-purple-500/40 rounded font-medium">Derivatives</span>
+                        <span className="px-2 py-1 text-xs bg-gradient-to-r from-green-500/20 to-teal-500/20 text-green-300 border border-green-500/40 rounded font-medium">UTA 2.0</span>
+                      </>
+                    ) : (
+                      <>
+                        {connection.markets.spot && (
+                          <span className="px-2 py-1 text-xs bg-blue-500/20 text-blue-300 border border-blue-500/40 rounded">Spot</span>
+                        )}
+                        {connection.markets.usdtPerpetual && (
+                          <span className="px-2 py-1 text-xs bg-purple-500/20 text-purple-300 border border-purple-500/40 rounded">USDT⊥</span>
+                        )}
+                        {connection.markets.inverseUsd && (
+                          <span className="px-2 py-1 text-xs bg-orange-500/20 text-orange-300 border border-orange-500/40 rounded">USD⊥</span>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -445,6 +473,13 @@ const ApiConfigPage: React.FC = () => {
                     <div className="flex items-center space-x-1 text-xs">
                       <span className="text-blue-400">LIVE</span>
                       <span className="text-gray-500">Data</span>
+                      <button
+                        onClick={() => refreshBalance(connection.id)}
+                        className="text-primary-blue hover:text-primary-blue-light ml-2"
+                        title="Refresh balance"
+                      >
+                        🔄
+                      </button>
                     </div>
                   </div>
                   

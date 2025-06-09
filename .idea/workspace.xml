@@ -5,17 +5,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="5bc93a3b-5cd2-4f9e-9a14-d8b6d15e6855" name="Changes" comment="Alles testen, manual order blijft hangen op execution en strategy builder zwart scherm bij machine learning.">
-      <change beforePath="$PROJECT_DIR$/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/package-lock.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/App.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/App.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/ApiConfigPage.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/ApiConfigPage.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/Dashboard.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/Dashboard.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/Header.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/Header.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/StrategiesPage.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/StrategiesPage.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/Tradespage.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/Tradespage.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/index.css" beforeDir="false" afterPath="$PROJECT_DIR$/src/index.css" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/services/api.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/services/api.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/vite.config.ts" beforeDir="false" afterPath="$PROJECT_DIR$/vite.config.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -92,7 +82,7 @@
       <workItem from="1749092071802" duration="68493000" />
       <workItem from="1749297499337" duration="24682000" />
       <workItem from="1749331612239" duration="20956000" />
-      <workItem from="1749363584202" duration="51362000" />
+      <workItem from="1749363584202" duration="52869000" />
     </task>
     <task id="LOCAL-00001" summary="2">
       <option name="closed" value="true" />
