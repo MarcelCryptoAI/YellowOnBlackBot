@@ -116,8 +116,8 @@ const StatCard: React.FC<{
   icon: string;
 }> = ({ title, value, change, changeType, icon }) => (
   <div className="relative group">
-    <div className="absolute inset-0 bg-gradient-to-br from-yellow-400/10 to-yellow-600/10 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
-    <div className="relative bg-gradient-to-br from-black to-gray-900 p-6 rounded-xl border border-gray-600/30 hover:border-yellow-400/40 transition-all duration-300 shadow-2xl shadow-black/50 hover:shadow-yellow-400/10">
+    <div className="absolute inset-0 bg-gradient-to-br from-primary-blue/10 to-primary-blue-dark/10 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
+    <div className="relative bg-gradient-to-br from-black to-gray-900 p-6 rounded-xl border border-gray-600/30 hover:border-primary-blue/40 transition-all duration-300 shadow-2xl shadow-black/50 hover:shadow-primary-blue/10">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-gray-400 text-sm font-medium tracking-wider uppercase">{title}</p>
@@ -143,7 +143,7 @@ const StatCard: React.FC<{
 
 const TradeCard: React.FC<{ trade: Position }> = ({ trade }) => (
   <div className="relative group">
-    <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-yellow-400/5 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
+    <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-primary-blue/5 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
     <div className="relative bg-gradient-to-br from-black to-gray-900 p-5 rounded-xl border border-gray-600/30 hover:border-white/30 transition-all duration-300 shadow-2xl shadow-black/50 hover:shadow-white/10">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center space-x-3">
@@ -159,7 +159,7 @@ const TradeCard: React.FC<{ trade: Position }> = ({ trade }) => (
         </div>
         <span className={`text-sm font-bold px-3 py-1 rounded-full shadow-lg ${
           trade.status === 'OPEN' 
-            ? 'text-yellow-300 bg-gradient-to-r from-yellow-500/20 to-yellow-400/20 border border-yellow-500/40 shadow-yellow-400/20' 
+            ? 'text-primary-blue bg-gradient-to-r from-primary-blue/20 to-primary-blue-dark/20 border border-primary-blue/40 shadow-primary-blue/20' 
             : 'text-gray-300 bg-gradient-to-r from-gray-600/20 to-gray-500/20 border border-gray-500/40 shadow-gray-400/20'
         }`}>
           {trade.status}
@@ -202,15 +202,15 @@ const TradeCard: React.FC<{ trade: Position }> = ({ trade }) => (
 
 const StrategyCard: React.FC<{ strategy: Strategy }> = ({ strategy }) => (
   <div className="relative group">
-    <div className="absolute inset-0 bg-gradient-to-br from-yellow-400/10 to-white/5 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
-    <div className="relative bg-gradient-to-br from-black to-gray-900 p-5 rounded-xl border border-gray-600/30 hover:border-yellow-400/40 transition-all duration-300 shadow-2xl shadow-black/50 hover:shadow-yellow-400/10">
+    <div className="absolute inset-0 bg-gradient-to-br from-primary-blue/10 to-white/5 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
+    <div className="relative bg-gradient-to-br from-black to-gray-900 p-5 rounded-xl border border-gray-600/30 hover:border-primary-blue/40 transition-all duration-300 shadow-2xl shadow-black/50 hover:shadow-primary-blue/10">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-bold text-white text-lg tracking-wide drop-shadow-md">{strategy.name}</h3>
         <span className={`text-xs px-3 py-1.5 rounded-full font-bold uppercase tracking-wider shadow-lg ${
           strategy.status === 'ACTIVE' 
             ? 'bg-gradient-to-r from-green-500/20 to-green-400/20 text-green-300 border border-green-500/40 shadow-green-400/20'
             : strategy.status === 'PAUSED'
-            ? 'bg-gradient-to-r from-yellow-500/20 to-yellow-400/20 text-yellow-300 border border-yellow-500/40 shadow-yellow-400/20'
+            ? 'bg-gradient-to-r from-primary-blue/20 to-primary-blue-dark/20 text-primary-blue border border-primary-blue/40 shadow-primary-blue/20'
             : 'bg-gradient-to-r from-red-500/20 to-red-400/20 text-red-300 border border-red-500/40 shadow-red-400/20'
         }`}>
           {strategy.status}
@@ -228,7 +228,7 @@ const StrategyCard: React.FC<{ strategy: Strategy }> = ({ strategy }) => (
         </div>
         <div className="flex justify-between items-center">
           <span className="text-gray-400 uppercase tracking-wider font-medium">Win Rate</span>
-          <span className="text-yellow-300 font-bold text-lg drop-shadow-sm">{strategy.winRate}%</span>
+          <span className="text-primary-blue font-bold text-lg drop-shadow-sm">{strategy.winRate}%</span>
         </div>
       </div>
     </div>
@@ -237,11 +237,11 @@ const StrategyCard: React.FC<{ strategy: Strategy }> = ({ strategy }) => (
 
 const SystemStatusCard: React.FC<{ status: SystemStatus }> = ({ status }) => (
   <div className="relative group">
-    <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-yellow-400/5 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
+    <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-primary-blue/5 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
     <div className="relative bg-gradient-to-br from-black to-gray-900 p-6 rounded-xl border border-gray-600/30 hover:border-white/30 transition-all duration-300 shadow-2xl shadow-black/50">
       <h3 className="text-xl font-bold mb-6 flex items-center">
         <span className="mr-3 text-2xl">🛡️</span>
-        <span className="bg-gradient-to-r from-white via-gray-200 to-yellow-400 bg-clip-text text-transparent drop-shadow-lg">
+        <span className="bg-gradient-to-r from-white via-gray-200 to-primary-blue bg-clip-text text-transparent drop-shadow-lg">
           SYSTEM STATUS
         </span>
       </h3>
@@ -846,7 +846,7 @@ const App: React.FC = () => {
     switch (status) {
       case 'Active': return 'text-green-300';
       case 'Inactive': return 'text-gray-400';
-      case 'Testing': return 'text-yellow-300';
+      case 'Testing': return 'text-primary-blue';
       case 'Error': return 'text-red-300';
       default: return 'text-gray-500';
     }
@@ -856,9 +856,9 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black relative overflow-hidden">
       {/* Elegant Background */}
       <div className="absolute inset-0 opacity-10">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gradient-to-br from-yellow-500/20 to-amber-600/20 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gradient-to-br from-primary-blue/20 to-secondary-purple/20 rounded-full blur-3xl animate-pulse"></div>
         <div className="absolute top-3/4 right-1/4 w-80 h-80 bg-gradient-to-br from-white/10 to-gray-300/10 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute top-1/2 left-1/2 w-72 h-72 bg-gradient-to-br from-yellow-600/15 to-yellow-500/15 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute top-1/2 left-1/2 w-72 h-72 bg-gradient-to-br from-primary-blue/15 to-primary-purple/15 rounded-full blur-3xl animate-pulse"></div>
       </div>
 
       {/* Compact Header */}
@@ -870,9 +870,9 @@ const App: React.FC = () => {
               {topCoins.map((coin) => (
                 <div 
                   key={coin.symbol}
-                  className="flex items-center space-x-1.5 bg-black/30 backdrop-blur-xl rounded-lg px-2 py-1 border border-yellow-400/30 hover:bg-yellow-400/10 transition-all cursor-pointer"
+                  className="flex items-center space-x-1.5 bg-black/30 backdrop-blur-xl rounded-lg px-2 py-1 border border-primary-blue/30 hover:bg-primary-blue/10 transition-all cursor-pointer"
                 >
-                  <span className="text-yellow-400 font-bold text-xs">{coin.symbol}</span>
+                  <span className="text-primary-blue font-bold text-xs">{coin.symbol}</span>
                   <span className="text-white font-semibold text-xs">
                     ${coin.price < 1 ? coin.price.toFixed(3) : coin.price.toLocaleString()}
                   </span>
@@ -888,9 +888,9 @@ const App: React.FC = () => {
           
           <div className="flex items-center space-x-2">
             {/* ByBit Portfolio Value */}
-            <div className="flex items-center space-x-1.5 bg-black/50 backdrop-blur-xl rounded-lg px-2 py-1 border border-yellow-600/30 shadow-lg shadow-black/20">
-              <span className="text-yellow-400 text-sm">💰</span>
-              <span className="text-xs font-medium text-yellow-300">
+            <div className="flex items-center space-x-1.5 bg-black/50 backdrop-blur-xl rounded-lg px-2 py-1 border border-primary-blue/30 shadow-lg shadow-black/20">
+              <span className="text-primary-blue text-sm">💰</span>
+              <span className="text-xs font-medium text-primary-blue">
                 ${totalValue.toLocaleString()}
               </span>
             </div>
@@ -919,31 +919,31 @@ const App: React.FC = () => {
             
             <button
               onClick={handleRefresh}
-              className={`p-1.5 rounded-lg bg-black/50 backdrop-blur-xl border border-gray-600/30 hover:border-yellow-400/40 hover:bg-yellow-400/10 transition-all duration-300 ${
+              className={`p-1.5 rounded-lg bg-black/50 backdrop-blur-xl border border-gray-600/30 hover:border-primary-blue/40 hover:bg-primary-blue/10 transition-all duration-300 ${
                 isRefreshing ? 'animate-spin' : ''
               }`}
             >
-              <span className="text-yellow-400 text-sm">🔄</span>
+              <span className="text-primary-blue text-sm">🔄</span>
             </button>
             <div className={`flex items-center space-x-1.5 bg-black/50 backdrop-blur-xl rounded-lg px-2 py-1 border ${
               backendStatus === 'connected' 
                 ? 'border-green-600/30' 
                 : backendStatus === 'connecting'
-                ? 'border-yellow-600/30'
+                ? 'border-primary-blue/30'
                 : 'border-red-600/30'
             }`}>
               <div className={`w-1.5 h-1.5 rounded-full ${
                 backendStatus === 'connected' 
                   ? 'bg-green-400 animate-pulse' 
                   : backendStatus === 'connecting'
-                  ? 'bg-yellow-400 animate-pulse'
+                  ? 'bg-primary-blue animate-pulse'
                   : 'bg-red-400'
               }`}></div>
               <span className={`text-xs font-medium ${
                 backendStatus === 'connected' 
                   ? 'text-green-300' 
                   : backendStatus === 'connecting'
-                  ? 'text-yellow-300'
+                  ? 'text-primary-blue'
                   : 'text-red-300'
               }`}>
                 {backendStatus === 'connected' ? 'LIVE' : backendStatus === 'connecting' ? 'CONN' : 'OFF'}
@@ -961,13 +961,13 @@ const App: React.FC = () => {
             <img 
               src="/arie-logo.png" 
               alt="ArIe Logo" 
-              className="h-8 w-8 rounded-full drop-shadow-lg border border-yellow-400/30"
+              className="h-8 w-8 rounded-full drop-shadow-lg border border-primary-blue/30"
               onError={(e) => {
                 (e.target as HTMLImageElement).style.display = 'none';
               }}
             />
             <div>
-              <h1 className="text-sm font-bold bg-gradient-to-r from-white via-yellow-200 to-yellow-400 bg-clip-text text-transparent">
+              <h1 className="text-sm font-bold bg-gradient-to-r from-white via-primary-blue/70 to-primary-blue bg-clip-text text-transparent">
                 ArIe
               </h1>
               <p className="text-xs text-gray-400">AI Trading Platform</p>
@@ -988,7 +988,7 @@ const App: React.FC = () => {
                 onClick={() => navigate(tab.path)}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 flex items-center space-x-2 ${
                   location.pathname === tab.path
-                    ? 'bg-gradient-to-r from-yellow-400 to-yellow-500 text-black shadow-xl shadow-yellow-400/25 font-bold'
+                    ? 'bg-gradient-to-r from-primary-blue to-primary-blue-dark text-white shadow-xl shadow-primary-blue/25 font-bold'
                     : 'text-gray-300 hover:text-white hover:bg-white/5 hover:shadow-lg hover:shadow-white/10'
                 }`}
               >
@@ -1145,7 +1145,7 @@ const App: React.FC = () => {
                 <div>
                   <label className="text-sm text-gray-400">Exchange</label>
                   <div className="flex items-center space-x-2">
-                    <span className="text-yellow-400">🟡</span>
+                    <span className="text-primary-blue">🔵</span>
                     <span className="text-white font-medium">Bybit {selectedConnection.testnet ? 'Testnet' : 'Mainnet'}</span>
                   </div>
                 </div>

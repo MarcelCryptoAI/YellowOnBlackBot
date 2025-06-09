@@ -382,6 +382,50 @@ export const openaiApi = {
     const response = await apiClient.get('/openai/pricing');
     return response.data;
   },
+
+  // Get strategy advice from OpenAI
+  getStrategyAdvice: async (strategyData: {
+    coin: string;
+    signalIndicator: any;
+    confirmingIndicators: any[];
+  }): Promise<{ success: boolean; data: any }> => {
+    const response = await apiClient.post('/openai/strategy-advice', {
+      coin: strategyData.coin,
+      signalIndicator: strategyData.signalIndicator,
+      confirmingIndicators: strategyData.confirmingIndicators
+    });
+    return response.data;
+  },
+
+  // AI Indicator Selectie - Optimize indicators and parameters
+  optimizeIndicators: async (requestData: {
+    coin: string;
+    timeframe?: string;
+    lookbackPeriod?: string;
+  }): Promise<{ success: boolean; data: any }> => {
+    const response = await apiClient.post('/openai/optimize-indicators', {
+      coin: requestData.coin,
+      timeframe: requestData.timeframe || '1m',
+      lookbackPeriod: requestData.lookbackPeriod || '1y'
+    });
+    return response.data;
+  },
+
+  // AI Trade Parameters - Optimize entry/exit and risk management
+  optimizeTradeParameters: async (requestData: {
+    coin: string;
+    signalIndicator: any;
+    confirmingIndicators: any[];
+    currentSettings: any;
+  }): Promise<{ success: boolean; data: any }> => {
+    const response = await apiClient.post('/openai/optimize-trade-parameters', {
+      coin: requestData.coin,
+      signalIndicator: requestData.signalIndicator,
+      confirmingIndicators: requestData.confirmingIndicators,
+      currentSettings: requestData.currentSettings
+    });
+    return response.data;
+  },
 };
 
 // Coins API

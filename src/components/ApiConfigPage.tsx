@@ -344,7 +344,7 @@ const ApiConfigPage: React.FC = () => {
     switch (status) {
       case 'Active': return 'text-green-300';
       case 'Inactive': return 'text-gray-400';
-      case 'Testing': return 'text-yellow-300';
+      case 'Testing': return 'text-primary-blue';
       case 'Error': return 'text-red-300';
       default: return 'text-gray-500';
     }
@@ -353,7 +353,7 @@ const ApiConfigPage: React.FC = () => {
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
-        <h2 className="text-3xl font-bold bg-gradient-to-r from-white via-gray-200 to-yellow-400 bg-clip-text text-transparent drop-shadow-lg">
+        <h2 className="text-3xl font-bold bg-gradient-to-r from-white via-gray-200 to-primary-blue bg-clip-text text-transparent drop-shadow-lg">
           API CONFIGURATION
         </h2>
         <div className="flex items-center space-x-4 text-sm text-gray-400">
@@ -392,15 +392,15 @@ const ApiConfigPage: React.FC = () => {
       
       {/* Existing Bybit Connections */}
       <div className="relative group">
-        <div className="absolute inset-0 bg-gradient-to-br from-yellow-400/10 to-white/5 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
-        <div className="relative bg-gradient-to-br from-black to-gray-900 p-6 rounded-xl border border-gray-600/30 hover:border-yellow-400/40 transition-all duration-300 shadow-2xl shadow-black/50">
-          <h3 className="text-xl font-bold mb-6 bg-gradient-to-r from-yellow-400 to-white bg-clip-text text-transparent drop-shadow-lg">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary-blue/10 to-white/5 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
+        <div className="relative bg-gradient-to-br from-black to-gray-900 p-6 rounded-xl border border-gray-600/30 hover:border-primary-blue/40 transition-all duration-300 shadow-2xl shadow-black/50">
+          <h3 className="text-xl font-bold mb-6 bg-gradient-to-r from-primary-blue to-white bg-clip-text text-transparent drop-shadow-lg">
             🟡 BYBIT CONNECTIONS ({bybitConnections.length})
           </h3>
           
           <div className="space-y-4">
             {bybitConnections.map((connection) => (
-              <div key={connection.id} className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-900 to-black rounded-lg border border-gray-700/40 hover:border-yellow-400/30 transition-all group/item">
+              <div key={connection.id} className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-900 to-black rounded-lg border border-gray-700/40 hover:border-primary-blue/30 transition-all group/item">
                 <div className="flex items-center space-x-4">
                   <div className="flex items-center space-x-3">
                     <span className="text-xl">{getStatusIcon(connection.status)}</span>
@@ -408,7 +408,7 @@ const ApiConfigPage: React.FC = () => {
                       <div className="flex items-center space-x-2">
                         <span className="text-white font-bold text-xl tracking-wide drop-shadow-lg">{connection.name}</span>
                         {connection.testnet && (
-                          <span className="px-2 py-1 text-xs bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 rounded font-medium">Testnet</span>
+                          <span className="px-2 py-1 text-xs bg-accent-orange/20 text-accent-orange border border-accent-orange/40 rounded font-medium">Testnet</span>
                         )}
                       </div>
                       <div className="flex items-center space-x-2 text-xs text-gray-400">
@@ -465,10 +465,10 @@ const ApiConfigPage: React.FC = () => {
                         setSelectedConnection(connection);
                         setShowConnectionDetails(true);
                       }}
-                      className="p-2 hover:bg-yellow-400/10 rounded transition-all"
+                      className="p-2 hover:bg-primary-blue/10 rounded transition-all"
                       title="View Details"
                     >
-                      <span className="text-yellow-400">ℹ️</span>
+                      <span className="text-primary-blue">ℹ️</span>
                     </button>
                     
                     <div className="relative group/menu">
@@ -554,7 +554,7 @@ const ApiConfigPage: React.FC = () => {
                         <div 
                           className={`h-full transition-all duration-300 ${
                             connection.subscription.usagePercentage > 80 ? 'bg-red-400' : 
-                            connection.subscription.usagePercentage > 60 ? 'bg-yellow-400' : 'bg-green-400'
+                            connection.subscription.usagePercentage > 60 ? 'bg-accent-orange' : 'bg-green-400'
                           }`}
                           style={{ width: `${Math.min(connection.subscription.usagePercentage, 100)}%` }}
                         />
@@ -626,9 +626,9 @@ const ApiConfigPage: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* New Bybit Connection Form */}
         <div className="relative group">
-          <div className="absolute inset-0 bg-gradient-to-br from-yellow-400/10 to-white/5 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
-          <div className="relative bg-gradient-to-br from-black to-gray-900 p-6 rounded-xl border border-gray-600/30 hover:border-yellow-400/40 transition-all duration-300 shadow-2xl shadow-black/50">
-            <h3 className="text-xl font-bold mb-6 bg-gradient-to-r from-yellow-400 to-white bg-clip-text text-transparent drop-shadow-lg">
+          <div className="absolute inset-0 bg-gradient-to-br from-primary-blue/10 to-white/5 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
+          <div className="relative bg-gradient-to-br from-black to-gray-900 p-6 rounded-xl border border-gray-600/30 hover:border-primary-blue/40 transition-all duration-300 shadow-2xl shadow-black/50">
+            <h3 className="text-xl font-bold mb-6 bg-gradient-to-r from-primary-blue to-white bg-clip-text text-transparent drop-shadow-lg">
               🟡 NEW BYBIT CONNECTION
             </h3>
             
@@ -641,7 +641,7 @@ const ApiConfigPage: React.FC = () => {
                   value={apiCredentials.bybit.name}
                   onChange={(e) => updateBybitCredentials('name', e.target.value)}
                   placeholder="e.g., Main Trading Account, Scalping Bot, Test Account..."
-                  className="w-full p-3 bg-gradient-to-r from-gray-900 to-black border border-gray-600/40 rounded-lg text-white placeholder-gray-500 focus:border-yellow-400/60 focus:outline-none transition-all"
+                  className="w-full p-3 bg-gradient-to-r from-gray-900 to-black border border-gray-600/40 rounded-lg text-white placeholder-gray-500 focus:border-primary-blue/60 focus:outline-none transition-all"
                   required
                 />
                 <p className="text-xs text-gray-500 mt-1">Give this connection a unique name to identify it</p>
@@ -655,7 +655,7 @@ const ApiConfigPage: React.FC = () => {
                   value={apiCredentials.bybit.apiKey}
                   onChange={(e) => updateBybitCredentials('apiKey', e.target.value)}
                   placeholder="Enter your Bybit API key..."
-                  className="w-full p-3 bg-gradient-to-r from-gray-900 to-black border border-gray-600/40 rounded-lg text-white placeholder-gray-500 focus:border-yellow-400/60 focus:outline-none transition-all"
+                  className="w-full p-3 bg-gradient-to-r from-gray-900 to-black border border-gray-600/40 rounded-lg text-white placeholder-gray-500 focus:border-primary-blue/60 focus:outline-none transition-all"
                   required
                 />
               </div>
@@ -668,7 +668,7 @@ const ApiConfigPage: React.FC = () => {
                   value={apiCredentials.bybit.secretKey}
                   onChange={(e) => updateBybitCredentials('secretKey', e.target.value)}
                   placeholder="Enter your Bybit secret key..."
-                  className="w-full p-3 bg-gradient-to-r from-gray-900 to-black border border-gray-600/40 rounded-lg text-white placeholder-gray-500 focus:border-yellow-400/60 focus:outline-none transition-all"
+                  className="w-full p-3 bg-gradient-to-r from-gray-900 to-black border border-gray-600/40 rounded-lg text-white placeholder-gray-500 focus:border-primary-blue/60 focus:outline-none transition-all"
                   required
                 />
               </div>
@@ -733,7 +733,7 @@ const ApiConfigPage: React.FC = () => {
                   id="testnet-toggle"
                   checked={apiCredentials.bybit.testnet}
                   onChange={(e) => updateBybitCredentials('testnet', e.target.checked)}
-                  className="w-4 h-4 text-yellow-400 bg-gray-900 border-gray-600 rounded focus:ring-yellow-400 focus:ring-2"
+                  className="w-4 h-4 text-primary-blue bg-gray-900 border-gray-600 rounded focus:ring-primary-blue focus:ring-2"
                 />
                 <label htmlFor="testnet-toggle" className="text-gray-300 text-sm flex items-center space-x-2 cursor-pointer">
                   <span>Use Testnet</span>
@@ -745,7 +745,7 @@ const ApiConfigPage: React.FC = () => {
               <button
                 onClick={testBybitConnection}
                 disabled={isTesting.bybit}
-                className="w-full bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-300 hover:to-yellow-400 disabled:from-gray-600 disabled:to-gray-700 text-black font-bold py-3 px-4 rounded-lg transition-all duration-300 shadow-lg mt-6"
+                className="w-full bg-gradient-to-r from-primary-blue to-primary-blue-dark hover:from-primary-blue/80 hover:to-primary-blue text-white font-bold py-3 px-4 rounded-lg transition-all duration-300 shadow-lg mt-6"
               >
                 {isTesting.bybit ? '🔄 Creating Connection...' : '🚀 Create Connection'}
               </button>
@@ -760,9 +760,9 @@ const ApiConfigPage: React.FC = () => {
 
         {/* OpenAI Configuration */}
         <div className="relative group">
-          <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-yellow-400/5 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
+          <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-primary-blue/5 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
           <div className="relative bg-gradient-to-br from-black to-gray-900 p-6 rounded-xl border border-gray-600/30 hover:border-white/30 transition-all duration-300 shadow-2xl shadow-black/50">
-            <h3 className="text-xl font-bold mb-6 bg-gradient-to-r from-white to-yellow-400 bg-clip-text text-transparent drop-shadow-lg">
+            <h3 className="text-xl font-bold mb-6 bg-gradient-to-r from-white to-primary-blue bg-clip-text text-transparent drop-shadow-lg">
               🤖 OPENAI API
             </h3>
             
@@ -774,7 +774,7 @@ const ApiConfigPage: React.FC = () => {
                   value={apiCredentials.openai.apiKey}
                   onChange={(e) => updateOpenAICredentials('apiKey', e.target.value)}
                   placeholder="sk-..."
-                  className="w-full p-3 bg-gradient-to-r from-gray-900 to-black border border-gray-600/40 rounded-lg text-white placeholder-gray-500 focus:border-yellow-400/60 focus:outline-none transition-all"
+                  className="w-full p-3 bg-gradient-to-r from-gray-900 to-black border border-gray-600/40 rounded-lg text-white placeholder-gray-500 focus:border-primary-blue/60 focus:outline-none transition-all"
                 />
               </div>
               
@@ -785,7 +785,7 @@ const ApiConfigPage: React.FC = () => {
                   value={apiCredentials.openai.organization}
                   onChange={(e) => updateOpenAICredentials('organization', e.target.value)}
                   placeholder="org-..."
-                  className="w-full p-3 bg-gradient-to-r from-gray-900 to-black border border-gray-600/40 rounded-lg text-white placeholder-gray-500 focus:border-yellow-400/60 focus:outline-none transition-all"
+                  className="w-full p-3 bg-gradient-to-r from-gray-900 to-black border border-gray-600/40 rounded-lg text-white placeholder-gray-500 focus:border-primary-blue/60 focus:outline-none transition-all"
                 />
               </div>
               
@@ -844,7 +844,7 @@ const ApiConfigPage: React.FC = () => {
               <div>
                 <label className="text-sm text-gray-400">Exchange</label>
                 <div className="flex items-center space-x-2">
-                  <span className="text-yellow-400">🟡</span>
+                  <span className="text-primary-blue">🔵</span>
                   <span className="text-white font-medium">Bybit {selectedConnection.testnet ? 'Testnet' : 'Mainnet'}</span>
                 </div>
               </div>

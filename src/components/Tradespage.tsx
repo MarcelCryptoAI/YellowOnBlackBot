@@ -63,7 +63,7 @@ const formatOpenDate = (timestamp: string) => {
 // Trade Card Component
 const TradeCard: React.FC<{ trade: Trade; showOpenDate?: boolean }> = ({ trade, showOpenDate = false }) => (
   <div className="relative group">
-    <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-yellow-400/5 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
+    <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-blue-400/5 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
     <div className="relative bg-gradient-to-br from-black to-gray-900 p-5 rounded-xl border border-gray-600/30 hover:border-white/30 transition-all duration-300 shadow-2xl shadow-black/50 hover:shadow-white/10">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center space-x-3">
@@ -79,7 +79,7 @@ const TradeCard: React.FC<{ trade: Trade; showOpenDate?: boolean }> = ({ trade, 
         </div>
         <span className={`text-sm font-bold px-3 py-1 rounded-full shadow-lg ${
           trade.status === 'OPEN' 
-            ? 'text-yellow-300 bg-gradient-to-r from-yellow-500/20 to-yellow-400/20 border border-yellow-500/40 shadow-yellow-400/20'
+            ? 'text-orange-300 bg-gradient-to-r from-orange-500/20 to-orange-400/20 border border-orange-500/40 shadow-orange-400/20'
             : trade.status === 'PENDING'
             ? 'text-blue-300 bg-gradient-to-r from-blue-500/20 to-blue-400/20 border border-blue-500/40 shadow-blue-400/20'
             : trade.status === 'CANCELLED'
@@ -107,7 +107,7 @@ const TradeCard: React.FC<{ trade: Trade; showOpenDate?: boolean }> = ({ trade, 
             </div>
             <div className="text-right">
               <p className="text-gray-400 uppercase tracking-wider text-xs font-medium mb-1">Duration</p>
-              <span className="text-yellow-300 font-medium text-sm">
+              <span className="text-cyan-300 font-medium text-sm">
                 {getTimeAgo(trade.timestamp)}
               </span>
             </div>
@@ -148,7 +148,7 @@ const TradeCard: React.FC<{ trade: Trade; showOpenDate?: boolean }> = ({ trade, 
           <button className="flex-1 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 shadow-lg hover:shadow-red-400/30">
             Close
           </button>
-          <button className="flex-1 bg-gradient-to-r from-yellow-600 to-yellow-500 hover:from-yellow-500 hover:to-yellow-400 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 shadow-lg hover:shadow-yellow-400/30">
+          <button className="flex-1 bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 shadow-lg hover:shadow-orange-400/30">
             Modify
           </button>
         </div>
@@ -312,8 +312,8 @@ const TradesPage: React.FC = () => {
       {/* Header with Summary Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="relative group">
-          <div className="absolute inset-0 bg-gradient-to-br from-yellow-400/10 to-yellow-600/10 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
-          <div className="relative bg-gradient-to-br from-black to-gray-900 p-6 rounded-xl border border-gray-600/30 hover:border-yellow-400/40 transition-all duration-300 shadow-2xl shadow-black/50 hover:shadow-yellow-400/10">
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-400/10 to-blue-600/10 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
+          <div className="relative bg-gradient-to-br from-black to-gray-900 p-6 rounded-xl border border-gray-600/30 hover:border-blue-400/40 transition-all duration-300 shadow-2xl shadow-black/50 hover:shadow-blue-400/10">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-400 text-sm font-medium tracking-wider uppercase">Total Portfolio</p>
@@ -376,7 +376,7 @@ const TradesPage: React.FC = () => {
             onClick={() => setActiveTab(tab.name)}
             className={`flex-1 px-6 py-3 rounded-lg font-medium transition-all duration-300 ${
               activeTab === tab.name
-                ? 'bg-gradient-to-r from-yellow-500 to-yellow-400 text-black shadow-lg shadow-yellow-400/30'
+                ? 'bg-gradient-to-r from-blue-500 to-blue-400 text-white shadow-lg shadow-blue-400/30'
                 : 'text-gray-300 hover:text-white hover:bg-gray-800/50'
             }`}
           >

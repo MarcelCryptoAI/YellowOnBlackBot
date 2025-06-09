@@ -1,0 +1,26 @@
+{
+  "marcel_1749306779188": {
+    "name": "Revolution X",
+    "markets": {
+      "spot": false,
+      "usdtPerpetual": true,
+      "inverseUsd": false
+    },
+    "apiKey": "lA6IFfWtM25UOeFItt",
+    "secretKey": "LxbyNoVLCf9nE96ojeybroPPF9gwsOmCtbNp",
+    "created_at": "2025-06-07T17:13:41.629340",
+    "status": "active"
+  },
+  "marcel_1749306780000": {
+    "name": "Crypto Oppulence",
+    "markets": {
+      "spot": false,
+      "usdtPerpetual": true,
+      "inverseUsd": false
+    },
+    "apiKey": "SHG7H7KEPA8SDc69ic",
+    "secretKey": "d6ACu6jCHT7Ul9JX3OoTButyohK4xMlzZkWi",
+    "created_at": "2025-06-08T17:13:41.629340",
+    "status": "active"
+  }
+}
