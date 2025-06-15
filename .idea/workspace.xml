@@ -42,6 +42,7 @@
   "keyToString": {
     "ModuleVcsDetector.initialDetectionPerformed": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager": "true",
     "RunOnceActivity.git.unshallow": "true",
     "git-widget-placeholder": "main",
     "last_opened_file_path": "/Users/marcelstuivenberg/PycharmProjects/CTB",
@@ -89,7 +90,7 @@
       <workItem from="1749633587032" duration="18399000" />
       <workItem from="1749706407578" duration="12656000" />
       <workItem from="1749830532154" duration="22083000" />
-      <workItem from="1749979433863" duration="4908000" />
+      <workItem from="1749979433863" duration="5870000" />
     </task>
     <task id="LOCAL-00001" summary="2">
       <option name="closed" value="true" />
