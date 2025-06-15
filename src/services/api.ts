@@ -274,7 +274,7 @@ class WebSocketManager {
 
     // Create WebSocket connection to live backend
     console.log('🔌 Connecting WebSocket to live backend...');
-    this.socket = io('http://localhost:6789', {
+    this.socket = io('https://arie-backend-api-d916579ecc97.herokuapp.com', {
       reconnection: true,
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
