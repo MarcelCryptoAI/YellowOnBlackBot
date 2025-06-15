@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     
     # Server
     HOST: str = "0.0.0.0"
-    PORT: int = 8000
+    PORT: int = 6789
     
     # Security
     SECRET_KEY: str = "ctb-trading-bot-secret-key-change-in-production"

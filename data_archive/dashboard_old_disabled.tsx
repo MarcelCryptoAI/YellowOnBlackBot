@@ -1,5 +1,40 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { bybitApi, Position, OrderHistory, ConnectionData } from '../services/api';
+import { Line } from 'react-chartjs-2';
+
+// Temporary BybitConnection interface until we remove NewDashboardSections dependency
+interface BybitConnection {
+  connectionId: string;
+  name: string;
+  status: string;
+  data: ConnectionData;
+  metadata: {
+    name: string;
+    created_at: string;
+  };
+}
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+} from 'chart.js';
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+);
 
 // Widget configuration interface
 interface WidgetConfig {
@@ -38,16 +73,6 @@ interface WidgetConfig {
   };
 }
 
-interface BybitConnection {
-  connectionId: string;
-  name: string;
-  status: string;
-  data: ConnectionData;
-  metadata: {
-    name: string;
-    created_at: string;
-  };
-}
 
 // Utility function for currency formatting
 function toCurrency(v: number) {
@@ -781,140 +806,188 @@ const DashboardPage: React.FC = () => {
 
   return (
     <div className="p-6 space-y-8">
+      {/* Top bar with coin prices */}
+      <div className="flex items-center justify-between text-sm text-gray-400 mb-2">
+        <div className="flex items-center space-x-6">
+          <div className="flex items-center space-x-2">
+            <span>BTC</span>
+            <span className="text-white">$45,231.50</span>
+            <span className="text-green-400">+2.3%</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <span>ETH</span>
+            <span className="text-white">$2,451.30</span>
+            <span className="text-red-400">-1.1%</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <span>SOL</span>
+            <span className="text-white">$98.45</span>
+            <span className="text-green-400">+4.2%</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Header with controls */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-3xl font-bold text-white">Dashboard</h1>
+          <p className="text-gray-400 mt-1">Live trading overview</p>
+        </div>
+        
+        <div className="flex items-center space-x-3">
+          {/* Refresh button */}
+          <button
+            onClick={fetchData}
+            className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
+            title="Refresh data"
+          >
+            <span className="text-gray-300">🔄</span>
+          </button>
+          
+          {/* Settings gear button */}
+          <button
+            onClick={() => setShowWidgetConfig(true)}
+            className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
+            title="Widget settings"
+          >
+            <span className="text-gray-300">⚙️</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Portfolio Overview Section */}
+      {widgetConfig.portfolioOverview?.enabled && (
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold text-white mb-4">💰 Portfolio Overview</h2>
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+            {widgetConfig.portfolioOverview?.portfolioValue && (
+              <MetricCard
+                title="Portfolio Value"
+                value={metrics.totalBalance}
+                subtitle="Total account balance"
+                trend="up"
+                trendValue="All accounts combined"
+                icon="💰"
+                gradient="bg-gradient-to-br from-blue-400/10 to-blue-600/10"
+              />
+            )}
+            {widgetConfig.portfolioOverview?.availableBalance && (
+              <MetricCard
+                title="Available Balance"
+                value={metrics.availableBalance}
+                subtitle="Ready to trade"
+                trend="neutral"
+                trendValue="Liquidity pool"
+                icon="💵"
+                gradient="bg-gradient-to-br from-green-400/10 to-green-600/10"
+              />
+            )}
+            {widgetConfig.portfolioOverview?.totalPnL && (
+              <MetricCard
+                title="Total P&L"
+                value={metrics.totalPnL}
+                subtitle="All-time performance"
+                trend={metrics.totalPnL >= 0 ? 'up' : 'down'}
+                trendValue={`${metrics.totalPnL >= 0 ? '+' : ''}${((metrics.totalPnL / metrics.totalBalance) * 100).toFixed(2)}%`}
+                icon="📊"
+                gradient="bg-gradient-to-br from-purple-400/10 to-purple-600/10"
+              />
+            )}
+            {widgetConfig.portfolioOverview?.pnl7D && (
+              <MetricCard
+                title="P&L (7D)"
+                value={metrics.totalPnL7D}
+                subtitle="Weekly performance"
+                trend={metrics.totalPnL7D >= 0 ? 'up' : 'down'}
+                trendValue="Rolling 7 days"
+                icon="📈"
+                gradient="bg-gradient-to-br from-cyan-400/10 to-cyan-600/10"
+              />
+            )}
+            {widgetConfig.portfolioOverview?.pnl24h && (
+              <MetricCard
+                title="P&L (24h)"
+                value={metrics.totalPnL24h}
+                subtitle="Today's performance"
+                trend={metrics.totalPnL24h >= 0 ? 'up' : 'down'}
+                trendValue="Since midnight"
+                icon="⏰"
+                gradient="bg-gradient-to-br from-orange-400/10 to-orange-600/10"
+              />
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Advanced Analytics */}
+      {widgetConfig.advancedAnalytics?.enabled && (
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold text-white mb-4">📊 Advanced Analytics</h2>
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+            {widgetConfig.advancedAnalytics?.cumulativeReturn && (
+              <MetricCard
+                title="Cumulative Return"
+                value={`${((metrics.totalPnL / Math.max(metrics.totalBalance - metrics.totalPnL, 1000)) * 100).toFixed(2)}%`}
+                subtitle="Total returns"
+                trend={metrics.totalPnL >= 0 ? 'up' : 'down'}
+                trendValue="Since inception"
+                icon="📈"
+                gradient="bg-gradient-to-br from-blue-400/10 to-blue-600/10"
+              />
+            )}
+            {widgetConfig.advancedAnalytics?.maxDrawdown && (
+              <MetricCard
+                title="Max Drawdown"
+                value={`${((Math.abs(metrics.maxDrawdown) / metrics.totalBalance) * 100).toFixed(2)}%`}
+                subtitle="Maximum loss"
+                trend="down"
+                trendValue="Risk tolerance"
+                icon="📉"
+                gradient="bg-gradient-to-br from-red-400/10 to-red-600/10"
+              />
+            )}
+            {widgetConfig.advancedAnalytics?.sharpeRatio && (
+              <MetricCard
+                title="Sharpe Ratio"
+                value={metrics.sharpeRatio.toFixed(2)}
+                subtitle="Risk-adjusted returns"
+                trend={metrics.sharpeRatio > 1 ? 'up' : 'down'}
+                trendValue="Performance quality"
+                icon="🎯"
+                gradient="bg-gradient-to-br from-green-400/10 to-green-600/10"
+              />
+            )}
+            {widgetConfig.advancedAnalytics?.volatilityIndex && (
+              <MetricCard
+                title="Volatility Index"
+                value={`${metrics.volatilityIndex.toFixed(1)}%`}
+                subtitle="Price fluctuation"
+                trend="neutral"
+                trendValue="Market dynamics"
+                icon="〰️"
+                gradient="bg-gradient-to-br from-purple-400/10 to-purple-600/10"
+              />
+            )}
+            {widgetConfig.advancedAnalytics?.openPositions && (
+              <MetricCard
+                title="Open Positions"
+                value={metrics.openPositionsCount}
+                subtitle="Active trades"
+                trend="neutral"
+                trendValue={`$${metrics.totalExposure.toFixed(2)} exposure`}
+                icon="💼"
+                gradient="bg-gradient-to-br from-cyan-400/10 to-cyan-600/10"
+              />
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Bitcoin Chart */}
       {widgetConfig.bitcoinChart && <BitcoinChart />}
       
       {/* Site-wide PnL Chart */}
       <PnLChart connections={connections} allPositions={allPositions} />
-
-      {/* Regel 1: Portfolio Metrics */}
-      {widgetConfig.portfolioOverview?.enabled && (
-      <div>
-        <h2 className="text-2xl font-bold text-white mb-4">📊 Portfolio Overview</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
-          {widgetConfig.portfolioOverview?.portfolioValue && (
-            <MetricCard
-              title="Portfolio Value"
-              value={metrics.totalBalance}
-              subtitle="All connected exchanges"
-              trend="up"
-              trendValue="+5.2% today"
-              icon="💰"
-              gradient="bg-gradient-to-br from-yellow-400/10 to-yellow-600/10"
-            />
-          )}
-          {widgetConfig.portfolioOverview?.availableBalance && (
-            <MetricCard
-              title="Available Balance"
-              value={metrics.availableBalance}
-              subtitle="Ready to trade"
-              trend="neutral"
-              trendValue="Liquid funds"
-              icon="💳"
-              gradient="bg-gradient-to-br from-blue-400/10 to-blue-600/10"
-            />
-          )}
-          {widgetConfig.portfolioOverview?.totalPnL && (
-            <MetricCard
-              title="Total P&L (All Time)"
-              value={metrics.totalPnL}
-              subtitle="Lifetime performance"
-              trend={metrics.totalPnL >= 0 ? 'up' : 'down'}
-              trendValue={`${metrics.totalPnL >= 0 ? '+' : ''}${((metrics.totalPnL / metrics.totalBalance) * 100).toFixed(1)}%`}
-              icon="📈"
-              gradient="bg-gradient-to-br from-green-400/10 to-green-600/10"
-            />
-          )}
-          {widgetConfig.portfolioOverview?.pnl7D && (
-            <MetricCard
-              title="P&L (7D)"
-              value={metrics.totalPnL7D}
-              subtitle="Weekly performance"
-              trend={metrics.totalPnL7D >= 0 ? 'up' : 'down'}
-              trendValue="This week"
-              icon="📅"
-              gradient="bg-gradient-to-br from-purple-400/10 to-purple-600/10"
-            />
-          )}
-          {widgetConfig.portfolioOverview?.pnl24h && (
-            <MetricCard
-              title="P&L (24h)"
-              value={metrics.totalPnL24h}
-              subtitle="Daily performance"
-              trend={metrics.totalPnL24h >= 0 ? 'up' : 'down'}
-              trendValue="Today"
-              icon="⏰"
-              gradient="bg-gradient-to-br from-orange-400/10 to-orange-600/10"
-            />
-          )}
-        </div>
-      </div>
-      )}
-
-      {/* Regel 2: Advanced Analytics */}
-      {widgetConfig.advancedAnalytics?.enabled && (
-      <div>
-        <h2 className="text-2xl font-bold text-white mb-4">📊 Advanced Analytics</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
-          {widgetConfig.advancedAnalytics?.cumulativeReturn && (
-            <MetricCard
-              title="Cumulative Return"
-              value="Coming Soon"
-              subtitle="Smooth curve from first trade"
-              trend="up"
-              trendValue="Chart view"
-              icon="📈"
-              gradient="bg-gradient-to-br from-green-400/10 to-emerald-600/10"
-            />
-          )}
-          {widgetConfig.advancedAnalytics?.maxDrawdown && (
-            <MetricCard
-              title="Max Drawdown"
-              value={metrics.maxDrawdown}
-              subtitle="Deepest portfolio decline"
-              trend="down"
-              trendValue="Risk warning"
-              icon="📉"
-              gradient="bg-gradient-to-br from-red-400/10 to-red-600/10"
-            />
-          )}
-          {widgetConfig.advancedAnalytics?.sharpeRatio && (
-            <MetricCard
-              title="Sharpe Ratio"
-              value={metrics.sharpeRatio.toFixed(2)}
-              subtitle="Risk-adjusted returns"
-              trend="up"
-              trendValue="Efficiency metric"
-              icon="⚖️"
-              gradient="bg-gradient-to-br from-blue-400/10 to-indigo-600/10"
-            />
-          )}
-          {widgetConfig.advancedAnalytics?.volatilityIndex && (
-            <MetricCard
-              title="Volatility Index (30D)"
-              value={`${metrics.volatilityIndex}%`}
-              subtitle="Market breathing"
-              trend="neutral"
-              trendValue="Monthly average"
-              icon="🌊"
-              gradient="bg-gradient-to-br from-cyan-400/10 to-cyan-600/10"
-            />
-          )}
-          {widgetConfig.advancedAnalytics?.openPositions && (
-            <MetricCard
-              title="Open Positions"
-              value={`${metrics.openPositionsCount} (${toCurrency(metrics.totalExposure)})`}
-              subtitle="Active trades & exposure"
-              trend="neutral"
-              trendValue="Live positions"
-              icon="🎯"
-              gradient="bg-gradient-to-br from-yellow-400/10 to-amber-600/10"
-            />
-          )}
-        </div>
-      </div>
-      )}
 
       {/* Regel 3: Trading Performance */}
       {widgetConfig.tradingPerformance?.enabled && (
@@ -1016,7 +1089,7 @@ const DashboardPage: React.FC = () => {
                         )}
                       </div>
                       
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm mb-3">
                         <div>
                           <p className="text-gray-400 text-xs uppercase">Entry Price</p>
                           <p className="text-white font-medium">${position.entryPrice.toLocaleString()}</p>
@@ -1024,6 +1097,14 @@ const DashboardPage: React.FC = () => {
                         <div>
                           <p className="text-gray-400 text-xs uppercase">Current Price</p>
                           <p className="text-white font-medium">${position.currentPrice.toLocaleString()}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-400 text-xs uppercase">Leverage</p>
+                          <p className="text-orange-400 font-bold">{position.leverage || '1'}x</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-400 text-xs uppercase">Liquidation</p>
+                          <p className="text-red-400 font-medium">${Number(position.liquidationPrice || 0).toLocaleString()}</p>
                         </div>
                         {widgetConfig.openPositionsList?.showExposure && (
                           <div>
@@ -1033,8 +1114,10 @@ const DashboardPage: React.FC = () => {
                         )}
                         {widgetConfig.openPositionsList?.showOpenDate && (
                           <div>
-                            <p className="text-gray-400 text-xs uppercase">Open Date</p>
-                            <p className="text-white font-medium">{new Date(position.timestamp).toLocaleDateString()}</p>
+                            <p className="text-gray-400 text-xs uppercase">Open Date & Time</p>
+                            <p className="text-white font-medium">
+                              {new Date(position.timestamp).toLocaleDateString()} {new Date(position.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                            </p>
                           </div>
                         )}
                       </div>
@@ -1044,7 +1127,17 @@ const DashboardPage: React.FC = () => {
                           <div className="flex items-center justify-between text-sm">
                             <span className="text-gray-400">Position Duration</span>
                             <span className="text-cyan-300">
-                              {Math.floor((Date.now() - new Date(position.timestamp).getTime()) / (1000 * 60 * 60 * 24))} days
+                              {(() => {
+                                const openTime = new Date(position.timestamp);
+                                const now = new Date();
+                                const diffMs = now.getTime() - openTime.getTime();
+                                const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+                                const diffDays = Math.floor(diffHours / 24);
+                                
+                                if (diffDays > 0) return `${diffDays}d ${diffHours % 24}h`;
+                                if (diffHours > 0) return `${diffHours}h ${Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60))}m`;
+                                return `${Math.floor(diffMs / (1000 * 60))}m`;
+                              })()}
                             </span>
                           </div>
                         </div>

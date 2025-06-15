@@ -65,33 +65,48 @@ const MiniPnLChart: React.FC = () => {
   const [currentPnL, setCurrentPnL] = useState(0);
   
   useEffect(() => {
-    generateMiniPnLData();
-    const interval = setInterval(generateMiniPnLData, 30000); // Update every 30 seconds
+    fetchRealPnLData();
+    const interval = setInterval(fetchRealPnLData, 30000); // Update every 30 seconds
     return () => clearInterval(interval);
   }, []);
   
-  const generateMiniPnLData = () => {
-    const data = [];
-    let currentValue = 0;
-    
-    // Generate last 20 data points (representing recent trading session)
-    for (let i = 0; i < 20; i++) {
-      const volatility = 0.005; // 0.5% volatility
-      const randomChange = (Math.random() - 0.5) * volatility;
-      currentValue += randomChange * 100; // Scale for display
-      
-      const date = new Date();
-      date.setMinutes(date.getMinutes() - (20 - i) * 5); // 5-minute intervals
-      
-      data.push({
-        time: date.toISOString(),
-        value: currentValue,
-        pnl: currentValue
-      });
+  const fetchRealPnLData = async () => {
+    try {
+      // Get live PnL data from connected accounts
+      const response = await bybitApi.getConnections();
+      if (response.success) {
+        let totalPnL = 0;
+        const timeSeriesData = [];
+        
+        // Calculate total PnL from all positions
+        response.connections.forEach(conn => {
+          const positions = conn.data?.positions || [];
+          positions.forEach(pos => {
+            totalPnL += Number(pos.pnl) || 0;
+          });
+        });
+        
+        // Generate time series data for the last hour (placeholder until real historical data available)
+        for (let i = 0; i < 20; i++) {
+          const date = new Date();
+          date.setMinutes(date.getMinutes() - (20 - i) * 3); // 3-minute intervals
+          
+          timeSeriesData.push({
+            time: date.toISOString(),
+            value: totalPnL * (0.8 + Math.random() * 0.4), // Simulate historical variation
+            pnl: totalPnL
+          });
+        }
+        
+        setChartData(timeSeriesData);
+        setCurrentPnL(totalPnL);
+        console.log('📊 Real PnL data updated:', totalPnL);
+      }
+    } catch (error) {
+      console.error('❌ Failed to fetch PnL data:', error);
+      setChartData([]);
+      setCurrentPnL(0);
     }
-    
-    setChartData(data);
-    setCurrentPnL(currentValue);
   };
   
   const maxValue = Math.max(...chartData.map(d => d.value), 0);
@@ -258,6 +273,54 @@ const ManualOrderPage: React.FC = () => {
       autoFillParameters(tradingState.symbol, currentPrice);
     }
   }, [currentPrice, tradingState.symbol]);
+
+  // Auto-regenerate take profit targets when number of TPs or price range changes
+  useEffect(() => {
+    if (tradingState.takeProfitsEnabled && 
+        tradingState.takeProfitPriceFrom > 0 && 
+        tradingState.takeProfitPriceTo > 0 && 
+        tradingState.numberOfTakeProfits > 0) {
+      
+      console.log(`🎯 Regenerating ${tradingState.numberOfTakeProfits} take profit targets from ${tradingState.takeProfitPriceFrom} to ${tradingState.takeProfitPriceTo}`);
+      
+      const newTargets = generateTargets(
+        tradingState.takeProfitPriceFrom,
+        tradingState.takeProfitPriceTo,
+        tradingState.numberOfTakeProfits,
+        0,
+        'takeProfit'
+      );
+      
+      setTradingState(prev => ({
+        ...prev,
+        takeProfitTargets: newTargets
+      }));
+    }
+  }, [tradingState.numberOfTakeProfits, tradingState.takeProfitPriceFrom, tradingState.takeProfitPriceTo, tradingState.takeProfitsEnabled]);
+
+  // Auto-regenerate entry targets when number of entries or price range changes
+  useEffect(() => {
+    if (tradingState.entryPriceFrom > 0 && 
+        tradingState.entryPriceTo > 0 && 
+        tradingState.numberOfEntries > 0 && 
+        tradingState.amount > 0) {
+      
+      console.log(`📈 Regenerating ${tradingState.numberOfEntries} entry targets from ${tradingState.entryPriceFrom} to ${tradingState.entryPriceTo}`);
+      
+      const newTargets = generateTargets(
+        tradingState.entryPriceFrom,
+        tradingState.entryPriceTo,
+        tradingState.numberOfEntries,
+        tradingState.amount,
+        'entry'
+      );
+      
+      setTradingState(prev => ({
+        ...prev,
+        entryTargets: newTargets
+      }));
+    }
+  }, [tradingState.numberOfEntries, tradingState.entryPriceFrom, tradingState.entryPriceTo, tradingState.amount]);
 
   const loadTradingViewChart = () => {
     // Force reload the chart to avoid DOM conflicts
@@ -1259,39 +1322,47 @@ Format your response as a structured analysis with clear sections for each aspec
   const availableAmount = accounts.find(acc => acc.id === tradingState.selectedAccount)?.balance.available || 0;
 
   return (
-    <div className="flex h-screen">
-      {/* Left Panel - Trading Interface */}
-      <div className="w-96 glass-card rounded-none border-r border-cyan-400/20 flex flex-col animate-fadeInUp">
+    <div className="flex h-screen gap-12 p-8">
+      {/* Left Panel - Trading Interface - ULTRA THICK */}
+      <div className="w-[480px] glass-card border-r border-neon-cyan/30 flex flex-col animate-fade-in shadow-3d-lg">
         {/* Page Title */}
-        <div className="p-4">
-          <h1 className="section-title mb-0">Manual Trading</h1>
+        <div className="p-8">
+          <h1 className="text-3xl font-orbitron font-black text-holographic mb-2">QUANTUM ORDERS</h1>
+          <p className="text-sm font-rajdhani text-neon-cyan uppercase tracking-wider">Neural Trading Interface</p>
         </div>
         {/* Tab Navigation */}
-        <div className="border-b border-cyan-400/20 p-4">
-          <div className="tab-container">
-            {[
-              { id: 'general', label: 'General' },
-              { id: 'entries', label: 'Entries' },
-              { id: 'take-profits', label: 'Take-Profits' },
-              { id: 'stop', label: 'Stop' }
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`tab ${
-                  activeTab === tab.id
-                    ? 'active'
-                    : ''
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+        <div className="border-b border-neon-cyan/30 px-8 py-6">
+          <div className="glass-panel px-3 py-3 rounded-2xl border-neon-cyan/20">
+            <div className="flex space-x-2">
+              {[
+                { id: 'general', label: 'Neural Core', icon: '🧠' },
+                { id: 'entries', label: 'Entry Matrix', icon: '🎯' },
+                { id: 'take-profits', label: 'Profit Locks', icon: '💎' },
+                { id: 'stop', label: 'Safety Net', icon: '🛡️' }
+              ].map((tab, index) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  className={`
+                    tab-futuristic px-6 py-4 rounded-xl font-rajdhani font-bold text-sm
+                    flex flex-col items-center space-y-1 transition-all duration-300
+                    ${activeTab === tab.id
+                      ? 'bg-neon-cyan/20 text-white border-2 border-neon-cyan/50 shadow-neon-cyan'
+                      : 'text-gray-400 hover:text-white hover:bg-white/5'
+                    }
+                  `}
+                  style={{ animationDelay: `${index * 0.1}s` }}
+                >
+                  <span className="text-lg">{tab.icon}</span>
+                  <span className="text-xs uppercase tracking-wider">{tab.label}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
         {/* Tab Content */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6">
           {activeTab === 'general' && (
             <>
               {/* Account Selection */}
@@ -1961,53 +2032,59 @@ Format your response as a structured analysis with clear sections for each aspec
         </div>
       </div>
 
-      {/* Right Panel - TradingView Chart */}
-      <div className="flex-1 relative animate-fadeInUp animate-delay-2">
+      {/* Right Panel - TradingView Chart - ULTRA THICK */}
+      <div className="flex-1 relative animate-fade-in">
         {/* Chart Header */}
-        <div className="absolute top-0 left-0 right-0 z-10 glass-card-small rounded-none border-b border-cyan-400/20 p-4">
+        <div className="absolute top-4 left-4 right-4 z-10 glass-panel rounded-2xl border-neon-purple/30 p-6 shadow-3d-lg">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="flex items-center space-x-2">
-                <span className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></span>
-                <span className="text-white font-bold text-lg">{tradingState.symbol}</span>
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-3">
+                <div className="status-dot status-online"></div>
+                <div>
+                  <span className="text-white font-orbitron font-bold text-xl">{tradingState.symbol}</span>
+                  <div className="text-neon-cyan font-rajdhani text-sm">Neural Analysis Active</div>
+                </div>
               </div>
-              <div className="text-gray-400 text-sm">
-                Current: <span className="text-white font-medium">${currentPrice.toLocaleString()}</span>
+              <div className="glass-panel px-4 py-2 rounded-xl border-neon-green/20">
+                <div className="text-gray-400 text-xs font-rajdhani uppercase tracking-wider">Live Price</div>
+                <div className="text-neon-green font-orbitron font-bold text-lg">${currentPrice.toLocaleString()}</div>
               </div>
             </div>
-            <div className="flex items-center space-x-2">
-              <select 
-                value="15"
-                onChange={(e) => {
-                  // Reload chart with new timeframe
-                  loadTradingViewChart();
-                }}
-                className="glass-input px-2 py-1 text-sm"
-              >
-                <option value="5">5m</option>
-                <option value="15">15m</option>
-                <option value="60">1h</option>
-                <option value="240">4h</option>
-              </select>
+            <div className="flex items-center space-x-3">
+              <div className="glass-panel px-3 py-2 rounded-xl">
+                <select 
+                  value="15"
+                  onChange={(e) => {
+                    loadTradingViewChart();
+                  }}
+                  className="input-3d text-sm font-rajdhani font-bold"
+                >
+                  <option value="5">5m</option>
+                  <option value="15">15m</option>
+                  <option value="60">1h</option>
+                  <option value="240">4h</option>
+                </select>
+              </div>
               <button 
                 onClick={loadTradingViewChart}
-                className="btn-secondary px-3 py-1 text-sm"
+                className="btn-neon-purple px-4 py-2 text-sm"
               >
-                🔄
+                <span className="text-lg">⚡</span>
+                <span className="ml-2 font-rajdhani font-bold">SYNC</span>
               </button>
             </div>
           </div>
         </div>
         
         {/* Chart Container */}
-        <div className="h-full pt-16">
-          <div className="w-full h-full rounded-lg overflow-hidden relative glass-card">
+        <div className="h-full pt-32 px-4 pb-4">
+          <div className="w-full h-full rounded-3xl overflow-hidden relative glass-card shadow-3d-lg">
             {!chartLoaded ? (
-              <div className="absolute inset-0 flex items-center justify-center text-gray-400 glass-card">
+              <div className="absolute inset-0 flex items-center justify-center text-gray-400">
                 <div className="text-center">
-                  <div className="animate-spin text-4xl mb-4">⚡</div>
-                  <div className="text-xl font-bold mb-2">Loading TradingView Chart</div>
-                  <div className="text-sm">Initializing {tradingState.symbol} chart...</div>
+                  <div className="animate-spin text-6xl mb-6 text-neon-cyan">⚡</div>
+                  <div className="text-2xl font-orbitron font-bold mb-3 text-holographic">Neural Chart Loading</div>
+                  <div className="text-sm font-rajdhani text-neon-purple">Initializing {tradingState.symbol} matrix...</div>
                 </div>
               </div>
             ) : (

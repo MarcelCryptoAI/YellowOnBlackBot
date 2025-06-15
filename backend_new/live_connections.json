@@ -12,7 +12,7 @@
     "status": "active"
   },
   "marcel_1749306780000": {
-    "name": "Crypto Oppulence",
+    "name": "Crypto Oppulence", 
     "markets": {
       "spot": false,
       "usdtPerpetual": true,

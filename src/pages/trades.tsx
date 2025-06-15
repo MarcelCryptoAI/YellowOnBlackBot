@@ -12,6 +12,24 @@ interface BybitConnection {
   };
 }
 
+// Interface for open orders from API
+interface OpenOrder {
+  orderId: string;
+  symbol: string;
+  side: 'Buy' | 'Sell';
+  orderType: string;
+  qty: string;
+  price: string;
+  orderStatus: string;
+  timeInForce: string;
+  createdTime: string;
+  updatedTime: string;
+  triggerPrice?: string;
+  takeProfitPrice?: string;
+  stopLossPrice?: string;
+  connectionId?: string;
+}
+
 // Utility function for currency formatting
 function toCurrency(v: number) {
   return "$" + (+v).toLocaleString("en-US", { minimumFractionDigits: 2 });
@@ -108,6 +126,11 @@ const TradesPage: React.FC = () => {
   const [allPositions, setAllPositions] = useState<Position[]>([]);
   const [allOrderHistory, setAllOrderHistory] = useState<OrderHistory[]>([]);
   const [selectedPeriod, setSelectedPeriod] = useState('7D');
+  const [realOpenOrders, setRealOpenOrders] = useState<OpenOrder[]>([]);
+  const [cancellingOrder, setCancellingOrder] = useState<string | null>(null);
+  const [closingPosition, setClosingPosition] = useState<string | null>(null);
+  const [modifyingOrder, setModifyingOrder] = useState<string | null>(null);
+  const [modifyingPosition, setModifyingPosition] = useState<string | null>(null);
 
   // Process and fix PnL calculations
   const processedPositions = useMemo(() => {
@@ -183,9 +206,8 @@ const TradesPage: React.FC = () => {
     }
   }, [processedOrderHistory]);
 
-  // Get open positions, orders, and closed trades from all connections
+  // Get open positions and closed trades from all connections
   const openPositions = processedPositions.filter(pos => pos.status === 'OPEN');
-  const openOrders = processedPositions.filter(pos => pos.status === 'PENDING');
   const closedTrades = processedOrderHistory.filter(order => order.status === 'CLOSED');
 
   // Calculate totals using real balance data
@@ -301,22 +323,42 @@ const TradesPage: React.FC = () => {
         // Combine all positions and order history from all connections
         const allPos: Position[] = [];
         const allOrders: OrderHistory[] = [];
+        const allOpenOrders: OpenOrder[] = [];
         
-        mappedConnections.forEach(conn => {
+        // Fetch open orders for each active connection
+        for (const conn of mappedConnections) {
+          if (conn.status === 'active') {
+            try {
+              const ordersResponse = await bybitApi.getOpenOrders(conn.connectionId);
+              if (ordersResponse.success && ordersResponse.data) {
+                // Add connectionId to each order for tracking
+                const ordersWithConnection = ordersResponse.data.map((order: OpenOrder) => ({
+                  ...order,
+                  connectionId: conn.connectionId
+                }));
+                allOpenOrders.push(...ordersWithConnection);
+              }
+            } catch (error) {
+              console.error(`Failed to fetch open orders for ${conn.connectionId}:`, error);
+            }
+          }
+          
           if (conn.data?.positions) {
             allPos.push(...conn.data.positions);
           }
           if (conn.data?.orderHistory) {
             allOrders.push(...conn.data.orderHistory);
           }
-        });
+        }
         
         setAllPositions(allPos);
         setAllOrderHistory(allOrders);
+        setRealOpenOrders(allOpenOrders);
         
         console.log('✅ Loaded', mappedConnections.length, 'connections with', allPos.length, 'positions');
         console.log('📊 Sample position:', allPos[0]); // Debug PnL data
         console.log('📋 Sample order history:', allOrders[0]); // Debug order history data
+        console.log('📝 Open orders:', allOpenOrders.length);
         console.log('🔒 Total closed trades:', allOrders.filter(o => o.status === 'CLOSED').length);
       } else {
         console.error('❌ Failed to fetch connections');
@@ -324,6 +366,7 @@ const TradesPage: React.FC = () => {
         setConnections([]);
         setAllPositions([]);
         setAllOrderHistory([]);
+        setRealOpenOrders([]);
       }
     } catch (error) {
       console.error('❌ Error fetching data:', error);
@@ -342,13 +385,149 @@ const TradesPage: React.FC = () => {
     setRefreshing(false);
   };
 
+  // Order management functions
+  const handleCancelOrder = async (order: OpenOrder) => {
+    if (!order.connectionId || !order.orderId) return;
+    
+    setCancellingOrder(order.orderId);
+    try {
+      console.log('🗑️ Cancelling order:', order.orderId, order.symbol);
+      const response = await bybitApi.cancelOrder({
+        connectionId: order.connectionId,
+        orderId: order.orderId,
+        symbol: order.symbol
+      });
+      
+      if (response.success) {
+        console.log('✅ Order cancelled successfully');
+        // Refresh data to update the list
+        await fetchData();
+      } else {
+        console.error('❌ Failed to cancel order:', response.message);
+        alert('Failed to cancel order: ' + (response.message || 'Unknown error'));
+      }
+    } catch (error: any) {
+      console.error('❌ Error cancelling order:', error);
+      alert('Error cancelling order: ' + error.message);
+    }
+    setCancellingOrder(null);
+  };
+
+  const handleModifyOrder = async (order: OpenOrder, newPrice?: number, newQty?: number) => {
+    if (!order.connectionId || !order.orderId) return;
+    
+    setModifyingOrder(order.orderId);
+    try {
+      console.log('✏️ Modifying order:', order.orderId, order.symbol);
+      const response = await bybitApi.modifyOrder({
+        connectionId: order.connectionId,
+        orderId: order.orderId,
+        symbol: order.symbol,
+        price: newPrice,
+        quantity: newQty
+      });
+      
+      if (response.success) {
+        console.log('✅ Order modified successfully');
+        // Refresh data to update the list
+        await fetchData();
+      } else {
+        console.error('❌ Failed to modify order:', response.message);
+        alert('Failed to modify order: ' + (response.message || 'Unknown error'));
+      }
+    } catch (error: any) {
+      console.error('❌ Error modifying order:', error);
+      alert('Error modifying order: ' + error.message);
+    }
+    setModifyingOrder(null);
+  };
+
+  // Position management functions
+  const handleClosePosition = async (position: Position) => {
+    if (!position.id) return;
+    
+    // Find connection for this position
+    const connection = connections.find(conn => 
+      conn.data?.positions?.some(pos => pos.id === position.id)
+    );
+    
+    if (!connection) {
+      alert('Connection not found for this position');
+      return;
+    }
+    
+    setClosingPosition(position.id);
+    try {
+      console.log('🔒 Closing position:', position.symbol, position.direction);
+      const response = await bybitApi.closePosition({
+        connectionId: connection.connectionId,
+        symbol: position.symbol,
+        side: position.direction === 'LONG' ? 'Sell' : 'Buy'
+      });
+      
+      if (response.success) {
+        console.log('✅ Position closed successfully');
+        // Refresh data to update the list
+        await fetchData();
+      } else {
+        console.error('❌ Failed to close position:', response.message);
+        alert('Failed to close position: ' + (response.message || 'Unknown error'));
+      }
+    } catch (error: any) {
+      console.error('❌ Error closing position:', error);
+      alert('Error closing position: ' + error.message);
+    }
+    setClosingPosition(null);
+  };
+
+  const handleModifyPosition = async (position: Position, takeProfit?: number, stopLoss?: number) => {
+    if (!position.id) return;
+    
+    // Find connection for this position
+    const connection = connections.find(conn => 
+      conn.data?.positions?.some(pos => pos.id === position.id)
+    );
+    
+    if (!connection) {
+      alert('Connection not found for this position');
+      return;
+    }
+    
+    setModifyingPosition(position.id);
+    try {
+      console.log('✏️ Modifying position SL/TP:', position.symbol);
+      const response = await bybitApi.modifyPosition({
+        connectionId: connection.connectionId,
+        symbol: position.symbol,
+        side: position.direction,
+        takeProfit,
+        stopLoss
+      });
+      
+      if (response.success) {
+        console.log('✅ Position SL/TP modified successfully');
+        // Refresh data to update the list
+        await fetchData();
+      } else {
+        console.error('❌ Failed to modify position:', response.message);
+        alert('Failed to modify position: ' + (response.message || 'Unknown error'));
+      }
+    } catch (error: any) {
+      console.error('❌ Error modifying position:', error);
+      alert('Error modifying position: ' + error.message);
+    }
+    setModifyingPosition(null);
+  };
+
   const tabs = [
     { name: 'Open Positions', data: openPositions, count: openPositions.length },
-    { name: 'Open Orders', data: openOrders, count: openOrders.length },
+    { name: 'Open Orders', data: realOpenOrders, count: realOpenOrders.length },
     { name: 'Closed Trades', data: closedTrades, count: closedTrades.length }
   ];
 
-  const currentData = tabs.find(tab => tab.name === activeTab)?.data || [] as any[];
+  const currentData = activeTab === 'Open Orders' 
+    ? realOpenOrders 
+    : tabs.find(tab => tab.name === activeTab)?.data || [] as any[];
 
   if (loading) {
     return (
@@ -578,74 +757,198 @@ const TradesPage: React.FC = () => {
               <thead>
                 <tr className="bg-black/20 border-b border-white/10">
                   <th className="px-6 py-4 text-left font-bold text-primary uppercase tracking-wider">Symbol</th>
-                  <th className="px-6 py-4 text-left font-bold text-primary uppercase tracking-wider">Direction</th>
-                  <th className="px-6 py-4 text-left font-bold text-primary uppercase tracking-wider">Amount</th>
-                  <th className="px-6 py-4 text-left font-bold text-primary uppercase tracking-wider">Entry</th>
-                  <th className="px-6 py-4 text-left font-bold text-primary uppercase tracking-wider">Current</th>
-                  <th className="px-6 py-4 text-left font-bold text-primary uppercase tracking-wider">PnL</th>
+                  <th className="px-6 py-4 text-left font-bold text-primary uppercase tracking-wider">
+                    {activeTab === 'Open Orders' ? 'Side' : 'Direction'}
+                  </th>
+                  <th className="px-6 py-4 text-left font-bold text-primary uppercase tracking-wider">
+                    {activeTab === 'Open Orders' ? 'Quantity' : 'Amount'}
+                  </th>
+                  <th className="px-6 py-4 text-left font-bold text-primary uppercase tracking-wider">
+                    {activeTab === 'Open Orders' ? 'Order Price' : 'Entry'}
+                  </th>
+                  {activeTab !== 'Open Orders' && (
+                    <th className="px-6 py-4 text-left font-bold text-primary uppercase tracking-wider">Current</th>
+                  )}
+                  {activeTab === 'Open Orders' && (
+                    <th className="px-6 py-4 text-left font-bold text-primary uppercase tracking-wider">Order Type</th>
+                  )}
+                  {activeTab !== 'Open Orders' && (
+                    <th className="px-6 py-4 text-left font-bold text-primary uppercase tracking-wider">PnL</th>
+                  )}
                   <th className="px-6 py-4 text-left font-bold text-primary uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-4 text-left font-bold text-primary uppercase tracking-wider">Exchange</th>
+                  <th className="px-6 py-4 text-left font-bold text-primary uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {currentData.map((trade, idx) => (
-                  <tr key={`${trade.id}-${idx}`} className="hover:bg-white/5 transition-all duration-300 border-b border-white/5">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center space-x-3">
-                        <div className={`w-3 h-3 rounded-full shadow-lg ${
-                          trade.direction === 'LONG' 
-                            ? 'bg-green-400 shadow-green-400/50' 
-                            : 'bg-red-400 shadow-red-400/50'
-                        }`} />
-                        <span className="font-bold text-white text-lg drop-shadow-sm">{trade.symbol}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
-                        trade.direction === 'LONG'
-                          ? 'bg-green-500/20 text-green-300 border border-green-500/40'
-                          : 'bg-red-500/20 text-red-300 border border-red-500/40'
-                      }`}>
-                        {trade.direction}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-white font-medium">{trade.amount}</td>
-                    <td className="px-6 py-4 text-white font-medium">${trade.entryPrice.toLocaleString()}</td>
-                    <td className="px-6 py-4 text-white font-medium">${trade.currentPrice.toLocaleString()}</td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col">
-                        <span className={`font-bold ${
-                          trade.pnl >= 0 ? 'text-green-300' : 'text-red-300'
+                {activeTab === 'Open Orders' ? (
+                  // Render Open Orders
+                  realOpenOrders.map((order, idx) => (
+                    <tr key={`${order.orderId}-${idx}`} className="hover:bg-white/5 transition-all duration-300 border-b border-white/5">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center space-x-3">
+                          <div className={`w-3 h-3 rounded-full shadow-lg ${
+                            order.side === 'Buy' 
+                              ? 'bg-green-400 shadow-green-400/50' 
+                              : 'bg-red-400 shadow-red-400/50'
+                          }`} />
+                          <span className="font-bold text-white text-lg drop-shadow-sm">{order.symbol}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+                          order.side === 'Buy'
+                            ? 'bg-green-500/20 text-green-300 border border-green-500/40'
+                            : 'bg-red-500/20 text-red-300 border border-red-500/40'
                         }`}>
-                          ${trade.pnl.toFixed(2)}
+                          {order.side}
                         </span>
-                        <span className={`text-sm ${
-                          trade.pnlPercent >= 0 ? 'text-green-400' : 'text-red-400'
+                      </td>
+                      <td className="px-6 py-4 text-white font-medium">{parseFloat(order.qty).toLocaleString()}</td>
+                      <td className="px-6 py-4 text-white font-medium">${parseFloat(order.price).toLocaleString()}</td>
+                      <td className="px-6 py-4 text-white font-medium">{order.orderType}</td>
+                      <td className="px-6 py-4">
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+                          order.orderStatus === 'New'
+                            ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
+                            : order.orderStatus === 'PartiallyFilled'
+                            ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/40'
+                            : 'bg-gray-500/20 text-gray-300 border border-gray-500/40'
                         }`}>
-                          {trade.pnlPercent >= 0 ? '+' : ''}{trade.pnlPercent.toFixed(2)}%
+                          {order.orderStatus}
                         </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
-                        trade.status === 'OPEN'
-                          ? 'bg-primary-blue/20 text-primary-blue border border-primary-blue/40'
-                          : trade.status === 'PENDING'
-                          ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
-                          : trade.status === 'CANCELLED'
-                          ? 'bg-red-500/20 text-red-300 border border-red-500/40'
-                          : 'bg-gray-500/20 text-gray-300 border border-gray-500/40'
-                      }`}>
-                        {trade.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="px-3 py-1 rounded-full text-xs bg-gradient-to-r from-gray-800 to-black border border-gray-600/40 text-gray-300 font-medium">
-                        {trade.exchange}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => handleCancelOrder(order)}
+                            disabled={cancellingOrder === order.orderId}
+                            className="btn-danger text-xs disabled:opacity-50"
+                          >
+                            {cancellingOrder === order.orderId ? (
+                              <span className="animate-spin">🔄</span>
+                            ) : (
+                              <span>🗑️</span>
+                            )}
+                          </button>
+                          <button
+                            onClick={() => {
+                              const newPrice = prompt('Enter new price:', order.price);
+                              if (newPrice && !isNaN(parseFloat(newPrice))) {
+                                handleModifyOrder(order, parseFloat(newPrice));
+                              }
+                            }}
+                            disabled={modifyingOrder === order.orderId}
+                            className="btn-secondary text-xs disabled:opacity-50"
+                          >
+                            {modifyingOrder === order.orderId ? (
+                              <span className="animate-spin">🔄</span>
+                            ) : (
+                              <span>✏️</span>
+                            )}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  // Render Positions/Trades (existing code with management buttons)
+                  currentData.map((trade, idx) => (
+                    <tr key={`${trade.id}-${idx}`} className="hover:bg-white/5 transition-all duration-300 border-b border-white/5">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center space-x-3">
+                          <div className={`w-3 h-3 rounded-full shadow-lg ${
+                            trade.direction === 'LONG' || trade.side === 'Buy' 
+                              ? 'bg-green-400 shadow-green-400/50' 
+                              : 'bg-red-400 shadow-red-400/50'
+                          }`} />
+                          <span className="font-bold text-white text-lg drop-shadow-sm">{trade.symbol}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+                          (trade.direction === 'LONG' || trade.side === 'Buy')
+                            ? 'bg-green-500/20 text-green-300 border border-green-500/40'
+                            : 'bg-red-500/20 text-red-300 border border-red-500/40'
+                        }`}>
+                          {trade.direction || trade.side}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-white font-medium">{trade.amount || trade.qty}</td>
+                      <td className="px-6 py-4 text-white font-medium">${(trade.entryPrice || trade.price)?.toLocaleString()}</td>
+                      <td className="px-6 py-4 text-white font-medium">${trade.currentPrice?.toLocaleString()}</td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col">
+                          <span className={`font-bold ${
+                            trade.pnl >= 0 ? 'text-green-300' : 'text-red-300'
+                          }`}>
+                            ${trade.pnl?.toFixed(2)}
+                          </span>
+                          <span className={`text-sm ${
+                            trade.pnlPercent >= 0 ? 'text-green-400' : 'text-red-400'
+                          }`}>
+                            {trade.pnlPercent >= 0 ? '+' : ''}{trade.pnlPercent?.toFixed(2)}%
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+                          trade.status === 'OPEN'
+                            ? 'bg-primary-blue/20 text-primary-blue border border-primary-blue/40'
+                            : trade.status === 'PENDING'
+                            ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
+                            : trade.status === 'CANCELLED'
+                            ? 'bg-red-500/20 text-red-300 border border-red-500/40'
+                            : 'bg-gray-500/20 text-gray-300 border border-gray-500/40'
+                        }`}>
+                          {trade.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        {activeTab === 'Open Positions' && (
+                          <div className="flex items-center space-x-2">
+                            <button
+                              onClick={() => handleClosePosition(trade)}
+                              disabled={closingPosition === trade.id}
+                              className="btn-danger text-xs disabled:opacity-50"
+                              title="Close Position"
+                            >
+                              {closingPosition === trade.id ? (
+                                <span className="animate-spin">🔄</span>
+                              ) : (
+                                <span>🔒</span>
+                              )}
+                            </button>
+                            <button
+                              onClick={() => {
+                                const takeProfit = prompt('Enter Take Profit price (leave empty to skip):', '');
+                                const stopLoss = prompt('Enter Stop Loss price (leave empty to skip):', '');
+                                const tp = takeProfit && !isNaN(parseFloat(takeProfit)) ? parseFloat(takeProfit) : undefined;
+                                const sl = stopLoss && !isNaN(parseFloat(stopLoss)) ? parseFloat(stopLoss) : undefined;
+                                if (tp || sl) {
+                                  handleModifyPosition(trade, tp, sl);
+                                }
+                              }}
+                              disabled={modifyingPosition === trade.id}
+                              className="btn-secondary text-xs disabled:opacity-50"
+                              title="Modify SL/TP"
+                            >
+                              {modifyingPosition === trade.id ? (
+                                <span className="animate-spin">🔄</span>
+                              ) : (
+                                <span>⚙️</span>
+                              )}
+                            </button>
+                          </div>
+                        )}
+                        {activeTab === 'Closed Trades' && (
+                          <div className="text-gray-400 text-xs">
+                            Closed
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -654,7 +957,12 @@ const TradesPage: React.FC = () => {
             <div className="py-16 text-center">
               <div className="text-6xl mb-4 opacity-50">📭</div>
               <h3 className="text-xl font-bold text-gray-300 mb-2">No {activeTab}</h3>
-              <p className="text-gray-500">Start trading to see your positions here.</p>
+              <p className="text-gray-500">
+                {activeTab === 'Open Orders' 
+                  ? 'No open orders found. Create orders to see them here.' 
+                  : 'Start trading to see your positions here.'
+                }
+              </p>
               {connections.length === 0 && (
                 <p className="text-info-cyan/70 text-sm mt-2">Connect your ByBit account in the API tab first</p>
               )}

@@ -5,7 +5,121 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="5bc93a3b-5cd2-4f9e-9a14-d8b6d15e6855" name="Changes" comment="Alles testen, manual order blijft hangen op execution en strategy builder zwart scherm bij machine learning.">
+      <change afterPath="$PROJECT_DIR$/designs/Schermafbeelding 2025-06-09 om 16.27.35.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/CTB.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/CTB.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main (1).zip" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main 2/.eslintrc.cjs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main 2/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main 2/ChatGPT Image 5 jun 2025, 10_54_40.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main 2/PeopleImages.com-2811278-zoom.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main 2/README.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main 2/definitions/services/api.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main 2/fix_app_with_api_script.sh" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main 2/fix_missing_deps.sh" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main 2/index.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main 2/install_app_script.sh" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main 2/install_deps_script.sh" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main 2/nuclear_reset_script.sh" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main 2/package-lock.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main 2/package.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main 2/postcss.config.cjs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main 2/public/header_logo.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main 2/public/vite.svg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main 2/quick_fix_script.sh" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main 2/src/App.css" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main 2/src/App.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main 2/src/assets/react.svg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main 2/src/components/ApiConfigPage.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main 2/src/components/Dashboard.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main 2/src/components/Header.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main 2/src/components/StrategiesPage.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main 2/src/components/Tradespage.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main 2/src/header_logo.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main 2/src/index.css" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main 2/src/main.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main 2/src/services/api.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main 2/src/types/index.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main 2/src/vite-env.d.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main 2/tailwind.config.cjs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main 2/tsconfig.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main 2/tsconfig.node.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main 2/update_logo_script.sh" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main 2/update_logo_wide_script.sh" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main 2/vite.config.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main.zip" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main/.eslintrc.cjs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main/ChatGPT Image 5 jun 2025, 10_54_40.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main/PeopleImages.com-2811278-zoom.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main/README.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main/definitions/services/api.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main/fix_app_with_api_script.sh" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main/fix_missing_deps.sh" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main/index.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main/install_app_script.sh" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main/install_deps_script.sh" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main/nuclear_reset_script.sh" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main/package-lock.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main/package.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main/postcss.config.cjs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main/public/header_logo.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main/public/vite.svg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main/quick_fix_script.sh" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main/src/App.css" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main/src/App.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main/src/assets/react.svg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main/src/components/ApiConfigPage.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main/src/components/Dashboard.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main/src/components/Header.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main/src/components/StrategiesPage.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main/src/components/Tradespage.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main/src/header_logo.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main/src/index.css" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main/src/main.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main/src/services/api.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main/src/types/index.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main/src/vite-env.d.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main/tailwind.config.cjs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main/tsconfig.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main/tsconfig.node.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main/update_logo_script.sh" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main/update_logo_wide_script.sh" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/YellowOnBlackBot-main/vite.config.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend_new/config/settings.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend_new/config/settings.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend_new/live_connections.json" beforeDir="false" afterPath="$PROJECT_DIR$/backend_new/live_connections.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend_new/live_main.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend_new/live_main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend_new/live_openai_connections.json" beforeDir="false" afterPath="$PROJECT_DIR$/backend_new/live_openai_connections.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/definitions/services/api.ts" beforeDir="false" afterPath="$PROJECT_DIR$/definitions/services/api.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/fixed_app_tsx (1).ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/fixed_app_tsx (2).ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/fixed_app_tsx (3).ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/fixed_app_tsx (4).ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/fixed_app_tsx (5).ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/fixed_app_tsx.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/manual_filter_test.mjs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/package-lock.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/.env" beforeDir="false" afterPath="$PROJECT_DIR$/src/.env" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/App.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/App.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/Router.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/Router.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/ApiConfigPage.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/ApiConfigPage.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/Dashboard.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/Dashboard.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/GlassCard.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/GlassCard.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/Header.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/Header.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/Sidebar.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/Sidebar.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/TradingChart.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/TradingChart.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/index.css" beforeDir="false" afterPath="$PROJECT_DIR$/src/index.css" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/pages/dashboard.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/pages/manual_order.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/pages/manual_order.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/pages/strategies.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/pages/strategies.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/pages/trades.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/pages/trades.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/pages/trading_strategy_builder.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/pages/trading_strategy_builder.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/services/api.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/services/api.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tailwind.config.cjs" beforeDir="false" afterPath="$PROJECT_DIR$/tailwind.config.cjs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/test_coins.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/test_filter.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/vite.config.ts" beforeDir="false" afterPath="$PROJECT_DIR$/vite.config.ts" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -38,29 +152,31 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
-    &quot;last_opened_file_path&quot;: &quot;/Users/marcelstuivenberg/PycharmProjects/CTB/src&quot;,
-    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
-    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
-    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
-    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;,
-    &quot;ts.external.directory.path&quot;: &quot;/Users/marcelstuivenberg/PycharmProjects/CTB/node_modules/typescript/lib&quot;,
-    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "git-widget-placeholder": "main",
+    "last_opened_file_path": "/Users/marcelstuivenberg/PycharmProjects/CTB",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "settings.editor.selected.configurable": "preferences.pluginManager",
+    "ts.external.directory.path": "/Users/marcelstuivenberg/PycharmProjects/CTB/node_modules/typescript/lib",
+    "vue.rearranger.settings.migration": "true"
   }
-}</component>
+}]]></component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="$PROJECT_DIR$/src" />
       <recent name="$PROJECT_DIR$" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/public" />
+      <recent name="$PROJECT_DIR$/designs" />
       <recent name="$PROJECT_DIR$/definitions" />
     </key>
   </component>
@@ -82,7 +198,12 @@
       <workItem from="1749092071802" duration="68493000" />
       <workItem from="1749297499337" duration="24682000" />
       <workItem from="1749331612239" duration="20956000" />
-      <workItem from="1749363584202" duration="52869000" />
+      <workItem from="1749363584202" duration="98027000" />
+      <workItem from="1749616204267" duration="1084000" />
+      <workItem from="1749633587032" duration="18399000" />
+      <workItem from="1749706407578" duration="12656000" />
+      <workItem from="1749830532154" duration="22083000" />
+      <workItem from="1749979433863" duration="3018000" />
     </task>
     <task id="LOCAL-00001" summary="2">
       <option name="closed" value="true" />

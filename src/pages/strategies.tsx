@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { bybitApi } from '../services/api';
+import { GlassCard, GlassButton, GlassMetric } from '../components/GlassCard';
 
 // Types
 interface Strategy {
@@ -16,147 +18,217 @@ interface Strategy {
   indicators: string[];
   mlModel?: string;
   riskScore: number;
-  config?: any; // Strategy configuration data for cloning
+  config?: any;
+  connectionId?: string;
+  quantity?: number;
+  lastSignal?: {
+    signal: 'BUY' | 'SELL';
+    timestamp: string;
+    executed: boolean;
+  };
 }
 
-// Utility function for currency formatting
-function toCurrency(v: number) {
-  return "$" + (+v).toLocaleString("en-US", { minimumFractionDigits: 2 });
+interface StrategyTrade {
+  id: string;
+  strategyId: string;
+  symbol: string;
+  type: 'LONG' | 'SHORT';
+  status: 'OPEN' | 'CLOSED';
+  entryPrice: number;
+  exitPrice?: number;
+  quantity: number;
+  pnl: number;
+  timestamp: string;
+  exitTimestamp?: string;
 }
 
-// Strategy Card Component
-const StrategyCard: React.FC<{ strategy: Strategy; onEdit: () => void; onToggle: () => void; onDelete: () => void }> = ({ 
-  strategy, 
-  onEdit, 
-  onToggle, 
-  onDelete 
-}) => (
-  <div className="relative group">
-    <div className="absolute inset-0 bg-gradient-to-br from-blue-400/10 to-white/5 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
-    <div className="relative bg-gradient-to-br from-black to-gray-900 p-6 rounded-xl border border-gray-600/30 hover:border-blue-400/40 transition-all duration-300 shadow-2xl shadow-black/50 hover:shadow-yellow-400/10">
-      
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+interface ByBitConnection {
+  connectionId: string;
+  name: string;
+  balance?: {
+    total: number;
+    available: number;
+  };
+}
+
+type ViewMode = 'grid' | 'list';
+type LogbookTab = 'open' | 'closed' | 'positions';
+
+// Strategy Card Component for Grid View
+const StrategyCard: React.FC<{ 
+  strategy: Strategy; 
+  isSelected: boolean;
+  onSelect: (checked: boolean) => void;
+  onEdit: () => void; 
+  onToggle: () => void; 
+  onDelete: () => void;
+}> = ({ strategy, isSelected, onSelect, onEdit, onToggle, onDelete }) => (
+  <GlassCard variant="neon" color="cyan" className="p-6 group hover:scale-105 transition-all duration-300">
+    {/* Header with Checkbox */}
+    <div className="flex items-start justify-between mb-4">
+      <div className="flex items-start space-x-3">
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={(e) => onSelect(e.target.checked)}
+          className="mt-1 w-4 h-4 accent-neon-cyan rounded"
+        />
         <div>
-          <h3 className="font-bold text-white text-lg tracking-wide drop-shadow-md">{strategy.name}</h3>
-          <p className="text-sm text-gray-400">{strategy.symbol} • {strategy.timeframe}</p>
+          <h3 className="font-orbitron font-bold text-white text-lg tracking-wide">{strategy.name}</h3>
+          <p className="text-sm text-neon-cyan font-rajdhani">{strategy.symbol} • {strategy.timeframe}</p>
         </div>
-        <span className={`text-xs px-3 py-1.5 rounded-full font-bold uppercase tracking-wider shadow-lg ${
-          strategy.status === 'ACTIVE' 
-            ? 'bg-gradient-to-r from-green-500/20 to-green-400/20 text-green-300 border border-green-500/40 shadow-green-400/20'
-            : strategy.status === 'PAUSED'
-            ? 'bg-gradient-to-r from-orange-500/20 to-orange-400/20 text-orange-300 border border-orange-500/40 shadow-orange-400/20'
-            : strategy.status === 'BACKTESTING'
-            ? 'bg-gradient-to-r from-blue-500/20 to-blue-400/20 text-blue-300 border border-blue-500/40 shadow-blue-400/20'
-            : strategy.status === 'OPTIMIZING'
-            ? 'bg-gradient-to-r from-purple-500/20 to-purple-400/20 text-purple-300 border border-purple-500/40 shadow-purple-400/20'
-            : 'bg-gradient-to-r from-red-500/20 to-red-400/20 text-red-300 border border-red-500/40 shadow-red-400/20'
-        }`}>
-          {strategy.status}
+      </div>
+      <span className={`text-xs px-3 py-1.5 rounded-full font-rajdhani font-bold uppercase tracking-wider shadow-lg ${
+        strategy.status === 'ACTIVE' 
+          ? 'bg-neon-green/20 text-neon-green border border-neon-green/40'
+          : strategy.status === 'PAUSED'
+          ? 'bg-neon-orange/20 text-neon-orange border border-neon-orange/40'
+          : strategy.status === 'BACKTESTING'
+          ? 'bg-neon-cyan/20 text-neon-cyan border border-neon-cyan/40'
+          : strategy.status === 'OPTIMIZING'
+          ? 'bg-neon-purple/20 text-neon-purple border border-neon-purple/40'
+          : 'bg-neon-red/20 text-neon-red border border-neon-red/40'
+      }`}>
+        {strategy.status}
+      </span>
+    </div>
+
+    {/* Description */}
+    <p className="text-sm text-gray-300 font-rajdhani mb-4 line-clamp-2">{strategy.description}</p>
+
+    {/* ML Model Badge */}
+    {strategy.mlModel && (
+      <div className="mb-4">
+        <span className="px-3 py-1 text-xs bg-neon-purple/20 text-neon-purple border border-neon-purple/40 rounded-full font-rajdhani font-bold">
+          🤖 {strategy.mlModel}
         </span>
       </div>
+    )}
 
-      {/* Description */}
-      <p className="text-sm text-gray-300 mb-4 line-clamp-2">{strategy.description}</p>
-
-      {/* Indicators */}
-      <div className="flex flex-wrap gap-1 mb-4">
-        {strategy.indicators.slice(0, 3).map((indicator, index) => (
-          <span key={index} className="px-2 py-1 text-xs bg-gray-800/50 text-gray-300 border border-gray-600/40 rounded">
-            {indicator}
-          </span>
-        ))}
-        {strategy.indicators.length > 3 && (
-          <span className="px-2 py-1 text-xs bg-gray-800/50 text-gray-400 border border-gray-600/40 rounded">
-            +{strategy.indicators.length - 3} more
-          </span>
-        )}
-      </div>
-
-      {/* ML Model Badge */}
-      {strategy.mlModel && (
-        <div className="mb-4">
-          <span className="px-3 py-1 text-xs bg-gradient-to-r from-purple-500/20 to-purple-400/20 text-purple-300 border border-purple-500/40 rounded-full">
-            🤖 {strategy.mlModel}
-          </span>
-        </div>
-      )}
-
-      {/* Performance Metrics */}
-      <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
-        <div className="text-center p-3 bg-gray-900/50 rounded-lg border border-gray-700/40">
-          <div className="text-xs text-gray-400 uppercase tracking-wider font-medium">Profit</div>
-          <div className={`text-lg font-bold ${strategy.profit >= 0 ? 'text-green-300' : 'text-red-300'}`}>
-            {strategy.profit >= 0 ? '+' : ''}{toCurrency(strategy.profit)}
-          </div>
-        </div>
-        <div className="text-center p-3 bg-gray-900/50 rounded-lg border border-gray-700/40">
-          <div className="text-xs text-gray-400 uppercase tracking-wider font-medium">Win Rate</div>
-          <div className="text-lg font-bold text-cyan-300">{strategy.winRate.toFixed(1)}%</div>
+    {/* Performance Metrics */}
+    <div className="grid grid-cols-2 gap-4 mb-4">
+      <div className="glass-panel p-3 text-center">
+        <div className="text-xs text-gray-400 uppercase tracking-wider font-rajdhani font-bold mb-1">Profit</div>
+        <div className={`text-lg font-orbitron font-bold ${
+          strategy.profit >= 0 ? 'text-neon-green' : 'text-neon-red'
+        }`}>
+          {strategy.profit >= 0 ? '+' : ''}${strategy.profit.toFixed(2)}
         </div>
       </div>
-
-      {/* Risk Score */}
-      <div className="mb-4">
-        <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
-          <span>Risk Score</span>
-          <span>{strategy.riskScore}/10</span>
-        </div>
-        <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
-          <div 
-            className={`h-full transition-all duration-300 ${
-              strategy.riskScore <= 3 ? 'bg-green-400' : 
-              strategy.riskScore <= 6 ? 'bg-orange-400' : 'bg-red-400'
-            }`}
-            style={{ width: `${strategy.riskScore * 10}%` }}
-          />
-        </div>
+      <div className="glass-panel p-3 text-center">
+        <div className="text-xs text-gray-400 uppercase tracking-wider font-rajdhani font-bold mb-1">Win Rate</div>
+        <div className="text-lg font-orbitron font-bold text-neon-cyan">{strategy.winRate.toFixed(1)}%</div>
       </div>
+    </div>
 
-      {/* Action Buttons */}
+    {/* Action Buttons */}
+    <div className="space-y-2">
       <div className="flex space-x-2">
-        <button
+        <GlassButton
           onClick={onEdit}
-          className="flex-1 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white px-3 py-2 rounded-lg text-sm font-medium transition-all duration-300 shadow-lg hover:shadow-blue-400/30"
+          variant="cyan"
+          className="flex-1 text-sm"
         >
           📊 Details
-        </button>
-        <button
+        </GlassButton>
+        <GlassButton
           onClick={onToggle}
-          className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-300 shadow-lg ${
-            strategy.status === 'ACTIVE'
-              ? 'bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white hover:shadow-yellow-400/30'
-              : 'bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 text-white hover:shadow-green-400/30'
-          }`}
+          variant={strategy.status === 'ACTIVE' ? 'orange' : 'green'}
+          className="flex-1 text-sm"
         >
           {strategy.status === 'ACTIVE' ? '⏸️ Pause' : '▶️ Start'}
-        </button>
-        <button
+        </GlassButton>
+        <GlassButton
           onClick={onDelete}
-          className="p-2 bg-gradient-to-r from-red-600/80 to-red-500/80 hover:from-red-500 hover:to-red-400 text-white rounded-lg transition-all duration-300 shadow-lg hover:shadow-red-400/30"
+          variant="red"
+          size="sm"
+          className="px-3"
         >
           🗑️
-        </button>
+        </GlassButton>
       </div>
-      
-      {/* Edit Button - Goes to Wizard */}
-      <div className="mt-3">
-        <button
-          onClick={() => {
-            // Save strategy for editing in wizard
-            localStorage.setItem('strategyToEdit', JSON.stringify(strategy));
-            window.location.href = '/strategies/builder';
-          }}
-          className="w-full bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 text-white px-3 py-2 rounded-lg text-sm font-medium transition-all duration-300 shadow-lg hover:shadow-purple-400/30 flex items-center justify-center space-x-2"
-        >
-          <span>✏️</span>
-          <span>Edit in Wizard</span>
-        </button>
-      </div>
+      <GlassButton
+        onClick={() => {
+          localStorage.setItem('strategyToEdit', JSON.stringify(strategy));
+          window.location.href = '/strategies/builder';
+        }}
+        variant="purple"
+        className="w-full text-sm"
+      >
+        ✏️ Edit in Wizard
+      </GlassButton>
+    </div>
 
-      {/* Created Date */}
-      <div className="text-xs text-gray-500 mt-3 text-center">
-        Created: {new Date(strategy.createdAt).toLocaleDateString()}
+    {/* Created Date */}
+    <div className="text-xs text-gray-500 mt-3 text-center font-rajdhani">
+      Created: {new Date(strategy.createdAt).toLocaleDateString()}
+    </div>
+  </GlassCard>
+);
+
+// Strategy List Row Component
+const StrategyListRow: React.FC<{ 
+  strategy: Strategy;
+  isSelected: boolean;
+  onSelect: (checked: boolean) => void;
+  onEdit: () => void;
+  onToggle: () => void;
+  onDelete: () => void;
+}> = ({ strategy, isSelected, onSelect, onEdit, onToggle, onDelete }) => (
+  <div className="glass-panel p-4 mb-3 hover:scale-[1.02] transition-all duration-300">
+    <div className="flex items-center space-x-4">
+      <input
+        type="checkbox"
+        checked={isSelected}
+        onChange={(e) => onSelect(e.target.checked)}
+        className="w-4 h-4 accent-neon-cyan rounded"
+      />
+      
+      <div className="flex-1 grid grid-cols-6 gap-4 items-center">
+        <div>
+          <h3 className="font-orbitron font-bold text-white text-sm">{strategy.name}</h3>
+          <p className="text-xs text-neon-cyan font-rajdhani">{strategy.symbol}</p>
+        </div>
+        
+        <div className="text-center">
+          <span className={`text-xs px-2 py-1 rounded-full font-rajdhani font-bold ${
+            strategy.status === 'ACTIVE' 
+              ? 'bg-neon-green/20 text-neon-green'
+              : strategy.status === 'PAUSED'
+              ? 'bg-neon-orange/20 text-neon-orange'
+              : 'bg-neon-red/20 text-neon-red'
+          }`}>
+            {strategy.status}
+          </span>
+        </div>
+        
+        <div className="text-center">
+          <div className={`font-orbitron font-bold ${
+            strategy.profit >= 0 ? 'text-neon-green' : 'text-neon-red'
+          }`}>
+            {strategy.profit >= 0 ? '+' : ''}${strategy.profit.toFixed(2)}
+          </div>
+        </div>
+        
+        <div className="text-center">
+          <div className="font-orbitron font-bold text-neon-cyan">{strategy.winRate.toFixed(1)}%</div>
+        </div>
+        
+        <div className="text-center">
+          <div className="text-white font-rajdhani">{strategy.trades}</div>
+        </div>
+        
+        <div className="flex items-center justify-end space-x-2">
+          <GlassButton onClick={onEdit} variant="cyan" size="sm">📊</GlassButton>
+          <GlassButton 
+            onClick={onToggle} 
+            variant={strategy.status === 'ACTIVE' ? 'orange' : 'green'} 
+            size="sm"
+          >
+            {strategy.status === 'ACTIVE' ? '⏸️' : '▶️'}
+          </GlassButton>
+          <GlassButton onClick={onDelete} variant="red" size="sm">🗑️</GlassButton>
+        </div>
       </div>
     </div>
   </div>
@@ -172,11 +244,92 @@ const StrategiesPage: React.FC = () => {
   const [selectedStrategy, setSelectedStrategy] = useState<Strategy | null>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [connections, setConnections] = useState<ByBitConnection[]>([]);
+  const [executingStrategy, setExecutingStrategy] = useState<string | null>(null);
+  
+  // New states for enhanced functionality
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [selectedStrategies, setSelectedStrategies] = useState<Set<string>>(new Set());
+  const [showBulkActions, setShowBulkActions] = useState(false);
+  const [showLogbook, setShowLogbook] = useState(false);
+  const [logbookTab, setLogbookTab] = useState<LogbookTab>('open');
+  const [strategyTrades, setStrategyTrades] = useState<StrategyTrade[]>([]);
+  const [loadingTrades, setLoadingTrades] = useState(false);
+  const [liveMonitoring, setLiveMonitoring] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState<string>('');
 
-  // Load strategies from localStorage or API
+  // Load strategy trades from API
+  const loadStrategyTrades = async () => {
+    setLoadingTrades(true);
+    try {
+      const connectionsResult = await bybitApi.getConnections();
+      if (connectionsResult.success) {
+        const allTrades: StrategyTrade[] = [];
+        
+        // Load order history from all connections
+        for (const conn of connectionsResult.connections) {
+          if (conn.data?.orderHistory) {
+            const trades = conn.data.orderHistory.map((order: any) => ({
+              id: order.id || `${conn.connectionId}_${Date.now()}_${Math.random()}`,
+              strategyId: 'manual', // These are manual trades, not strategy trades yet
+              symbol: order.symbol,
+              type: order.direction, // 'LONG' or 'SHORT'
+              status: order.status === 'FILLED' ? 'CLOSED' : 'OPEN', 
+              entryPrice: order.entryPrice,
+              exitPrice: order.status === 'FILLED' ? order.entryPrice : undefined,
+              quantity: order.amount,
+              pnl: order.pnl || 0,
+              timestamp: order.timestamp,
+              exitTimestamp: order.status === 'FILLED' ? order.timestamp : undefined
+            }));
+            allTrades.push(...trades);
+          }
+        }
+        
+        setStrategyTrades(allTrades);
+        setLastUpdate(new Date().toLocaleTimeString());
+        console.log('✅ Loaded', allTrades.length, 'strategy trades from API');
+      }
+    } catch (error) {
+      console.error('❌ Failed to load strategy trades:', error);
+      // Keep existing trades on error
+    }
+    setLoadingTrades(false);
+  };
+
+  // Start/stop live monitoring
+  const toggleLiveMonitoring = () => {
+    setLiveMonitoring(!liveMonitoring);
+    if (!liveMonitoring) {
+      console.log('🔴 Starting live strategy monitoring...');
+    } else {
+      console.log('⏸️ Stopping live strategy monitoring...');
+    }
+  };
+
+  // Live monitoring effect
   useEffect(() => {
-    const loadStrategies = () => {
-      // Load from localStorage first
+    let interval: NodeJS.Timeout | null = null;
+    
+    if (liveMonitoring) {
+      // Refresh strategy data every 30 seconds when monitoring is active
+      interval = setInterval(() => {
+        console.log('🔄 Live monitoring: Refreshing strategy data...');
+        loadStrategyTrades();
+      }, 30000);
+    }
+    
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [liveMonitoring]);
+
+  // Load strategies from localStorage and connections from API
+  useEffect(() => {
+    const loadData = async () => {
+      // Load strategies from localStorage
       const saved = localStorage.getItem('userStrategies');
       if (saved) {
         try {
@@ -186,13 +339,29 @@ const StrategiesPage: React.FC = () => {
           console.error('Error parsing saved strategies:', error);
           setStrategies([]);
         }
-      } else {
-        setStrategies([]);
       }
+      
+      // Load ByBit connections
+      try {
+        const connectionsResult = await bybitApi.getConnections();
+        if (connectionsResult.success) {
+          setConnections(connectionsResult.connections.map((conn: any) => ({
+            connectionId: conn.connection_id,
+            name: conn.name || conn.metadata?.name || 'Unknown',
+            balance: conn.data?.balance
+          })));
+        }
+      } catch (error) {
+        console.error('Failed to load connections:', error);
+      }
+      
+      // Load strategy trades
+      await loadStrategyTrades();
+      
       setLoading(false);
     };
 
-    setTimeout(loadStrategies, 500);
+    loadData();
   }, []);
 
   // Filter and sort strategies
@@ -211,6 +380,47 @@ const StrategiesPage: React.FC = () => {
       }
     });
 
+  // Bulk action handlers
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedStrategies(new Set(filteredStrategies.map(s => s.id)));
+    } else {
+      setSelectedStrategies(new Set());
+    }
+  };
+
+  const handleSelectStrategy = (strategyId: string, checked: boolean) => {
+    const newSelected = new Set(selectedStrategies);
+    if (checked) {
+      newSelected.add(strategyId);
+    } else {
+      newSelected.delete(strategyId);
+    }
+    setSelectedStrategies(newSelected);
+  };
+
+  const handleBulkAction = (action: 'start' | 'pause' | 'stop' | 'delete') => {
+    const selectedIds = Array.from(selectedStrategies);
+    if (selectedIds.length === 0) return;
+
+    if (action === 'delete') {
+      if (confirm(`Are you sure you want to delete ${selectedIds.length} strategies?`)) {
+        const updatedStrategies = strategies.filter(s => !selectedIds.includes(s.id));
+        setStrategies(updatedStrategies);
+        localStorage.setItem('userStrategies', JSON.stringify(updatedStrategies));
+        setSelectedStrategies(new Set());
+      }
+    } else {
+      const newStatus = action === 'start' ? 'ACTIVE' : action === 'pause' ? 'PAUSED' : 'STOPPED';
+      const updatedStrategies = strategies.map(s => 
+        selectedIds.includes(s.id) ? { ...s, status: newStatus as any } : s
+      );
+      setStrategies(updatedStrategies);
+      localStorage.setItem('userStrategies', JSON.stringify(updatedStrategies));
+      setSelectedStrategies(new Set());
+    }
+  };
+
   const handleEditStrategy = (strategyId: string) => {
     const strategy = strategies.find(s => s.id === strategyId);
     if (strategy) {
@@ -220,558 +430,506 @@ const StrategiesPage: React.FC = () => {
     }
   };
 
-  const handleSaveStrategy = () => {
-    if (selectedStrategy) {
-      setStrategies(prev => prev.map(strategy => 
-        strategy.id === selectedStrategy.id ? selectedStrategy : strategy
-      ));
-      
-      // Save to localStorage
-      const updatedStrategies = strategies.map(strategy => 
-        strategy.id === selectedStrategy.id ? selectedStrategy : strategy
-      );
-      localStorage.setItem('userStrategies', JSON.stringify(updatedStrategies));
-      
-      setIsEditing(false);
-      alert('Strategy updated successfully!');
+  const handleToggleStrategy = async (strategyId: string) => {
+    const strategy = strategies.find(s => s.id === strategyId);
+    if (!strategy) return;
+    
+    const newStatus = strategy.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE';
+    
+    // If activating a strategy, check if it has live trading setup
+    if (newStatus === 'ACTIVE' && !strategy.connectionId) {
+      alert('Please configure a ByBit connection for this strategy before activating live trading.');
+      return;
     }
-  };
-
-  const updateSelectedStrategy = (field: string, value: any) => {
-    if (selectedStrategy) {
-      setSelectedStrategy({
-        ...selectedStrategy,
-        [field]: value
-      });
-    }
-  };
-
-  const handleToggleStrategy = (strategyId: string) => {
-    setStrategies(prev => prev.map(strategy => {
-      if (strategy.id === strategyId) {
+    
+    const updatedStrategies = strategies.map(s => {
+      if (s.id === strategyId) {
         return {
-          ...strategy,
-          status: strategy.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE'
+          ...s,
+          status: newStatus
         };
       }
-      return strategy;
-    }));
+      return s;
+    });
+    
+    setStrategies(updatedStrategies);
+    localStorage.setItem('userStrategies', JSON.stringify(updatedStrategies));
+    
+    // If activating, start monitoring this strategy
+    if (newStatus === 'ACTIVE') {
+      console.log(`🤖 Strategy ${strategy.name} activated for live trading`);
+    } else {
+      console.log(`⏸️ Strategy ${strategy.name} paused`);
+    }
   };
 
   const handleDeleteStrategy = (strategyId: string) => {
     if (confirm('Are you sure you want to delete this strategy?')) {
-      setStrategies(prev => prev.filter(strategy => strategy.id !== strategyId));
+      const updatedStrategies = strategies.filter(strategy => strategy.id !== strategyId);
+      setStrategies(updatedStrategies);
+      localStorage.setItem('userStrategies', JSON.stringify(updatedStrategies));
     }
   };
 
   if (loading) {
     return (
-      <div className="p-6 space-y-6">
+      <div className="p-8 space-y-8">
         <div className="text-center py-16">
           <div className="animate-spin text-6xl mb-4">🧠</div>
-          <div className="text-white text-xl font-bold">Loading AI Strategies...</div>
-          <div className="text-gray-400 mt-2">Analyzing your trading algorithms</div>
+          <div className="text-holographic text-4xl font-orbitron font-bold mb-4">NEURAL SYNC</div>
+          <div className="text-neon-cyan font-rajdhani text-xl">Analyzing AI Trading Algorithms</div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8">
+    <div className="relative min-h-screen p-8 space-y-8">
+      {/* Futuristic Background Elements */}
+      <div className="fixed inset-0 pointer-events-none">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-neon-cyan/5 rounded-full blur-3xl animate-float"></div>
+        <div className="absolute top-3/4 right-1/4 w-96 h-96 bg-neon-purple/5 rounded-full blur-3xl animate-float-delayed"></div>
+      </div>
+
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-4xl font-bold bg-gradient-to-r from-white via-gray-200 to-blue-400 bg-clip-text text-transparent drop-shadow-lg">
-            🧠 AI Trading Strategies
-          </h2>
-          <p className="text-gray-400 mt-2">Machine Learning powered trading algorithms</p>
+      <div className="relative z-10">
+        <div className="flex items-center justify-between mb-8 animate-fade-in">
+          <div className="relative">
+            <h1 className="text-6xl font-orbitron font-black text-holographic mb-4">
+              NEURAL STRATEGIES
+            </h1>
+            <p className="text-xl font-rajdhani text-neon-cyan uppercase tracking-[0.3em]">
+              🧠 AI TRADING ALGORITHMS
+            </p>
+            <div className="absolute -inset-8 bg-gradient-to-r from-neon-cyan/10 via-neon-purple/10 to-neon-pink/10 blur-2xl opacity-50 animate-pulse-slow"></div>
+          </div>
+          
+          <div className="flex items-center space-x-4">
+            <GlassButton
+              onClick={toggleLiveMonitoring}
+              variant={liveMonitoring ? "red" : "green"}
+              className="flex items-center space-x-3"
+            >
+              <span className={liveMonitoring ? 'animate-pulse' : ''}>
+                {liveMonitoring ? '🔴' : '⭕'}
+              </span>
+              <span>{liveMonitoring ? 'Stop Monitor' : 'Start Monitor'}</span>
+            </GlassButton>
+            <GlassButton
+              onClick={loadStrategyTrades}
+              disabled={loadingTrades}
+              variant="blue"
+              className="flex items-center space-x-3"
+            >
+              <span className={loadingTrades ? 'animate-spin' : ''}>⚡</span>
+              <span>{loadingTrades ? 'Syncing' : 'Refresh Trades'}</span>
+            </GlassButton>
+            <GlassButton
+              onClick={() => setShowLogbook(true)}
+              variant="purple"
+              className="flex items-center space-x-3"
+            >
+              <span>📊</span>
+              <span>Strategy Logbook</span>
+            </GlassButton>
+            <GlassButton
+              onClick={() => navigate('/strategies/builder')}
+              variant="cyan"
+              className="flex items-center space-x-3"
+            >
+              <span>🚀</span>
+              <span>Create AI Strategy</span>
+            </GlassButton>
+          </div>
         </div>
-        <button 
-          onClick={() => navigate('/strategies/builder')}
-          className="relative group"
+
+        {/* Live Trading Status */}
+        <GlassCard 
+          variant="neon" 
+          color={connections.length > 0 ? 'green' : 'orange'} 
+          className="p-6 mb-8 animate-fade-in"
         >
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-blue-500 rounded-lg blur opacity-75 group-hover:opacity-100 transition-all duration-300"></div>
-          <div className="relative bg-gradient-to-r from-blue-400 to-blue-500 hover:from-yellow-300 hover:to-blue-400 px-6 py-3 rounded-lg text-black font-bold transition-all duration-300 shadow-2xl shadow-yellow-400/25 flex items-center space-x-2">
-            <span>🚀</span>
-            <span>Maak Nieuwe AI & ML Strategy</span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className={`status-dot ${connections.length > 0 ? 'status-online' : 'status-offline'}`}></div>
+              <div>
+                <h3 className={`font-orbitron font-bold text-xl ${
+                  connections.length > 0 ? 'text-neon-green' : 'text-neon-orange'
+                }`}>
+                  {connections.length > 0 ? 'NEURAL LINK ACTIVE' : 'AWAITING NEURAL LINK'}
+                </h3>
+                <p className="font-rajdhani text-gray-300">
+                  {connections.length > 0 
+                    ? `${connections.length} ByBit connection${connections.length > 1 ? 's' : ''} ready for live trading`
+                    : 'Connect ByBit account to enable live strategy execution'
+                  }
+                  {liveMonitoring && (
+                    <span className="ml-4 text-neon-cyan">
+                      • Live monitoring active {lastUpdate && `• Last update: ${lastUpdate}`}
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+            {connections.length === 0 && (
+              <GlassButton
+                onClick={() => navigate('/api')}
+                variant="cyan"
+              >
+                Setup Neural Link
+              </GlassButton>
+            )}
           </div>
-        </button>
-      </div>
+        </GlassCard>
 
-      {/* Stats Bar */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-gradient-to-br from-black to-gray-900 p-4 rounded-xl border border-gray-600/30">
-          <div className="text-2xl font-bold text-white">{strategies.length}</div>
-          <div className="text-sm text-gray-400">Total Strategies</div>
-        </div>
-        <div className="bg-gradient-to-br from-black to-gray-900 p-4 rounded-xl border border-gray-600/30">
-          <div className="text-2xl font-bold text-green-300">{strategies.filter(s => s.status === 'ACTIVE').length}</div>
-          <div className="text-sm text-gray-400">Active</div>
-        </div>
-        <div className="bg-gradient-to-br from-black to-gray-900 p-4 rounded-xl border border-gray-600/30">
-          <div className="text-2xl font-bold text-white">
-            {toCurrency(strategies.reduce((sum, s) => sum + s.profit, 0))}
+        {/* Metrics Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="animate-fade-in" style={{ animationDelay: '0.1s' }}>
+            <GlassMetric
+              label="Total Strategies"
+              value={strategies.length.toString()}
+              change="Neural Networks"
+              changeType="positive"
+              icon="🧠"
+              color="cyan"
+            />
           </div>
-          <div className="text-sm text-gray-400">Total Profit</div>
-        </div>
-        <div className="bg-gradient-to-br from-black to-gray-900 p-4 rounded-xl border border-gray-600/30">
-          <div className="text-2xl font-bold text-cyan-300">
-            {(strategies.reduce((sum, s) => sum + s.winRate, 0) / strategies.length || 0).toFixed(1)}%
+          <div className="animate-fade-in" style={{ animationDelay: '0.2s' }}>
+            <GlassMetric
+              label="Active Strategies"
+              value={strategies.filter(s => s.status === 'ACTIVE').length.toString()}
+              change="Live Trading"
+              changeType="positive"
+              icon="⚡"
+              color="green"
+            />
           </div>
-          <div className="text-sm text-gray-400">Avg Win Rate</div>
-        </div>
-      </div>
-
-      {/* Filters and Sort */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2">
-            <span className="text-gray-400 text-sm">Filter:</span>
-            <select
-              value={filter}
-              onChange={(e) => setFilter(e.target.value as any)}
-              className="bg-gray-900 border border-gray-600/40 rounded-lg px-3 py-2 text-white text-sm focus:border-blue-400/60 focus:outline-none"
-            >
-              <option value="ALL">All Strategies</option>
-              <option value="ACTIVE">Active</option>
-              <option value="PAUSED">Paused</option>
-              <option value="STOPPED">Stopped</option>
-            </select>
+          <div className="animate-fade-in" style={{ animationDelay: '0.3s' }}>
+            <GlassMetric
+              label="Total P&L"
+              value={`$${strategyTrades.reduce((sum, t) => sum + t.pnl, 0).toFixed(2)}`}
+              change={`${strategyTrades.length} Trades`}
+              changeType={strategyTrades.reduce((sum, t) => sum + t.pnl, 0) >= 0 ? 'positive' : 'negative'}
+              icon="💎"
+              color="purple"
+            />
           </div>
-          <div className="flex items-center space-x-2">
-            <span className="text-gray-400 text-sm">Sort by:</span>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as any)}
-              className="bg-gray-900 border border-gray-600/40 rounded-lg px-3 py-2 text-white text-sm focus:border-blue-400/60 focus:outline-none"
-            >
-              <option value="profit">Profit</option>
-              <option value="winRate">Win Rate</option>
-              <option value="created">Created Date</option>
-            </select>
+          <div className="animate-fade-in" style={{ animationDelay: '0.4s' }}>
+            <GlassMetric
+              label="Open Trades"
+              value={strategyTrades.filter(t => t.status === 'OPEN').length.toString()}
+              change={loadingTrades ? 'Syncing...' : 'Live Data'}
+              changeType="positive"
+              icon="🎯"
+              color="orange"
+            />
           </div>
         </div>
-        <div className="text-sm text-gray-400">
-          Showing {filteredStrategies.length} of {strategies.length} strategies
-        </div>
-      </div>
 
-      {/* Strategies Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredStrategies.map((strategy) => (
-          <StrategyCard
-            key={strategy.id}
-            strategy={strategy}
-            onEdit={() => handleEditStrategy(strategy.id)}
-            onToggle={() => handleToggleStrategy(strategy.id)}
-            onDelete={() => handleDeleteStrategy(strategy.id)}
-          />
-        ))}
-      </div>
-
-      {filteredStrategies.length === 0 && (
-        <div className="text-center py-16">
-          <div className="text-6xl mb-4 opacity-50">🤖</div>
-          <h3 className="text-xl font-bold text-gray-300 mb-2">No Strategies Found</h3>
-          <p className="text-gray-500 mb-6">Create your first AI-powered trading strategy to get started.</p>
-          <button 
-            onClick={() => navigate('/strategies/builder')}
-            className="bg-gradient-to-r from-blue-400 to-blue-500 hover:from-yellow-300 hover:to-blue-400 px-6 py-3 rounded-lg text-black font-bold transition-all duration-300 shadow-lg"
-          >
-            🚀 Create First Strategy
-          </button>
-        </div>
-      )}
-
-      {/* Strategy Details Modal */}
-      {showDetails && selectedStrategy && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="w-full max-w-4xl max-h-[90vh] bg-gradient-to-b from-gray-900 to-black rounded-xl border border-gray-600/30 shadow-2xl overflow-hidden">
-            {/* Header */}
-            <div className="p-6 border-b border-gray-700/30">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-2xl font-bold text-white">{selectedStrategy.name}</h2>
-                  <p className="text-gray-400 mt-1">{selectedStrategy.symbol} • {selectedStrategy.timeframe}</p>
+        {/* Controls and Filters */}
+        <GlassCard variant="holographic" className="p-6 mb-8 animate-fade-in">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center space-x-6">
+              {/* View Mode Toggle */}
+              <div className="flex items-center space-x-3">
+                <span className="text-neon-cyan font-rajdhani font-bold text-sm uppercase tracking-wider">View:</span>
+                <div className="flex space-x-1 glass-panel p-1 rounded-lg">
+                  <button
+                    onClick={() => setViewMode('grid')}
+                    className={`px-3 py-1 rounded text-sm font-rajdhani font-bold transition-all duration-300 ${
+                      viewMode === 'grid' ? 'bg-neon-cyan/20 text-neon-cyan' : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    🔷 Grid
+                  </button>
+                  <button
+                    onClick={() => setViewMode('list')}
+                    className={`px-3 py-1 rounded text-sm font-rajdhani font-bold transition-all duration-300 ${
+                      viewMode === 'list' ? 'bg-neon-cyan/20 text-neon-cyan' : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    📋 List
+                  </button>
                 </div>
-                <div className="flex items-center space-x-3">
-                  <button
-                    onClick={() => setIsEditing(!isEditing)}
-                    className="flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300"
+              </div>
+
+              {/* Filters */}
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-2">
+                  <span className="text-neon-purple font-rajdhani font-bold text-sm uppercase tracking-wider">Filter:</span>
+                  <select
+                    value={filter}
+                    onChange={(e) => setFilter(e.target.value as any)}
+                    className="glass-input px-3 py-1 text-sm"
                   >
-                    <span>{isEditing ? '👁️' : '✏️'}</span>
-                    <span>{isEditing ? 'View' : 'Edit'}</span>
-                  </button>
-                  <button
-                    onClick={() => setShowDetails(false)}
-                    className="p-2 hover:bg-gray-800 rounded transition-all"
+                    <option value="ALL">All Strategies</option>
+                    <option value="ACTIVE">Active</option>
+                    <option value="PAUSED">Paused</option>
+                    <option value="STOPPED">Stopped</option>
+                  </select>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-neon-pink font-rajdhani font-bold text-sm uppercase tracking-wider">Sort:</span>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as any)}
+                    className="glass-input px-3 py-1 text-sm"
                   >
-                    <span className="text-gray-400 text-xl">✕</span>
-                  </button>
+                    <option value="profit">Profit</option>
+                    <option value="winRate">Win Rate</option>
+                    <option value="created">Created Date</option>
+                  </select>
                 </div>
               </div>
             </div>
 
-            {/* Content */}
-            <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                
-                {/* Left Column - Strategy Info */}
-                <div className="space-y-6">
-                  {/* Performance Overview */}
-                  <div className="bg-gradient-to-br from-gray-900/50 to-black/50 p-6 rounded-xl border border-gray-600/30">
-                    <h3 className="text-lg font-bold text-white mb-4 flex items-center">
-                      <span className="mr-2">📊</span>
-                      Performance Overview
-                    </h3>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="text-center p-3 bg-gray-900/50 rounded-lg">
-                        <div className="text-2xl font-bold text-green-300">
-                          {selectedStrategy.profit >= 0 ? '+' : ''}{toCurrency(selectedStrategy.profit)}
-                        </div>
-                        <div className="text-xs text-gray-400">Total Profit</div>
-                      </div>
-                      <div className="text-center p-3 bg-gray-900/50 rounded-lg">
-                        <div className="text-2xl font-bold text-cyan-300">{selectedStrategy.winRate.toFixed(1)}%</div>
-                        <div className="text-xs text-gray-400">Win Rate</div>
-                      </div>
-                      <div className="text-center p-3 bg-gray-900/50 rounded-lg">
-                        <div className="text-2xl font-bold text-white">{selectedStrategy.trades}</div>
-                        <div className="text-xs text-gray-400">Total Trades</div>
-                      </div>
-                      <div className="text-center p-3 bg-gray-900/50 rounded-lg">
-                        <div className="text-2xl font-bold text-blue-300">{selectedStrategy.riskScore}/10</div>
-                        <div className="text-xs text-gray-400">Risk Score</div>
-                      </div>
-                    </div>
-                  </div>
+            {/* Results Count */}
+            <div className="text-sm text-gray-400 font-rajdhani">
+              Showing {filteredStrategies.length} of {strategies.length} strategies
+            </div>
+          </div>
 
-                  {/* Strategy Configuration */}
-                  <div className="bg-gradient-to-br from-gray-900/50 to-black/50 p-6 rounded-xl border border-gray-600/30">
-                    <h3 className="text-lg font-bold text-white mb-4 flex items-center">
-                      <span className="mr-2">⚙️</span>
-                      Configuration
-                    </h3>
-                    
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-sm text-gray-400">Strategy Name</label>
-                          {isEditing ? (
-                            <input
-                              type="text"
-                              value={selectedStrategy.name}
-                              onChange={(e) => updateSelectedStrategy('name', e.target.value)}
-                              className="w-full p-2 bg-gray-900 border border-gray-600/40 rounded text-white focus:border-blue-400/60 focus:outline-none"
-                            />
-                          ) : (
-                            <div className="text-white font-medium">{selectedStrategy.name}</div>
-                          )}
-                        </div>
-                        <div>
-                          <label className="text-sm text-gray-400">Trading Pair</label>
-                          {isEditing ? (
-                            <input
-                              type="text"
-                              value={selectedStrategy.symbol}
-                              onChange={(e) => updateSelectedStrategy('symbol', e.target.value)}
-                              className="w-full p-2 bg-gray-900 border border-gray-600/40 rounded text-white focus:border-blue-400/60 focus:outline-none"
-                            />
-                          ) : (
-                            <div className="text-white font-medium">{selectedStrategy.symbol}</div>
-                          )}
-                        </div>
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-sm text-gray-400">Timeframe</label>
-                          {isEditing ? (
-                            <select
-                              value={selectedStrategy.timeframe}
-                              onChange={(e) => updateSelectedStrategy('timeframe', e.target.value)}
-                              className="w-full p-2 bg-gray-900 border border-gray-600/40 rounded text-white focus:border-blue-400/60 focus:outline-none"
-                            >
-                              <option value="5m">5 minutes</option>
-                              <option value="15m">15 minutes</option>
-                              <option value="30m">30 minutes</option>
-                              <option value="1h">1 hour</option>
-                              <option value="4h">4 hours</option>
-                              <option value="1d">1 day</option>
-                            </select>
-                          ) : (
-                            <div className="text-white font-medium">{selectedStrategy.timeframe}</div>
-                          )}
-                        </div>
-                        <div>
-                          <label className="text-sm text-gray-400">Status</label>
-                          {isEditing ? (
-                            <select
-                              value={selectedStrategy.status}
-                              onChange={(e) => updateSelectedStrategy('status', e.target.value)}
-                              className="w-full p-2 bg-gray-900 border border-gray-600/40 rounded text-white focus:border-blue-400/60 focus:outline-none"
-                            >
-                              <option value="ACTIVE">Active</option>
-                              <option value="PAUSED">Paused</option>
-                              <option value="STOPPED">Stopped</option>
-                              <option value="BACKTESTING">Backtesting</option>
-                              <option value="OPTIMIZING">Optimizing</option>
-                            </select>
-                          ) : (
-                            <div className="flex items-center space-x-2 mt-1">
-                              <span className={`w-2 h-2 rounded-full ${
-                                selectedStrategy.status === 'ACTIVE' ? 'bg-green-400' : 
-                                selectedStrategy.status === 'PAUSED' ? 'bg-orange-400' : 'bg-red-400'
-                              }`}></span>
-                              <span className="text-white font-medium">{selectedStrategy.status}</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
+          {/* Bulk Actions */}
+          {selectedStrategies.size > 0 && (
+            <div className="flex items-center justify-between p-4 glass-panel rounded-lg border border-neon-cyan/30 animate-fade-in">
+              <div className="flex items-center space-x-3">
+                <span className="text-neon-cyan font-rajdhani font-bold">
+                  {selectedStrategies.size} strategies selected
+                </span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <GlassButton onClick={() => handleBulkAction('start')} variant="green" size="sm">
+                  ▶️ Start All
+                </GlassButton>
+                <GlassButton onClick={() => handleBulkAction('pause')} variant="orange" size="sm">
+                  ⏸️ Pause All
+                </GlassButton>
+                <GlassButton onClick={() => handleBulkAction('stop')} variant="purple" size="sm">
+                  ⏹️ Stop All
+                </GlassButton>
+                <GlassButton onClick={() => handleBulkAction('delete')} variant="red" size="sm">
+                  🗑️ Delete All
+                </GlassButton>
+                <GlassButton onClick={() => setSelectedStrategies(new Set())} variant="cyan" size="sm">
+                  ✕ Clear
+                </GlassButton>
+              </div>
+            </div>
+          )}
+        </GlassCard>
 
-                      <div>
-                        <label className="text-sm text-gray-400">Description</label>
-                        {isEditing ? (
-                          <textarea
-                            value={selectedStrategy.description}
-                            onChange={(e) => updateSelectedStrategy('description', e.target.value)}
-                            rows={3}
-                            className="w-full p-2 bg-gray-900 border border-gray-600/40 rounded text-white focus:border-blue-400/60 focus:outline-none resize-none"
-                          />
-                        ) : (
-                          <div className="text-white">{selectedStrategy.description}</div>
-                        )}
-                      </div>
+        {/* List View Header */}
+        {viewMode === 'list' && filteredStrategies.length > 0 && (
+          <div className="glass-panel p-4 mb-4">
+            <div className="flex items-center space-x-4">
+              <input
+                type="checkbox"
+                checked={selectedStrategies.size === filteredStrategies.length && filteredStrategies.length > 0}
+                onChange={(e) => handleSelectAll(e.target.checked)}
+                className="w-4 h-4 accent-neon-cyan rounded"
+              />
+              <div className="flex-1 grid grid-cols-6 gap-4 items-center text-sm font-rajdhani font-bold text-neon-cyan uppercase tracking-wider">
+                <div>Strategy</div>
+                <div className="text-center">Status</div>
+                <div className="text-center">Profit</div>
+                <div className="text-center">Win Rate</div>
+                <div className="text-center">Trades</div>
+                <div className="text-center">Actions</div>
+              </div>
+            </div>
+          </div>
+        )}
 
-                      <div>
-                        <label className="text-sm text-gray-400">Risk Score (1-10)</label>
-                        {isEditing ? (
-                          <input
-                            type="number"
-                            min="1"
-                            max="10"
-                            value={selectedStrategy.riskScore}
-                            onChange={(e) => updateSelectedStrategy('riskScore', parseInt(e.target.value))}
-                            className="w-full p-2 bg-gray-900 border border-gray-600/40 rounded text-white focus:border-blue-400/60 focus:outline-none"
-                          />
-                        ) : (
-                          <div className="text-blue-300 font-medium">{selectedStrategy.riskScore}/10</div>
-                        )}
-                      </div>
+        {/* Strategies Content */}
+        {viewMode === 'grid' ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredStrategies.map((strategy, index) => (
+              <div key={strategy.id} className="animate-fade-in" style={{ animationDelay: `${index * 0.1}s` }}>
+                <StrategyCard
+                  strategy={strategy}
+                  isSelected={selectedStrategies.has(strategy.id)}
+                  onSelect={(checked) => handleSelectStrategy(strategy.id, checked)}
+                  onEdit={() => handleEditStrategy(strategy.id)}
+                  onToggle={() => handleToggleStrategy(strategy.id)}
+                  onDelete={() => handleDeleteStrategy(strategy.id)}
+                />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {filteredStrategies.map((strategy, index) => (
+              <div key={strategy.id} className="animate-slide-up" style={{ animationDelay: `${index * 0.05}s` }}>
+                <StrategyListRow
+                  strategy={strategy}
+                  isSelected={selectedStrategies.has(strategy.id)}
+                  onSelect={(checked) => handleSelectStrategy(strategy.id, checked)}
+                  onEdit={() => handleEditStrategy(strategy.id)}
+                  onToggle={() => handleToggleStrategy(strategy.id)}
+                  onDelete={() => handleDeleteStrategy(strategy.id)}
+                />
+              </div>
+            ))}
+          </div>
+        )}
 
-                      {selectedStrategy.mlModel && (
-                        <div>
-                          <label className="text-sm text-gray-400">ML Model</label>
-                          <div className="text-purple-300 font-medium">🤖 {selectedStrategy.mlModel}</div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+        {filteredStrategies.length === 0 && (
+          <GlassCard variant="holographic" className="p-16 text-center animate-fade-in">
+            <div className="text-8xl mb-6 animate-float">🤖</div>
+            <h3 className="text-3xl font-orbitron font-bold text-holographic mb-4">
+              NO NEURAL STRATEGIES DETECTED
+            </h3>
+            <p className="text-gray-400 font-rajdhani text-xl mb-8">
+              Initialize your first AI-powered trading algorithm
+            </p>
+            <GlassButton 
+              onClick={() => navigate('/strategies/builder')}
+              variant="cyan"
+              className="text-lg px-8 py-4"
+            >
+              🚀 Deploy First Neural Strategy
+            </GlassButton>
+          </GlassCard>
+        )}
 
-                  {/* Indicators */}
-                  <div className="bg-gradient-to-br from-gray-900/50 to-black/50 p-6 rounded-xl border border-gray-600/30">
-                    <h3 className="text-lg font-bold text-white mb-4 flex items-center">
-                      <span className="mr-2">📈</span>
-                      Indicators ({selectedStrategy.indicators.length})
-                    </h3>
-                    
-                    <div className="flex flex-wrap gap-2">
-                      {selectedStrategy.indicators.map((indicator, index) => (
-                        <span key={index} className="px-3 py-1 text-sm bg-gray-800/50 text-gray-300 border border-gray-600/40 rounded-full">
-                          {indicator}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
+        {/* Strategy Trades Logbook Modal */}
+        {showLogbook && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-lg z-50 flex items-center justify-center p-4 animate-fade-in">
+            <GlassCard variant="holographic" className="w-full max-w-6xl max-h-[90vh] overflow-hidden">
+              {/* Header */}
+              <div className="p-6 border-b border-white/10 flex items-center justify-between">
+                <div>
+                  <h2 className="text-3xl font-orbitron font-bold text-holographic">
+                    📊 STRATEGY LOGBOOK
+                  </h2>
+                  <p className="text-neon-cyan font-rajdhani mt-2">
+                    Neural Trading Activity Matrix
+                  </p>
                 </div>
+                <GlassButton
+                  onClick={() => setShowLogbook(false)}
+                  variant="red"
+                  size="sm"
+                >
+                  ✕
+                </GlassButton>
+              </div>
 
-                {/* Right Column - Advanced Metrics */}
-                <div className="space-y-6">
-                  {/* Live Trading Stats */}
-                  <div className="bg-gradient-to-br from-gray-900/50 to-black/50 p-6 rounded-xl border border-gray-600/30">
-                    <h3 className="text-lg font-bold text-white mb-4 flex items-center">
-                      <span className="mr-2">📉</span>
-                      Live Trading Statistics
-                    </h3>
-                    
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-sm text-gray-400">Best Trade</label>
-                          <div className="text-green-300 font-bold">+$87.45</div>
-                        </div>
-                        <div>
-                          <label className="text-sm text-gray-400">Worst Trade</label>
-                          <div className="text-red-300 font-bold">-$23.12</div>
-                        </div>
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-sm text-gray-400">Avg Win</label>
-                          <div className="text-white font-medium">$45.23</div>
-                        </div>
-                        <div>
-                          <label className="text-sm text-gray-400">Avg Loss</label>
-                          <div className="text-white font-medium">$18.67</div>
-                        </div>
-                      </div>
+              {/* Tabs */}
+              <div className="p-6 border-b border-white/10">
+                <div className="flex space-x-1 glass-panel p-1 rounded-lg inline-flex">
+                  <button
+                    onClick={() => setLogbookTab('open')}
+                    className={`px-6 py-3 rounded font-rajdhani font-bold transition-all duration-300 ${
+                      logbookTab === 'open' ? 'bg-neon-green/20 text-neon-green' : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    🟢 Open Trades ({strategyTrades.filter(t => t.status === 'OPEN').length})
+                  </button>
+                  <button
+                    onClick={() => setLogbookTab('closed')}
+                    className={`px-6 py-3 rounded font-rajdhani font-bold transition-all duration-300 ${
+                      logbookTab === 'closed' ? 'bg-neon-cyan/20 text-neon-cyan' : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    📈 Closed Trades ({strategyTrades.filter(t => t.status === 'CLOSED').length})
+                  </button>
+                  <button
+                    onClick={() => setLogbookTab('positions')}
+                    className={`px-6 py-3 rounded font-rajdhani font-bold transition-all duration-300 ${
+                      logbookTab === 'positions' ? 'bg-neon-purple/20 text-neon-purple' : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    🎯 Current Positions (0)
+                  </button>
+                </div>
+              </div>
 
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-sm text-gray-400">Profit Factor</label>
-                          <div className="text-cyan-300 font-bold">2.42</div>
-                        </div>
-                        <div>
-                          <label className="text-sm text-gray-400">Max Drawdown</label>
-                          <div className="text-red-300 font-bold">-8.3%</div>
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="text-sm text-gray-400">R:R Ratio</label>
-                        <div className="text-blue-300 font-bold">1:2.4</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Recent Trades */}
-                  <div className="bg-gradient-to-br from-gray-900/50 to-black/50 p-6 rounded-xl border border-gray-600/30">
-                    <h3 className="text-lg font-bold text-white mb-4 flex items-center">
-                      <span className="mr-2">🔄</span>
-                      Recent Trades
-                    </h3>
-                    
-                    <div className="space-y-3">
-                      {[
-                        { date: '2024-01-20', type: 'LONG', pnl: 45.67, status: 'WIN' },
-                        { date: '2024-01-19', type: 'SHORT', pnl: -12.34, status: 'LOSS' },
-                        { date: '2024-01-18', type: 'LONG', pnl: 78.90, status: 'WIN' },
-                        { date: '2024-01-17', type: 'SHORT', pnl: 23.45, status: 'WIN' },
-                        { date: '2024-01-16', type: 'LONG', pnl: -8.76, status: 'LOSS' },
-                      ].map((trade, index) => (
-                        <div key={index} className="flex items-center justify-between p-3 bg-gray-900/30 rounded-lg">
-                          <div className="flex items-center space-x-3">
-                            <span className={`w-2 h-2 rounded-full ${
-                              trade.type === 'LONG' ? 'bg-green-400' : 'bg-red-400'
-                            }`}></span>
+              {/* Content */}
+              <div className="p-6 overflow-y-auto max-h-[60vh]">
+                {logbookTab === 'open' && (
+                  <div className="space-y-4">
+                    {strategyTrades.filter(t => t.status === 'OPEN').map((trade) => (
+                      <div key={trade.id} className="glass-panel p-6 animate-slide-up">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-4">
+                            <div className={`status-dot ${trade.type === 'LONG' ? 'status-online' : 'status-offline'}`}></div>
                             <div>
-                              <div className="text-white text-sm font-medium">{trade.type}</div>
-                              <div className="text-gray-400 text-xs">{trade.date}</div>
+                              <h3 className="font-orbitron font-bold text-white text-lg">{trade.symbol}</h3>
+                              <p className="text-neon-cyan font-rajdhani">
+                                {trade.type} • Entry: ${trade.entryPrice.toFixed(2)} • Qty: {trade.quantity}
+                              </p>
+                              <p className="text-gray-400 text-sm font-rajdhani">
+                                {new Date(trade.timestamp).toLocaleString()}
+                              </p>
                             </div>
                           </div>
                           <div className="text-right">
-                            <div className={`font-bold ${trade.pnl >= 0 ? 'text-green-300' : 'text-red-300'}`}>
+                            <div className={`text-2xl font-orbitron font-bold ${
+                              trade.pnl >= 0 ? 'text-neon-green' : 'text-neon-red'
+                            }`}>
                               {trade.pnl >= 0 ? '+' : ''}${trade.pnl.toFixed(2)}
                             </div>
-                            <div className={`text-xs ${trade.status === 'WIN' ? 'text-green-400' : 'text-red-400'}`}>
-                              {trade.status}
-                            </div>
+                            <div className="text-sm text-gray-400 font-rajdhani">Unrealized P&L</div>
                           </div>
                         </div>
-                      ))}
-                    </div>
+                      </div>
+                    ))}
+                    {strategyTrades.filter(t => t.status === 'OPEN').length === 0 && (
+                      <div className="text-center py-16">
+                        <div className="text-6xl mb-4 animate-float">📊</div>
+                        <div className="text-gray-400 font-rajdhani text-xl">No open trades</div>
+                        <div className="text-gray-600 text-sm mt-2">Strategies haven't generated signals yet</div>
+                      </div>
+                    )}
                   </div>
+                )}
 
-                  {/* Market Analysis */}
-                  <div className="bg-gradient-to-br from-gray-900/50 to-black/50 p-6 rounded-xl border border-gray-600/30">
-                    <h3 className="text-lg font-bold text-white mb-4 flex items-center">
-                      <span className="mr-2">🎯</span>
-                      Market Analysis
-                    </h3>
-                    
-                    <div className="space-y-4">
-                      <div>
-                        <label className="text-sm text-gray-400">Best Market Conditions</label>
-                        <div className="text-white">Trending markets with medium volatility</div>
-                      </div>
-                      
-                      <div>
-                        <label className="text-sm text-gray-400">Worst Market Conditions</label>
-                        <div className="text-white">Sideways choppy markets</div>
-                      </div>
-                      
-                      <div>
-                        <label className="text-sm text-gray-400">Optimal Trading Hours</label>
-                        <div className="text-white">8:00 - 16:00 UTC (London/NY overlap)</div>
-                      </div>
-
-                      <div>
-                        <label className="text-sm text-gray-400">Strategy Strengths</label>
-                        <div className="space-y-1 text-sm">
-                          <div className="text-green-300">• Strong trend detection</div>
-                          <div className="text-green-300">• Good exit timing</div>
-                          <div className="text-green-300">• Risk management</div>
+                {logbookTab === 'closed' && (
+                  <div className="space-y-4">
+                    {strategyTrades.filter(t => t.status === 'CLOSED').map((trade) => (
+                      <div key={trade.id} className="glass-panel p-6 animate-slide-up">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-4">
+                            <div className={`w-3 h-3 rounded-full ${
+                              trade.pnl >= 0 ? 'bg-neon-green' : 'bg-neon-red'
+                            }`}></div>
+                            <div>
+                              <h3 className="font-orbitron font-bold text-white text-lg">{trade.symbol}</h3>
+                              <p className="text-neon-cyan font-rajdhani">
+                                {trade.type} • Entry: ${trade.entryPrice.toFixed(2)} • Exit: ${trade.exitPrice?.toFixed(2)}
+                              </p>
+                              <p className="text-gray-400 text-sm font-rajdhani">
+                                {new Date(trade.timestamp).toLocaleDateString()} - {trade.exitTimestamp && new Date(trade.exitTimestamp).toLocaleDateString()}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className={`text-2xl font-orbitron font-bold ${
+                              trade.pnl >= 0 ? 'text-neon-green' : 'text-neon-red'
+                            }`}>
+                              {trade.pnl >= 0 ? '+' : ''}${trade.pnl.toFixed(2)}
+                            </div>
+                            <div className="text-sm text-gray-400 font-rajdhani">Realized P&L</div>
+                          </div>
                         </div>
                       </div>
-
-                      <div>
-                        <label className="text-sm text-gray-400">Areas for Improvement</label>
-                        <div className="space-y-1 text-sm">
-                          <div className="text-cyan-300">• Entry timing could be better</div>
-                          <div className="text-cyan-300">• Consider adding volume filter</div>
-                        </div>
-                      </div>
-                    </div>
+                    ))}
                   </div>
-                </div>
-              </div>
-            </div>
+                )}
 
-            {/* Footer */}
-            <div className="p-6 border-t border-gray-700/30">
-              <div className="flex items-center justify-between">
-                <div className="text-sm text-gray-400">
-                  Created: {new Date(selectedStrategy.createdAt).toLocaleString()}
-                  {selectedStrategy.id && (
-                    <span className="ml-4">ID: {selectedStrategy.id}</span>
-                  )}
-                </div>
-                <div className="flex items-center space-x-3">
-                  {isEditing ? (
-                    <>
-                      <button
-                        onClick={() => setIsEditing(false)}
-                        className="bg-gradient-to-r from-gray-600 to-gray-500 hover:from-gray-500 hover:to-gray-400 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300"
-                      >
-                        ❌ Cancel
-                      </button>
-                      <button
-                        onClick={handleSaveStrategy}
-                        className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300"
-                      >
-                        💾 Save Changes
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        onClick={() => navigate('/strategies/builder')}
-                        className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300"
-                      >
-                        🚀 Create Similar
-                      </button>
-                      <button
-                        onClick={() => {
-                          // Clone strategy by pre-filling builder with current strategy data
-                          if (selectedStrategy.config) {
-                            localStorage.setItem('strategyToClone', JSON.stringify(selectedStrategy.config));
-                          }
-                          navigate('/strategies/builder');
-                        }}
-                        className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300"
-                      >
-                        📋 Clone Strategy
-                      </button>
-                    </>
-                  )}
-                </div>
+                {logbookTab === 'positions' && (
+                  <div className="text-center py-16">
+                    <div className="text-6xl mb-4 animate-float">🎯</div>
+                    <div className="text-gray-400 font-rajdhani text-xl">No current positions</div>
+                    <div className="text-gray-600 text-sm mt-2">Live positions will appear here</div>
+                  </div>
+                )}
               </div>
-            </div>
+            </GlassCard>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };

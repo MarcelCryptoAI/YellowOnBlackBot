@@ -10,104 +10,124 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab, isRefreshing, onRefresh }) => {
   const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: '🏠', description: 'Overview & Analytics' },
-    { id: 'trades', label: 'Trades', icon: '💹', description: 'Live Positions' },
-    { id: 'strategies', label: 'Strategies', icon: '🧠', description: 'AI Algorithms' },
-    { id: 'api-config', label: 'API Config', icon: '🔧', description: 'Connections' },
+    { id: 'dashboard', label: 'Dashboard', icon: '🚀', color: 'cyan' },
+    { id: 'trades', label: 'Trades', icon: '⚡', color: 'purple' },
+    { id: 'strategies', label: 'Strategies', icon: '🧠', color: 'pink' },
+    { id: 'api-config', label: 'API Config', icon: '🔧', color: 'green' },
   ];
 
   return (
-    <header className="sticky top-0 z-50 border-b border-primary-blue/20 backdrop-blur-xl bg-gradient-to-r from-black/80 via-gray-900/90 to-black/80 shadow-2xl shadow-black/50">
-      {/* Premium Top Border */}
-      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary-blue to-transparent"></div>
+    <header className="relative z-50 overflow-hidden">
+      {/* Animated Background */}
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-2xl"></div>
+      <div className="absolute inset-0 bg-gradient-to-r from-neon-cyan/10 via-neon-purple/10 to-neon-pink/10 animate-gradient-x"></div>
       
-      <div className="max-w-8xl mx-auto px-8 py-6">
-        <div className="flex items-center justify-between">
+      {/* Top Glow Line */}
+      <div className="glow-line-x top-0"></div>
+      
+      <div className="relative px-8 py-6">
+        <div className="max-w-[1920px] mx-auto flex items-center justify-between">
           {/* Brand Section */}
           <div className="flex items-center space-x-8">
-            <div className="flex items-center space-x-4 group">
-              <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-primary-blue/30 to-primary-purple/30 rounded-xl blur-lg animate-pulse-glow"></div>
+            <div className="group relative">
+              {/* Logo Container with 3D Effect */}
+              <div className="relative transform-style-preserve-3d animate-float">
+                <div className="absolute inset-0 bg-gradient-to-r from-neon-cyan/40 via-neon-purple/40 to-neon-pink/40 blur-2xl animate-pulse-slow"></div>
                 <img
                   src="/header_logo.png"
                   alt="CTB Logo"
-                  className="relative h-14 w-auto drop-shadow-2xl group-hover:scale-110 transition-transform duration-300"
+                  className="relative h-16 w-auto filter drop-shadow-[0_0_20px_rgba(0,255,255,0.8)] group-hover:scale-110 transition-all duration-500"
                   onError={(e) => {
                     (e.target as HTMLImageElement).style.display = 'none';
                   }}
                 />
               </div>
-              <div className="relative">
-                <h1 className="text-3xl font-black bg-gradient-to-r from-primary-blue via-white to-primary-purple bg-clip-text text-transparent">
+              
+              {/* Title Section */}
+              <div className="relative ml-6">
+                <h1 className="text-4xl font-black font-orbitron text-holographic tracking-wider">
                   CRYPTO TRADING BOT
                 </h1>
-                <p className="text-info-cyan-light text-sm font-semibold tracking-wide">
+                <p className="text-sm font-rajdhani text-neon-cyan mt-1 tracking-[0.3em] uppercase">
                   ⚡ AI-Powered Trading Platform
                 </p>
-                <div className="absolute -inset-2 bg-gradient-to-r from-primary-blue/5 via-transparent to-primary-purple/5 blur-xl opacity-70"></div>
               </div>
             </div>
             
-            {/* Premium Navigation */}
-            <nav className="flex items-center bg-gradient-to-r from-black/50 to-gray-900/50 rounded-2xl p-2 border border-primary-blue/20 backdrop-blur-xl shadow-xl">
-              {navItems.map((item) => (
-                <div key={item.id} className="relative group">
+            {/* Navigation with Glass Effect */}
+            <nav className="flex items-center glass-panel px-2 py-2 border-neon-cyan/20">
+              <div className="flex space-x-2">
+                {navItems.map((item, index) => (
                   <button
+                    key={item.id}
                     onClick={() => setCurrentTab(item.id)}
-                    className={`relative px-6 py-3 rounded-xl font-semibold transition-all duration-300 ${
-                      currentTab === item.id
-                        ? 'bg-gradient-to-r from-primary-blue to-primary-blue-dark text-white shadow-lg shadow-primary-blue/50 scale-105'
-                        : 'text-info-cyan-light hover:text-white hover:bg-primary-blue/10'
-                    }`}
+                    className={`
+                      relative px-6 py-3 font-medium transition-all duration-300
+                      ${currentTab === item.id 
+                        ? `text-neon-${item.color} bg-neon-${item.color}/10 border-2 border-neon-${item.color}/50` 
+                        : 'text-gray-400 hover:text-white border-2 border-transparent hover:border-white/20'
+                      }
+                      rounded-xl backdrop-blur-xl
+                      transform hover:scale-105 hover:-translate-y-0.5
+                      animate-fade-in
+                    `}
+                    style={{ 
+                      animationDelay: `${index * 0.1}s`,
+                      boxShadow: currentTab === item.id ? `0 0 30px var(--neon-${item.color})` : ''
+                    }}
                   >
-                    <div className="flex items-center space-x-3">
+                    <div className="flex items-center space-x-2">
                       <span className="text-xl">{item.icon}</span>
-                      <div className="flex flex-col items-start">
-                        <span className="text-sm font-bold">{item.label}</span>
-                        <span className="text-xs opacity-75">{item.description}</span>
-                      </div>
+                      <span className="font-rajdhani font-semibold tracking-wide">{item.label}</span>
                     </div>
                     
-                    {/* Active indicator */}
+                    {/* Active Indicator */}
                     {currentTab === item.id && (
-                      <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-primary-blue rounded-full animate-pulse"></div>
+                      <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-full h-0.5 bg-gradient-to-r from-transparent via-current to-transparent animate-pulse"></div>
                     )}
                   </button>
-                  
-                  {/* Hover effect */}
-                  <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-primary-blue/0 via-primary-blue/15 to-primary-purple/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                </div>
-              ))}
+                ))}
+              </div>
             </nav>
           </div>
           
           {/* Action Section */}
           <div className="flex items-center space-x-6">
-            {/* Status Indicator */}
-            <div className="flex items-center space-x-3 px-4 py-2 bg-gradient-to-r from-success-green/20 to-success-green/10 border border-success-green/30 rounded-xl">
-              <div className="w-3 h-3 bg-success-green rounded-full animate-pulse shadow-lg shadow-success-green/50"></div>
-              <span className="text-success-green-light font-semibold text-sm">Live Trading</span>
+            {/* Status Indicator with Holographic Effect */}
+            <div className="glass-panel px-6 py-3 flex items-center space-x-3 border-neon-green/30 animate-fade-in">
+              <div className="status-dot status-online"></div>
+              <span className="text-neon-green font-rajdhani font-semibold tracking-wider uppercase">
+                Live Trading
+              </span>
+              <div className="text-xs text-gray-400 font-mono">
+                {new Date().toLocaleTimeString()}
+              </div>
             </div>
             
-            {/* Refresh Button */}
+            {/* Refresh Button with Neon Effect */}
             <button
               onClick={onRefresh}
               disabled={isRefreshing}
-              className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-3 shadow-lg shadow-primary-blue/30"
+              className={`
+                btn-neon-cyan
+                disabled:opacity-50 disabled:cursor-not-allowed
+                flex items-center space-x-3
+                ${isRefreshing ? 'animate-pulse' : ''}
+              `}
             >
-              <span className={`text-xl ${isRefreshing ? 'animate-spin' : 'hover:scale-110 transition-transform'}`}>
-                🔄
+              <span className={`text-xl ${isRefreshing ? 'animate-spin' : ''}`}>
+                ⚡
               </span>
-              <span className="font-bold">
-                {isRefreshing ? 'Refreshing...' : 'Refresh Data'}
+              <span className="font-rajdhani font-bold">
+                {isRefreshing ? 'SYNCING...' : 'REFRESH'}
               </span>
             </button>
           </div>
         </div>
       </div>
       
-      {/* Bottom glow effect */}
-      <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary-blue/50 to-transparent"></div>
+      {/* Bottom Glow Line */}
+      <div className="glow-line-x bottom-0"></div>
     </header>
   );
 };

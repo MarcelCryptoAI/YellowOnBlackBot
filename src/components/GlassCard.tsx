@@ -1,59 +1,167 @@
-import React from 'react';
+import React, { ReactNode } from 'react';
 
 interface GlassCardProps {
-  children: React.ReactNode;
+  children: ReactNode;
   className?: string;
-  variant?: 'default' | 'accent' | 'success' | 'danger';
-  size?: 'sm' | 'md' | 'lg' | 'xl';
-  neonColor?: string;
+  variant?: 'default' | 'neon' | 'holographic' | 'data';
+  color?: 'cyan' | 'purple' | 'pink' | 'green' | 'orange' | 'yellow';
+  hover3d?: boolean;
+  animated?: boolean;
   onClick?: () => void;
 }
 
-export const GlassCard: React.FC<GlassCardProps> = ({ 
-  children, 
+export const GlassCard: React.FC<GlassCardProps> = ({
+  children,
   className = '',
   variant = 'default',
-  size = 'md',
-  neonColor,
+  color = 'cyan',
+  hover3d = true,
+  animated = false,
   onClick
 }) => {
-  const neonColors = {
-    default: 'before:from-[#07d7fa] before:via-[#942dff] before:to-[#ff2ef8]',
-    accent: 'before:from-[#ff2ef8] before:via-[#4efcff] before:to-[#942dff]',
-    success: 'before:from-[#00ff88] before:via-[#00d4ff] before:to-[#4efcff]',
-    danger: 'before:from-[#ff0080] before:via-[#ff2ef8] before:to-[#942dff]'
+  const getVariantClasses = () => {
+    switch (variant) {
+      case 'neon':
+        return `border-neon-${color}/30 hover:border-neon-${color}/60`;
+      case 'holographic':
+        return 'border-gradient bg-gradient-to-br from-white/5 via-transparent to-white/5';
+      case 'data':
+        return 'data-card';
+      default:
+        return '';
+    }
   };
 
-  const sizes = {
-    sm: 'p-4',
-    md: 'p-6',
-    lg: 'p-8',
-    xl: 'p-10'
+  const getAnimationClasses = () => {
+    if (!animated) return '';
+    return 'animate-fade-in';
+  };
+
+  const get3dClasses = () => {
+    if (!hover3d) return '';
+    return 'hover:transform hover:perspective-1000 hover:rotate-y-5 hover:scale-105';
   };
 
   return (
-    <div className={`relative ${className}`} onClick={onClick}>
-      <div className={`
-        rounded-3xl
-        bg-gradient-to-br from-[#0A1134] to-[#181432]
-        p-1
-        shadow-[12px_16px_48px_0_rgba(27,22,77,0.7)]
-        before:content-[''] before:absolute before:inset-0 before:rounded-3xl before:-z-10
-        before:bg-gradient-to-tr ${neonColor || neonColors[variant]}
-        before:blur-[4px] before:opacity-60
-        hover:scale-[1.03] hover:shadow-[24px_32px_64px_0_rgba(80,0,210,0.6)] 
-        transition-all duration-300
+    <div
+      className={`
+        glass-card
+        ${getVariantClasses()}
+        ${getAnimationClasses()}
+        ${get3dClasses()}
         ${onClick ? 'cursor-pointer' : ''}
-      `}>
-        <div className={`
-          bg-[#10132a]/95
-          rounded-[22px]
-          ${sizes[size]}
-          backdrop-blur-xl
-          shadow-[inset_1px_1px_24px_1px_rgba(0,185,255,0.08)]
-        `}>
-          {children}
+        ${className}
+      `}
+      onClick={onClick}
+      style={{
+        '--card-color': `var(--neon-${color})`,
+      } as React.CSSProperties}
+    >
+      {variant === 'neon' && (
+        <>
+          <div className="absolute inset-0 rounded-[24px] opacity-0 hover:opacity-20 transition-opacity duration-300"
+               style={{ background: `radial-gradient(circle at center, var(--card-color) 0%, transparent 70%)` }}></div>
+          <div className="absolute -inset-[1px] rounded-[24px] opacity-0 hover:opacity-100 transition-opacity duration-300"
+               style={{ 
+                 background: `linear-gradient(135deg, var(--card-color), transparent, var(--card-color))`,
+                 filter: 'blur(10px)',
+                 zIndex: -1
+               }}></div>
+        </>
+      )}
+      
+      <div className="relative z-10">
+        {children}
+      </div>
+    </div>
+  );
+};
+
+interface GlassMetricProps {
+  label: string;
+  value: string | number;
+  change?: string;
+  changeType?: 'positive' | 'negative' | 'neutral';
+  icon?: string;
+  color?: 'cyan' | 'purple' | 'pink' | 'green' | 'orange' | 'yellow';
+}
+
+export const GlassMetric: React.FC<GlassMetricProps> = ({
+  label,
+  value,
+  change,
+  changeType = 'neutral',
+  icon,
+  color = 'cyan'
+}) => {
+  const getChangeColor = () => {
+    switch (changeType) {
+      case 'positive': return 'text-neon-green';
+      case 'negative': return 'text-neon-red';
+      default: return 'text-gray-400';
+    }
+  };
+
+  return (
+    <GlassCard variant="neon" color={color} className="p-6">
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <p className="text-sm font-rajdhani text-gray-400 uppercase tracking-wider mb-2">
+            {label}
+          </p>
+          <div className="flex items-baseline space-x-3">
+            <h3 className="text-3xl font-orbitron font-bold text-white">
+              {value}
+            </h3>
+            {change && (
+              <span className={`text-sm font-medium ${getChangeColor()}`}>
+                {changeType === 'positive' ? '↑' : changeType === 'negative' ? '↓' : '→'} {change}
+              </span>
+            )}
+          </div>
         </div>
+        {icon && (
+          <div className="text-3xl filter" style={{ filter: `drop-shadow(0 0 20px var(--neon-${color}))` }}>
+            {icon}
+          </div>
+        )}
+      </div>
+    </GlassCard>
+  );
+};
+
+interface GlassTableProps {
+  headers: string[];
+  rows: any[][];
+  className?: string;
+}
+
+export const GlassTable: React.FC<GlassTableProps> = ({ headers, rows, className = '' }) => {
+  return (
+    <div className={`glass-panel rounded-xl overflow-hidden ${className}`}>
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-white/10">
+              {headers.map((header, index) => (
+                <th key={index} className="px-6 py-4 text-left text-sm font-rajdhani font-bold text-gray-400 uppercase tracking-wider">
+                  {header}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, rowIndex) => (
+              <tr key={rowIndex} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                {row.map((cell, cellIndex) => (
+                  <td key={cellIndex} className="px-6 py-4 text-sm text-gray-300">
+                    {cell}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
@@ -62,35 +170,16 @@ export const GlassCard: React.FC<GlassCardProps> = ({
 export const GlassButton: React.FC<{
   children: React.ReactNode;
   onClick?: () => void;
-  variant?: 'primary' | 'secondary' | 'danger';
+  variant?: 'cyan' | 'purple' | 'pink' | 'green' | 'orange';
   size?: 'sm' | 'md' | 'lg';
   className?: string;
   disabled?: boolean;
-}> = ({ children, onClick, variant = 'primary', size = 'md', className = '', disabled = false }) => {
-  const variants = {
-    primary: 'bg-[#1b0d2a] text-[#f052ff] shadow-[0_0_18px_2px_#7c27ffb0] hover:bg-[#29085d] hover:shadow-[0_0_32px_6px_#fc36ff99]',
-    secondary: 'bg-[#0a1134] text-[#07d7fa] shadow-[0_0_18px_2px_#07d7fa60] hover:bg-[#181432] hover:shadow-[0_0_32px_6px_#4efcff99]',
-    danger: 'bg-[#2a0d1b] text-[#ff0080] shadow-[0_0_18px_2px_#ff008060] hover:bg-[#5d0829] hover:shadow-[0_0_32px_6px_#ff2ef899]'
-  };
-
-  const sizes = {
-    sm: 'px-4 py-2 text-sm',
-    md: 'px-6 py-3',
-    lg: 'px-8 py-4 text-lg'
-  };
-
+}> = ({ children, onClick, variant = 'cyan', size = 'md', className = '', disabled = false }) => {
   return (
     <button 
       onClick={onClick}
       disabled={disabled}
-      className={`
-        ${sizes[size]}
-        rounded-xl font-medium
-        ${variants[variant]}
-        transition-all duration-300
-        disabled:opacity-50 disabled:cursor-not-allowed
-        ${className}
-      `}
+      className={`btn-neon-${variant} ${className} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
     >
       {children}
     </button>
@@ -112,17 +201,9 @@ export const GlassInput: React.FC<{
       onChange={onChange}
       placeholder={placeholder}
       readOnly={readOnly}
-      className={`
-        w-full px-4 py-3 rounded-lg 
-        bg-transparent 
-        border border-[#a86fff] 
-        text-[#f9f9f9] 
-        placeholder-[#a86fff80] 
-        outline-none 
-        focus:ring-2 focus:ring-[#4efcff]
-        transition-all duration-300
-        ${className}
-      `}
+      className={`input-3d ${className}`}
     />
   );
 };
+
+export default GlassCard;

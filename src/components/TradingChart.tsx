@@ -21,33 +21,8 @@ export const TradingChart: React.FC<TradingChartProps> = ({
   const seriesRef = useRef<ISeriesApi<'Area'> | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Generate sample data if none provided
-  const generateSampleData = () => {
-    const sampleData = [];
-    const now = new Date();
-    let baseValue = variant === 'portfolio' ? 10000 : variant === 'price' ? 50000 : 0;
-    
-    for (let i = 30; i >= 0; i--) {
-      const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
-      const timeString = date.getFullYear() + '-' + 
-        String(date.getMonth() + 1).padStart(2, '0') + '-' + 
-        String(date.getDate()).padStart(2, '0');
-      
-      // Add some realistic volatility
-      const volatility = variant === 'portfolio' ? 0.02 : variant === 'price' ? 0.05 : 0.1;
-      const change = (Math.random() - 0.5) * volatility;
-      baseValue *= (1 + change);
-      
-      sampleData.push({
-        time: timeString,
-        value: baseValue
-      });
-    }
-    
-    return sampleData;
-  };
-
-  const chartData = data.length > 0 ? data : generateSampleData();
+  // Use provided data or show loading state
+  const chartData = data;
 
   useEffect(() => {
     if (!chartContainerRef.current) return;

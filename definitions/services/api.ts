@@ -11,7 +11,7 @@ import {
 } from '../types';
 
 class ApiService {
-  private static baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:3000/api';
+  private static baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
   private static timeout = 200000; // 200 seconden timeout
 
   // Generic API call method with error handling and custom timeout
@@ -373,7 +373,7 @@ export default ApiService;
   // WebSocket Connection
   static createWebSocketConnection(): WebSocket | null {
     try {
-      const wsUrl = process.env.REACT_APP_WS_URL || 'ws://localhost:3001/ws';
+      const wsUrl = process.env.REACT_APP_WS_URL || 'ws://localhost:8000/ws';
       const ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {

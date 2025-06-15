@@ -441,7 +441,7 @@ const ApiConfigPage: React.FC = () => {
                   </div>
                   
                   <div className="flex space-x-2">
-                    {connection.name === 'Crypto Oppulence' ? (
+                    {(connection.name === 'Crypto Oppulence' || connection.name === 'Revolution X') ? (
                       <>
                         <span className="px-2 py-1 text-xs bg-gradient-to-r from-purple-500/20 to-blue-500/20 text-purple-300 border border-purple-500/40 rounded font-medium">Derivatives</span>
                         <span className="px-2 py-1 text-xs bg-gradient-to-r from-green-500/20 to-teal-500/20 text-green-300 border border-green-500/40 rounded font-medium">UTA 2.0</span>

@@ -2,7 +2,7 @@
 import axios from 'axios';
 import { io, Socket } from 'socket.io-client';
 
-const API_BASE_URL = 'http://localhost:8000/api';
+const API_BASE_URL = 'http://localhost:6789/api';
 
 // API Client setup
 const apiClient = axios.create({
@@ -47,6 +47,103 @@ export interface ByBitConnection {
     usdtPerpetual: boolean;
     inverseUsd: boolean;
   };
+}
+
+// New types for automation features
+export interface Strategy {
+  id: string;
+  name: string;
+  connection_id: string;
+  symbol: string;
+  status: 'INACTIVE' | 'ACTIVE' | 'PAUSED' | 'ERROR' | 'STOPPED';
+  config: {
+    type: string;
+    position_size: number;
+    leverage: number;
+    [key: string]: any;
+  };
+  performance?: {
+    total_pnl: number;
+    win_rate: number;
+    total_trades: number;
+    current_drawdown: number;
+    max_drawdown: number;
+  };
+  risk_limits?: {
+    max_position_size: number;
+    max_daily_loss: number;
+    max_drawdown: number;
+    max_leverage: number;
+  };
+  last_execution?: string;
+  last_signal?: any;
+}
+
+export interface RiskSummary {
+  global_limits: Record<string, number>;
+  portfolio_metrics: {
+    total_equity: number;
+    total_unrealized_pnl: number;
+    total_exposure: number;
+    daily_pnl: number;
+    max_drawdown: number;
+    current_drawdown: number;
+    win_rate: number;
+    sharpe_ratio: number;
+    active_positions: number;
+    total_trades_today: number;
+    timestamp: string;
+  } | null;
+  emergency_stop_triggered: boolean;
+  active_positions: number;
+  position_risks: Record<string, any>;
+  recent_alerts: any[];
+  risk_stats: Record<string, any>;
+  monitoring_active: boolean;
+  last_update: string;
+}
+
+export interface MonitoringDashboard {
+  system_health: {
+    cpu_usage: number;
+    memory_usage: number;
+    disk_usage: number;
+    network_io: Record<string, number>;
+    uptime: number;
+    timestamp: string;
+  } | null;
+  trading_performance: {
+    total_trades: number;
+    winning_trades: number;
+    losing_trades: number;
+    total_pnl: number;
+    win_rate: number;
+    avg_win: number;
+    avg_loss: number;
+    max_drawdown: number;
+    sharpe_ratio: number;
+    profit_factor: number;
+    timestamp: string;
+  } | null;
+  active_alerts: any[];
+  metrics_summary: Record<string, any>;
+  monitoring_stats: Record<string, any>;
+  thresholds: Record<string, number>;
+  is_monitoring: boolean;
+  uptime: number;
+  last_update: string;
+}
+
+export interface MarketData {
+  symbol: string;
+  price: number;
+  volume: number;
+  timestamp: string;
+  high_24h: number;
+  low_24h: number;
+  change_24h: number;
+  bid: number;
+  ask: number;
 }
 
 export interface BalanceData {
@@ -175,10 +272,15 @@ class WebSocketManager {
       return this.socket;
     }
 
-    // Temporary disable WebSocket for simple backend
-    console.log('⚠️ WebSocket disabled for simple backend');
-    this.socket = null;
-    return this.socket as any;
+    // Create WebSocket connection to live backend
+    console.log('🔌 Connecting WebSocket to live backend...');
+    this.socket = io('http://localhost:6789', {
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      timeout: 20000,
+      forceNew: true
+    });
 
     this.socket.on('connect', () => {
       console.log('= WebSocket connected');
@@ -325,6 +427,257 @@ export const bybitApi = {
     stopLossPrice?: number;
   }) => {
     const response = await apiClient.post('/trading/create-order', tradeData);
+    return response.data;
+  },
+
+  // Get open orders
+  getOpenOrders: async (connectionId: string) => {
+    const response = await apiClient.get(`/trading/open-orders/${connectionId}`);
+    return response.data;
+  },
+
+  // Cancel order
+  cancelOrder: async (data: {
+    connectionId: string;
+    orderId: string;
+    symbol: string;
+  }) => {
+    const response = await apiClient.post('/trading/cancel-order', data);
+    return response.data;
+  },
+
+  // Modify order
+  modifyOrder: async (data: {
+    connectionId: string;
+    orderId: string;
+    symbol: string;
+    quantity?: number;
+    price?: number;
+    triggerPrice?: number;
+    takeProfit?: number;
+    stopLoss?: number;
+  }) => {
+    const response = await apiClient.post('/trading/modify-order', data);
+    return response.data;
+  },
+
+  // Close position
+  closePosition: async (data: {
+    connectionId: string;
+    symbol: string;
+    side: string;
+  }) => {
+    const response = await apiClient.post('/trading/close-position', data);
+    return response.data;
+  },
+
+  // Modify position (SL/TP)
+  modifyPosition: async (data: {
+    connectionId: string;
+    symbol: string;
+    side: string;
+    takeProfit?: number;
+    stopLoss?: number;
+    tpTriggerBy?: string;
+    slTriggerBy?: string;
+  }) => {
+    const response = await apiClient.post('/trading/modify-position', data);
+    return response.data;
+  },
+
+  // Strategy execution
+  executeStrategy: async (data: {
+    strategyId: string;
+    connectionId: string;
+    signal: 'BUY' | 'SELL';
+    symbol: string;
+    quantity: number;
+    price?: number;
+    orderType?: 'market' | 'limit';
+  }) => {
+    const response = await apiClient.post('/strategies/execute', data);
+    return response.data;
+  },
+
+  // Get strategy status
+  getStrategyStatus: async (strategyId: string) => {
+    const response = await apiClient.get(`/strategies/status/${strategyId}`);
+    return response.data;
+  },
+
+  // Stop strategy
+  stopStrategy: async (data: {
+    strategyId: string;
+    connectionId?: string;
+    closePositions?: boolean;
+  }) => {
+    const response = await apiClient.post('/strategies/stop', data);
+    return response.data;
+  },
+};
+
+// ================================
+// NEW AUTOMATION API FUNCTIONS
+// ================================
+
+// Strategy Engine API
+export const strategyEngineApi = {
+  // Create enhanced strategy
+  createStrategy: async (data: {
+    name: string;
+    connection_id: string;
+    symbol: string;
+    config: Record<string, any>;
+    risk_limits?: Record<string, number>;
+  }) => {
+    const response = await apiClient.post('/strategy/create/enhanced', data);
+    return response.data;
+  },
+
+  // Control strategy (start/pause/stop)
+  controlStrategy: async (data: {
+    strategy_id: string;
+    action: 'start' | 'pause' | 'stop';
+  }) => {
+    const response = await apiClient.post('/strategy/control', data);
+    return response.data;
+  },
+
+  // Get strategy status
+  getStrategyStatus: async (strategyId: string): Promise<{ success: boolean; data: Strategy }> => {
+    const response = await apiClient.get(`/strategy/status/${strategyId}`);
+    return response.data;
+  },
+
+  // Get engine status
+  getEngineStatus: async () => {
+    const response = await apiClient.get('/strategy/engine/status');
+    return response.data;
+  },
+
+  // Start strategy engine
+  startEngine: async () => {
+    const response = await apiClient.post('/strategy/engine/start');
+    return response.data;
+  },
+
+  // Stop strategy engine
+  stopEngine: async () => {
+    const response = await apiClient.post('/strategy/engine/stop');
+    return response.data;
+  },
+};
+
+// Real-time Data API
+export const realTimeDataApi = {
+  // Start data feeds
+  startDataFeeds: async (symbols: string[]) => {
+    const response = await apiClient.post('/data/start', symbols);
+    return response.data;
+  },
+
+  // Stop data feeds
+  stopDataFeeds: async () => {
+    const response = await apiClient.post('/data/stop');
+    return response.data;
+  },
+
+  // Get data statistics
+  getDataStats: async () => {
+    const response = await apiClient.get('/data/stats');
+    return response.data;
+  },
+
+  // Get market data for symbol
+  getMarketData: async (symbol: string): Promise<{ success: boolean; data: MarketData }> => {
+    const response = await apiClient.get(`/data/market/${symbol}`);
+    return response.data;
+  },
+
+  // Get kline data
+  getKlineData: async (symbol: string, limit: number = 100) => {
+    const response = await apiClient.get(`/data/klines/${symbol}?limit=${limit}`);
+    return response.data;
+  },
+};
+
+// Risk Management API
+export const riskManagementApi = {
+  // Get risk summary
+  getRiskSummary: async (): Promise<{ success: boolean; data: RiskSummary }> => {
+    const response = await apiClient.get('/risk/summary');
+    return response.data;
+  },
+
+  // Set risk limit
+  setRiskLimit: async (data: {
+    limit_name: string;
+    value: number;
+  }) => {
+    const response = await apiClient.post('/risk/limits', data);
+    return response.data;
+  },
+
+  // Start risk monitoring
+  startRiskMonitoring: async () => {
+    const response = await apiClient.post('/risk/monitoring/start');
+    return response.data;
+  },
+
+  // Stop risk monitoring
+  stopRiskMonitoring: async () => {
+    const response = await apiClient.post('/risk/monitoring/stop');
+    return response.data;
+  },
+
+  // Reset emergency stop
+  resetEmergencyStop: async () => {
+    const response = await apiClient.post('/risk/emergency/reset');
+    return response.data;
+  },
+
+  // Get position risk
+  getPositionRisk: async (symbol: string) => {
+    const response = await apiClient.get(`/risk/position/${symbol}`);
+    return response.data;
+  },
+};
+
+// Monitoring API
+export const monitoringApi = {
+  // Get monitoring dashboard
+  getDashboard: async (): Promise<{ success: boolean; data: MonitoringDashboard }> => {
+    const response = await apiClient.get('/monitoring/dashboard');
+    return response.data;
+  },
+
+  // Start monitoring
+  startMonitoring: async () => {
+    const response = await apiClient.post('/monitoring/start');
+    return response.data;
+  },
+
+  // Stop monitoring
+  stopMonitoring: async () => {
+    const response = await apiClient.post('/monitoring/stop');
+    return response.data;
+  },
+
+  // Configure alerts
+  configureAlerts: async (config: Record<string, any>) => {
+    const response = await apiClient.post('/monitoring/alerts/config', { config });
+    return response.data;
+  },
+
+  // Get metric history
+  getMetricHistory: async (metricName: string, hours: number = 24) => {
+    const response = await apiClient.get(`/monitoring/metrics/${metricName}?hours=${hours}`);
+    return response.data;
+  },
+
+  // Resolve alert
+  resolveAlert: async (alertId: string) => {
+    const response = await apiClient.post(`/monitoring/alerts/${alertId}/resolve`);
     return response.data;
   },
 };

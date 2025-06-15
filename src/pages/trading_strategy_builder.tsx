@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { bybitApi, openaiApi } from '../services/api';
 import AdvancedBacktest from '../components/AdvancedBacktest';
+import TradingViewBacktest from '../components/TradingViewBacktest';
 
 // Types
 interface StrategyData {
@@ -71,6 +72,7 @@ const TradingStrategyBuilder: React.FC = () => {
   const [currentTab, setCurrentTab] = useState(1);
   const [showBacktestSidebar, setShowBacktestSidebar] = useState(false);
   const [showAdvancedBacktest, setShowAdvancedBacktest] = useState(false);
+  const [showTradingViewBacktest, setShowTradingViewBacktest] = useState(false);
   const [isBacktesting, setIsBacktesting] = useState(false);
   
   // Data states
@@ -142,6 +144,10 @@ const TradingStrategyBuilder: React.FC = () => {
   // AI Trade Parameters states
   const [isOptimizingTradeParams, setIsOptimizingTradeParams] = useState(false);
   const [tradeParamsOptimization, setTradeParamsOptimization] = useState<any>(null);
+  
+  // AI Report Sidebar state
+  const [showAiReportSidebar, setShowAiReportSidebar] = useState(false);
+  const [activeAiReport, setActiveAiReport] = useState<'indicators' | 'parameters' | 'advice' | null>(null);
 
   // Signal indicators available
   const signalIndicators: Indicator[] = [
@@ -420,19 +426,19 @@ const TradingStrategyBuilder: React.FC = () => {
     }, 200);
 
     // Simulate backtest calculation
-    setTimeout(() => {
-      const trades = generateMockTrades();
+    setTimeout(async () => {
+      const trades = await generateRealTrades();
       setTradeHistory(trades);
       
       const winTrades = trades.filter(t => t.pnl > 0);
       const lossTrades = trades.filter(t => t.pnl <= 0);
       
       setBacktestResults({
-        winRate: (winTrades.length / trades.length) * 100,
+        winRate: trades.length > 0 ? (winTrades.length / trades.length) * 100 : 0,
         wins: winTrades.length,
         losses: lossTrades.length,
         roi: trades.reduce((sum, t) => sum + t.roi, 0),
-        drawdown: Math.max(...trades.map(t => Math.abs(Math.min(0, t.cumulativeROI)))),
+        drawdown: trades.length > 0 ? Math.max(...trades.map(t => Math.abs(Math.min(0, t.cumulativeROI)))) : 0,
         pnl: trades.reduce((sum, t) => sum + t.pnl, 0),
         cumulativeGrowth: calculateCumulativeGrowth(trades)
       });
@@ -442,8 +448,44 @@ const TradingStrategyBuilder: React.FC = () => {
     }, 2500);
   };
 
-  // Generate mock trade history based on period
-  const generateMockTrades = () => {
+  // Generate real trade history from database and simulate backtesting
+  const generateRealTrades = async () => {
+    try {
+      // Get real trades from API for this symbol if available
+      const response = await api.request('GET', `/trades/history?symbol=${selectedCoin}&period=${backtestPeriod}&limit=1000`);
+      
+      if (response.success && response.data && response.data.length > 0) {
+        // Use real trade data
+        const realTrades = response.data.map((trade: any, index: number) => ({
+          id: trade.id || index,
+          timestamp: new Date(trade.executed_at || trade.created_at),
+          side: trade.side.toLowerCase(),
+          price: trade.executed_price || trade.price || 0,
+          quantity: trade.executed_quantity || trade.quantity || 0,
+          pnl: trade.pnl || 0,
+          roi: trade.pnl / (trade.price * trade.quantity) * 100,
+          cumulativeROI: 0 // Will be calculated below
+        }));
+        
+        // Calculate cumulative ROI
+        let cumulativePnL = 0;
+        realTrades.forEach(trade => {
+          cumulativePnL += trade.pnl;
+          trade.cumulativeROI = (cumulativePnL / 10000) * 100; // Assuming $10k start capital
+        });
+        
+        return realTrades;
+      }
+    } catch (error) {
+      console.warn('Could not fetch real trade data, using simulated data:', error);
+    }
+    
+    // Fallback to simulated trades based on strategy parameters
+    return generateSimulatedTrades();
+  };
+
+  // Generate simulated trade history based on strategy and market conditions
+  const generateSimulatedTrades = () => {
     const trades = [];
     let cumulativePnL = 0;
     const initialCapital = 10000;
@@ -718,55 +760,139 @@ const TradingStrategyBuilder: React.FC = () => {
     }));
   };
 
-  const saveStrategy = () => {
-    const strategies = JSON.parse(localStorage.getItem('userStrategies') || '[]');
+  const saveStrategy = async () => {
+    if (!strategyData.name || !strategyData.selectedAccount || !strategyData.coinPair) {
+      alert('❌ Vul alle verplichte velden in');
+      return;
+    }
     
-    // Check if we're editing an existing strategy
-    const existingStrategyIndex = strategies.findIndex(s => s.name === strategyData.name);
-    
-    if (existingStrategyIndex >= 0) {
-      // Update existing strategy
-      const updatedStrategy = {
-        ...strategies[existingStrategyIndex],
-        name: strategyData.name,
-        symbol: strategyData.coinPair,
-        description: `Strategy for ${strategyData.coinPair} with ${strategyData.signalIndicator.type}`,
-        timeframe: strategyData.signalIndicator.timeframe,
-        indicators: [strategyData.signalIndicator.type, ...strategyData.confirmingIndicators.filter(ind => ind.enabled).map(ind => ind.type)],
-        mlModel: strategyData.mlEnabled ? 'Enabled' : undefined,
-        config: strategyData
+    try {
+      // Prepare strategy configuration for execution engine
+      const strategyConfig = {
+        type: strategyData.signalIndicator.type.toLowerCase().replace(/\s+/g, '_'),
+        position_size: strategyData.amountType === 'fixed' ? 
+          strategyData.fixedAmount / 100 : // Convert to percentage of portfolio
+          strategyData.percentageAmount / 100,
+        leverage: strategyData.multiplier,
+        
+        // Signal indicator settings
+        ...strategyData.signalIndicator.settings,
+        
+        // Confirming indicators
+        confirming_indicators: strategyData.confirmingIndicators
+          .filter(ind => ind.enabled)
+          .map(ind => ({
+            type: ind.type.toLowerCase().replace(/\s+/g, '_'),
+            timeframe: ind.timeframe,
+            settings: ind.settings
+          })),
+        
+        // Risk management
+        margin_mode: strategyData.marginType.toLowerCase(),
+        
+        // ML settings if enabled
+        ml_enabled: strategyData.mlEnabled,
+        ml_models: strategyData.mlEnabled ? strategyData.mlModels : null
       };
       
-      strategies[existingStrategyIndex] = updatedStrategy;
-      localStorage.setItem('userStrategies', JSON.stringify(strategies));
+      // Risk limits based on strategy settings
+      const riskLimits = {
+        max_position_size: strategyData.amountType === 'fixed' ? 
+          strategyData.fixedAmount : 
+          (strategyData.percentageAmount / 100) * 10000, // Assume 10k portfolio
+        max_leverage: strategyData.multiplier,
+        max_daily_loss: 500.0, // Default daily loss limit
+        max_drawdown: 0.15 // 15% max drawdown
+      };
       
-      alert('Strategy updated successfully!');
-    } else {
-      // Create new strategy
+      // Create strategy via backend execution engine
+      const response = await fetch('/strategy/create/enhanced', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: strategyData.name,
+          connection_id: strategyData.selectedAccount,
+          symbol: strategyData.coinPair,
+          config: strategyConfig,
+          risk_limits: riskLimits
+        })
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        
+        // Also save to localStorage for frontend display
+        const strategies = JSON.parse(localStorage.getItem('userStrategies') || '[]');
+        const existingStrategyIndex = strategies.findIndex(s => s.name === strategyData.name);
+        
+        const strategyData_display = {
+          id: result.data.strategy_id,
+          backend_id: result.data.strategy_id,
+          name: strategyData.name,
+          symbol: strategyData.coinPair,
+          status: 'INACTIVE', // Will be activated separately
+          profit: 0,
+          trades: 0,
+          winRate: 0,
+          createdAt: new Date().toISOString(),
+          description: `Live automated strategy for ${strategyData.coinPair} with ${strategyData.signalIndicator.type}`,
+          timeframe: strategyData.signalIndicator.timeframe,
+          indicators: [strategyData.signalIndicator.type, ...strategyData.confirmingIndicators.filter(ind => ind.enabled).map(ind => ind.type)],
+          mlModel: strategyData.mlEnabled ? 'Enabled' : undefined,
+          riskScore: Math.floor(Math.random() * 10) + 1,
+          config: strategyData,
+          execution_engine: true // Mark as execution engine strategy
+        };
+        
+        if (existingStrategyIndex >= 0) {
+          strategies[existingStrategyIndex] = strategyData_display;
+        } else {
+          strategies.push(strategyData_display);
+        }
+        
+        localStorage.setItem('userStrategies', JSON.stringify(strategies));
+        
+        alert(`✅ Strategy "${strategyData.name}" succesvol aangemaakt in execution engine!\n\n🤖 Strategy ID: ${result.data.strategy_id}\n📊 Status: ${result.data.status}\n🛡️ Risk validated: ✓\n\nDe strategy kan nu geactiveerd worden via de Strategies pagina.`);
+        
+        navigate('/strategies');
+        
+      } else {
+        const error = await response.json();
+        throw new Error(error.error || 'Strategy creation failed');
+      }
+      
+    } catch (error) {
+      console.error('Error creating strategy:', error);
+      
+      // Fallback to local storage save if backend fails
+      const strategies = JSON.parse(localStorage.getItem('userStrategies') || '[]');
       const newStrategy = {
         id: Date.now().toString(),
         name: strategyData.name,
         symbol: strategyData.coinPair,
-        status: 'STOPPED',
+        status: 'DRAFT',
         profit: 0,
         trades: 0,
         winRate: 0,
         createdAt: new Date().toISOString(),
-        description: `Strategy for ${strategyData.coinPair} with ${strategyData.signalIndicator.type}`,
+        description: `Draft strategy for ${strategyData.coinPair} with ${strategyData.signalIndicator.type}`,
         timeframe: strategyData.signalIndicator.timeframe,
         indicators: [strategyData.signalIndicator.type, ...strategyData.confirmingIndicators.filter(ind => ind.enabled).map(ind => ind.type)],
         mlModel: strategyData.mlEnabled ? 'Enabled' : undefined,
         riskScore: Math.floor(Math.random() * 10) + 1,
-        config: strategyData
+        config: strategyData,
+        execution_engine: false,
+        error: error.message
       };
       
       strategies.push(newStrategy);
       localStorage.setItem('userStrategies', JSON.stringify(strategies));
       
-      alert('Strategy saved successfully!');
+      alert(`⚠️ Strategy opgeslagen als DRAFT (backend fout)\n\nFout: ${error.message}\n\nDe strategy is lokaal opgeslagen maar niet verbonden met de execution engine.`);
+      navigate('/strategies');
     }
-    
-    navigate('/strategies');
   };
 
   const renderGeneralTab = () => (
@@ -940,12 +1066,18 @@ const TradingStrategyBuilder: React.FC = () => {
       const response = await openaiApi.optimizeIndicators({
         coin: strategyData.coinPair,
         timeframe: '1m',
-        lookbackPeriod: '1y'
+        lookbackPeriod: '1y',
+        currentSettings: {
+          signalIndicator: strategyData.signalIndicator,
+          confirmingIndicators: strategyData.confirmingIndicators
+        }
       });
 
       if (response.success) {
         console.log('✅ AI Indicator Optimization successful:', response.data);
         setIndicatorOptimization(response.data);
+        setActiveAiReport('indicators');
+        setShowAiReportSidebar(true);
 
         // Auto-apply optimized indicators
         if (response.data.signal_indicator) {
@@ -1036,6 +1168,8 @@ const TradingStrategyBuilder: React.FC = () => {
       if (response.success) {
         console.log('✅ AI Trade Parameters Optimization successful:', response.data);
         setTradeParamsOptimization(response.data);
+        setActiveAiReport('parameters');
+        setShowAiReportSidebar(true);
 
         // Show detailed optimization results
         const entry = response.data.entry_strategy;
@@ -1250,6 +1384,8 @@ const TradingStrategyBuilder: React.FC = () => {
         
         if (response.success) {
           setAiAdvice(response.data);
+          setActiveAiReport('advice');
+          setShowAiReportSidebar(true);
         } else {
           console.error('OpenAI advice failed:', response);
           alert(`AI Advice failed: ${response.error || 'Unknown error'}`);
@@ -1578,37 +1714,6 @@ const TradingStrategyBuilder: React.FC = () => {
         </div>
       </div>
 
-      {/* AI Optimization Results */}
-      {(indicatorOptimization || tradeParamsOptimization) && (
-        <div className="bg-gradient-to-r from-green-600/20 to-blue-600/20 p-6 rounded-xl border border-green-500/30 mb-6">
-          <div className="flex items-center mb-4">
-            <span className="mr-2 text-2xl">🎯</span>
-            <h4 className="text-lg font-medium text-white">AI Optimalisatie Resultaten</h4>
-          </div>
-          
-          {indicatorOptimization && (
-            <div className="mb-4 p-4 bg-black/30 rounded-lg">
-              <h5 className="text-green-400 font-semibold mb-2">📊 Indicator Optimalisatie:</h5>
-              <div className="text-sm text-gray-300 space-y-1">
-                <p>• Signal: {indicatorOptimization.signal_indicator?.indicator} op {indicatorOptimization.signal_indicator?.timeframe}</p>
-                <p>• Win Rate: {indicatorOptimization.backtest_results?.win_rate}</p>
-                <p>• Verwacht Rendement: {indicatorOptimization.backtest_results?.expected_monthly_return}</p>
-              </div>
-            </div>
-          )}
-          
-          {tradeParamsOptimization && (
-            <div className="p-4 bg-black/30 rounded-lg">
-              <h5 className="text-blue-400 font-semibold mb-2">💰 Trade Parameters:</h5>
-              <div className="text-sm text-gray-300 space-y-1">
-                <p>• Entry: {tradeParamsOptimization.entry_strategy?.entry_condition}</p>
-                <p>• Position Size: {tradeParamsOptimization.entry_strategy?.position_size}</p>
-                <p>• Win Rate Target: {tradeParamsOptimization.expected_performance?.win_rate}</p>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* AI Recommendation Box */}
       <div className="bg-gradient-to-r from-primary-blue/20 to-primary-purple/20 p-6 rounded-xl border border-primary-blue/30 mb-6">
@@ -2569,6 +2674,14 @@ const TradingStrategyBuilder: React.FC = () => {
             <span>📊</span>
             <span>Live Backtest</span>
           </button>
+          
+          <button
+            onClick={() => setShowTradingViewBacktest(true)}
+            className="flex items-center space-x-2 bg-gradient-to-r from-gray-700 to-gray-600 hover:from-gray-600 hover:to-gray-500 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300"
+          >
+            <span>📈</span>
+            <span>TradingView Backtest</span>
+          </button>
         </div>
       </div>
 
@@ -2785,6 +2898,406 @@ const TradingStrategyBuilder: React.FC = () => {
                 strategy={strategyData.name || 'AI Strategy'}
                 isLoading={isBacktesting}
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TradingView Backtest */}
+      {showTradingViewBacktest && (
+        <TradingViewBacktest 
+          onClose={() => setShowTradingViewBacktest(false)}
+          strategyName={strategyData.name || `${strategyData.coinPair} Strategy`}
+          isLoading={isBacktesting}
+        />
+      )}
+
+      {/* AI Report Sidebar */}
+      {showAiReportSidebar && (
+        <div className="fixed inset-y-0 right-0 w-full md:w-[600px] lg:w-[800px] bg-gradient-to-br from-gray-900 via-black to-gray-900 border-l border-primary-blue/30 shadow-2xl z-50 flex flex-col transform transition-transform duration-300 animate-slideInRight">
+          <div className="flex items-center justify-between p-6 border-b border-primary-blue/20">
+            <h2 className="section-title flex items-center">
+              <span className="mr-2 text-3xl">
+                {activeAiReport === 'indicators' ? '🎯' : activeAiReport === 'parameters' ? '💰' : '🤖'}
+              </span>
+              {activeAiReport === 'indicators' ? 'AI Indicator Analysis Report' : 
+               activeAiReport === 'parameters' ? 'AI Trade Parameters Report' : 
+               'AI Strategy Advice Report'}
+            </h2>
+            <button
+              onClick={() => setShowAiReportSidebar(false)}
+              className="p-2 hover:bg-primary-blue/10 rounded-lg transition-all text-gray-400 hover:text-white"
+            >
+              <span className="text-2xl">✕</span>
+            </button>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto p-6 space-y-6">
+            {/* Indicator Optimization Report */}
+            {activeAiReport === 'indicators' && indicatorOptimization && (
+              <>
+                {/* Testing Report Section */}
+                {indicatorOptimization.testing_report && (
+                  <div className="bg-gradient-to-br from-blue-900/20 to-cyan-900/20 p-6 rounded-xl border border-blue-500/30">
+                    <h3 className="text-xl font-bold text-white mb-4 flex items-center">
+                      <span className="mr-2">📊</span>Testing Report
+                    </h3>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-gray-400">Total Combinations Tested:</span>
+                        <p className="text-white font-semibold">{indicatorOptimization.testing_report.total_combinations_tested || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Testing Period:</span>
+                        <p className="text-white font-semibold">{indicatorOptimization.testing_report.testing_period || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Best Win Rate Found:</span>
+                        <p className="text-green-400 font-semibold">{indicatorOptimization.testing_report.best_win_rate_found || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Best Profit Factor:</span>
+                        <p className="text-green-400 font-semibold">{indicatorOptimization.testing_report.best_profit_factor || 'N/A'}</p>
+                      </div>
+                      <div className="col-span-2">
+                        <span className="text-gray-400">Most Stable Setup:</span>
+                        <p className="text-blue-400 font-semibold">{indicatorOptimization.testing_report.most_stable_setup || 'N/A'}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Signal Indicator */}
+                {indicatorOptimization.signal_indicator && (
+                  <div className="bg-gradient-to-br from-green-900/20 to-emerald-900/20 p-6 rounded-xl border border-green-500/30">
+                    <h3 className="text-xl font-bold text-white mb-4">🎯 Recommended Signal Indicator</h3>
+                    <div className="space-y-3">
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Indicator:</span>
+                        <span className="text-white font-bold">{indicatorOptimization.signal_indicator.indicator}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Timeframe:</span>
+                        <span className="text-primary-blue font-bold">{indicatorOptimization.signal_indicator.timeframe}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Parameters:</span>
+                        <span className="text-yellow-400">{indicatorOptimization.signal_indicator.parameters}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Accuracy:</span>
+                        <span className="text-green-400 font-bold">{indicatorOptimization.signal_indicator.accuracy}</span>
+                      </div>
+                      {indicatorOptimization.signal_indicator.reasoning && (
+                        <div className="mt-4 p-3 bg-black/30 rounded-lg">
+                          <p className="text-sm text-gray-300">{indicatorOptimization.signal_indicator.reasoning}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Confirming Indicators */}
+                {indicatorOptimization.confirming_indicators && indicatorOptimization.confirming_indicators.length > 0 && (
+                  <div className="bg-gradient-to-br from-purple-900/20 to-pink-900/20 p-6 rounded-xl border border-purple-500/30">
+                    <h3 className="text-xl font-bold text-white mb-4">✅ Confirming Indicators</h3>
+                    <div className="space-y-4">
+                      {indicatorOptimization.confirming_indicators.map((ind: any, index: number) => (
+                        <div key={index} className="p-4 bg-black/20 rounded-lg">
+                          <h4 className="text-lg font-semibold text-purple-300 mb-2">Indicator {index + 1}</h4>
+                          <div className="grid grid-cols-2 gap-3 text-sm">
+                            <div>
+                              <span className="text-gray-400">Type:</span>
+                              <p className="text-white font-semibold">{ind.indicator}</p>
+                            </div>
+                            <div>
+                              <span className="text-gray-400">Timeframe:</span>
+                              <p className="text-blue-400 font-semibold">{ind.timeframe}</p>
+                            </div>
+                            <div>
+                              <span className="text-gray-400">Parameters:</span>
+                              <p className="text-yellow-400">{ind.parameters}</p>
+                            </div>
+                            <div>
+                              <span className="text-gray-400">Accuracy:</span>
+                              <p className="text-green-400 font-semibold">{ind.accuracy}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Comparison with Current Settings */}
+                {indicatorOptimization.comparison_with_current && (
+                  <div className="bg-gradient-to-br from-orange-900/20 to-red-900/20 p-6 rounded-xl border border-orange-500/30">
+                    <h3 className="text-xl font-bold text-white mb-4">📈 Performance Comparison</h3>
+                    <div className="space-y-3">
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Current Win Rate:</span>
+                        <span className="text-orange-300">{indicatorOptimization.comparison_with_current.current_win_rate || 'N/A'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Recommended Win Rate:</span>
+                        <span className="text-green-400 font-bold">{indicatorOptimization.comparison_with_current.recommended_win_rate || 'N/A'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Improvement:</span>
+                        <span className="text-primary-blue font-bold">{indicatorOptimization.comparison_with_current.improvement || 'N/A'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Risk Reduction:</span>
+                        <span className="text-green-400">{indicatorOptimization.comparison_with_current.risk_reduction || 'N/A'}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Detailed Parameter Analysis */}
+                {indicatorOptimization.parameter_analysis && indicatorOptimization.parameter_analysis.length > 0 && (
+                  <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 p-6 rounded-xl border border-gray-600/30">
+                    <h3 className="text-xl font-bold text-white mb-4">🔬 Detailed Parameter Analysis</h3>
+                    <div className="space-y-2">
+                      {indicatorOptimization.parameter_analysis.map((analysis: string, index: number) => (
+                        <div key={index} className="p-3 bg-black/30 rounded-lg">
+                          <p className="text-sm text-gray-300">{analysis}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Raw Analysis (collapsed by default) */}
+                <details className="bg-gray-900/50 p-4 rounded-xl border border-gray-700/30">
+                  <summary className="cursor-pointer text-gray-400 hover:text-white font-medium">
+                    View Raw AI Analysis
+                  </summary>
+                  <div className="mt-4 p-4 bg-black/50 rounded-lg overflow-x-auto">
+                    <pre className="text-xs text-gray-300 whitespace-pre-wrap">{indicatorOptimization.raw_analysis}</pre>
+                  </div>
+                </details>
+              </>
+            )}
+
+            {/* Trade Parameters Report */}
+            {activeAiReport === 'parameters' && tradeParamsOptimization && (
+              <>
+                {/* Entry Strategy */}
+                {tradeParamsOptimization.entry_strategy && (
+                  <div className="bg-gradient-to-br from-green-900/20 to-emerald-900/20 p-6 rounded-xl border border-green-500/30">
+                    <h3 className="text-xl font-bold text-white mb-4">💰 Entry Strategy</h3>
+                    <div className="space-y-3">
+                      <div>
+                        <span className="text-gray-400">Entry Condition:</span>
+                        <p className="text-white mt-1">{tradeParamsOptimization.entry_strategy.entry_condition}</p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <span className="text-gray-400">Position Size:</span>
+                          <p className="text-yellow-400 font-bold">{tradeParamsOptimization.entry_strategy.position_size}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-400">Entry Type:</span>
+                          <p className="text-blue-400 font-semibold">{tradeParamsOptimization.entry_strategy.entry_type}</p>
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Confirmation Required:</span>
+                        <p className="text-primary-blue">{tradeParamsOptimization.entry_strategy.confirmation_required}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Take Profit Strategy */}
+                {tradeParamsOptimization.take_profit_strategy && (
+                  <div className="bg-gradient-to-br from-blue-900/20 to-cyan-900/20 p-6 rounded-xl border border-blue-500/30">
+                    <h3 className="text-xl font-bold text-white mb-4">🎯 Take Profit Strategy</h3>
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-1 gap-2">
+                        <div className="p-3 bg-black/30 rounded-lg">
+                          <span className="text-green-400 font-semibold">TP Level 1:</span>
+                          <p className="text-white">{tradeParamsOptimization.take_profit_strategy.tp_level_1}</p>
+                        </div>
+                        <div className="p-3 bg-black/30 rounded-lg">
+                          <span className="text-green-400 font-semibold">TP Level 2:</span>
+                          <p className="text-white">{tradeParamsOptimization.take_profit_strategy.tp_level_2}</p>
+                        </div>
+                        <div className="p-3 bg-black/30 rounded-lg">
+                          <span className="text-green-400 font-semibold">TP Level 3:</span>
+                          <p className="text-white">{tradeParamsOptimization.take_profit_strategy.tp_level_3}</p>
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Trailing Stop:</span>
+                        <p className="text-blue-400">{tradeParamsOptimization.take_profit_strategy.trailing_stop}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Stop Loss Strategy */}
+                {tradeParamsOptimization.stop_loss_strategy && (
+                  <div className="bg-gradient-to-br from-red-900/20 to-orange-900/20 p-6 rounded-xl border border-red-500/30">
+                    <h3 className="text-xl font-bold text-white mb-4">🛡️ Stop Loss Strategy</h3>
+                    <div className="space-y-3">
+                      <div>
+                        <span className="text-gray-400">Initial Stop:</span>
+                        <p className="text-red-400 font-bold">{tradeParamsOptimization.stop_loss_strategy.initial_stop}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Break-even Move:</span>
+                        <p className="text-yellow-400">{tradeParamsOptimization.stop_loss_strategy.break_even_move}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Trailing Stop:</span>
+                        <p className="text-orange-400">{tradeParamsOptimization.stop_loss_strategy.trailing_stop}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Maximum Loss:</span>
+                        <p className="text-red-400 font-bold">{tradeParamsOptimization.stop_loss_strategy.maximum_loss}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Risk Parameters */}
+                {tradeParamsOptimization.risk_parameters && (
+                  <div className="bg-gradient-to-br from-purple-900/20 to-pink-900/20 p-6 rounded-xl border border-purple-500/30">
+                    <h3 className="text-xl font-bold text-white mb-4">⚡ Risk Parameters</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <span className="text-gray-400">Max Portfolio Risk:</span>
+                        <p className="text-purple-300 font-bold">{tradeParamsOptimization.risk_parameters.max_portfolio_risk}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Daily Loss Limit:</span>
+                        <p className="text-red-400 font-bold">{tradeParamsOptimization.risk_parameters.daily_loss_limit}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Max Concurrent Trades:</span>
+                        <p className="text-blue-400 font-semibold">{tradeParamsOptimization.risk_parameters.max_concurrent_trades}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Risk-Reward Ratio:</span>
+                        <p className="text-green-400 font-bold">{tradeParamsOptimization.risk_parameters.risk_reward_ratio}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Market Conditions */}
+                {tradeParamsOptimization.market_conditions && (
+                  <div className="bg-gradient-to-br from-cyan-900/20 to-blue-900/20 p-6 rounded-xl border border-cyan-500/30">
+                    <h3 className="text-xl font-bold text-white mb-4">🌊 Market Conditions</h3>
+                    <div className="space-y-3">
+                      <div>
+                        <span className="text-gray-400">Best Market Conditions:</span>
+                        <p className="text-cyan-300">{tradeParamsOptimization.market_conditions.best_market_conditions}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Avoid Trading When:</span>
+                        <p className="text-orange-400">{tradeParamsOptimization.market_conditions.avoid_trading_when}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Time Filters:</span>
+                        <p className="text-blue-400">{tradeParamsOptimization.market_conditions.time_filters}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Expected Performance */}
+                {tradeParamsOptimization.expected_performance && (
+                  <div className="bg-gradient-to-br from-green-900/20 to-emerald-900/20 p-6 rounded-xl border border-green-500/30">
+                    <h3 className="text-xl font-bold text-white mb-4">📊 Expected Performance</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <span className="text-gray-400">Win Rate:</span>
+                        <p className="text-green-400 font-bold text-lg">{tradeParamsOptimization.expected_performance.win_rate}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Average Win:</span>
+                        <p className="text-green-400 font-bold text-lg">{tradeParamsOptimization.expected_performance.average_win}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Average Loss:</span>
+                        <p className="text-red-400 font-bold text-lg">{tradeParamsOptimization.expected_performance.average_loss}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Monthly Return Target:</span>
+                        <p className="text-primary-blue font-bold text-lg">{tradeParamsOptimization.expected_performance.monthly_return_target}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* AI Advice Report */}
+            {activeAiReport === 'advice' && aiAdvice && (
+              <>
+                <div className="bg-gradient-to-br from-primary-blue/20 to-primary-purple/20 p-6 rounded-xl border border-primary-blue/30">
+                  <h3 className="text-xl font-bold text-white mb-4">🤖 OpenAI Analysis</h3>
+                  <p className="text-gray-300 leading-relaxed">{aiAdvice.analysis}</p>
+                </div>
+
+                <div className="bg-gradient-to-br from-yellow-900/20 to-orange-900/20 p-6 rounded-xl border border-yellow-500/30">
+                  <h3 className="text-xl font-bold text-white mb-4">⚡ Suggestions</h3>
+                  <p className="text-gray-300 leading-relaxed">{aiAdvice.suggestion}</p>
+                </div>
+
+                {aiAdvice.recommendations && aiAdvice.recommendations.length > 0 && (
+                  <div className="bg-gradient-to-br from-green-900/20 to-emerald-900/20 p-6 rounded-xl border border-green-500/30">
+                    <h3 className="text-xl font-bold text-white mb-4">📋 Recommendations</h3>
+                    <div className="space-y-3">
+                      {aiAdvice.recommendations.map((rec: string, index: number) => (
+                        <div key={index} className="flex items-start">
+                          <span className="text-green-400 mr-2 mt-1">•</span>
+                          <p className="text-gray-300">{rec}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Raw Response */}
+                <details className="bg-gray-900/50 p-4 rounded-xl border border-gray-700/30">
+                  <summary className="cursor-pointer text-gray-400 hover:text-white font-medium">
+                    View Raw AI Response
+                  </summary>
+                  <div className="mt-4 p-4 bg-black/50 rounded-lg overflow-x-auto">
+                    <pre className="text-xs text-gray-300 whitespace-pre-wrap">{aiAdvice.raw_response}</pre>
+                  </div>
+                </details>
+              </>
+            )}
+          </div>
+
+          {/* Footer Actions */}
+          <div className="p-6 border-t border-primary-blue/20 bg-black/50">
+            <div className="flex justify-between items-center">
+              <div className="text-sm text-gray-400">
+                Generated at {new Date().toLocaleTimeString()}
+              </div>
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => {
+                    // Apply settings logic here
+                    setShowAiReportSidebar(false);
+                  }}
+                  className="px-6 py-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded-lg font-medium transition-all"
+                >
+                  Apply Settings
+                </button>
+                <button
+                  onClick={() => setShowAiReportSidebar(false)}
+                  className="px-6 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg font-medium transition-all"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>

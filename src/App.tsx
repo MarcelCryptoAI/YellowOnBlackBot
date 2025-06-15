@@ -74,38 +74,7 @@ interface BybitConnection {
   connectionData?: ConnectionData;
 }
 
-// Live data state will replace these
-const mockStrategies: Strategy[] = [
-  {
-    id: '1',
-    name: 'BTC Small Position Strategy',
-    symbol: 'BTCUSDT',
-    status: 'ACTIVE',
-    profit: 3.25,
-    trades: 12,
-    winRate: 66.7
-  },
-  {
-    id: '2',
-    name: 'ETH Learning Bot',
-    symbol: 'ETHUSDT',
-    status: 'ACTIVE',
-    profit: 2.10,
-    trades: 8,
-    winRate: 62.5
-  },
-  {
-    id: '3',
-    name: 'Practice Scalping',
-    symbol: 'MIXED',
-    status: 'PAUSED',
-    profit: 1.85,
-    trades: 15,
-    winRate: 53.3
-  }
-];
-
-// These will be populated with live data from ByBit API
+// All strategy data now comes from live API - no more mock data
 
 // Components
 const StatCard: React.FC<{
@@ -320,12 +289,22 @@ const App: React.FC = () => {
   const [isTesting, setIsTesting] = useState({ bybit: false, openai: false });
   const [lastSaved, setLastSaved] = useState<string>('');
   
-  // Top coin tickers state with more accurate BTC price
+  // Top 10 coin tickers state for CNN-style news ticker
   const [topCoins, setTopCoins] = useState([
     { symbol: 'BTC', price: 105371, change24h: 2.4, color: 'orange' },
     { symbol: 'SOL', price: 203.45, change24h: 5.2, color: 'purple' },
-    { symbol: 'FARTCOIN', price: 0.87, change24h: -1.8, color: 'red' }
+    { symbol: 'FARTCOIN', price: 0.87, change24h: -1.8, color: 'red' },
+    { symbol: 'ETH', price: 3967, change24h: 1.8, color: 'blue' },
+    { symbol: 'ADA', price: 1.12, change24h: -0.5, color: 'cyan' },
+    { symbol: 'DOGE', price: 0.34, change24h: 3.2, color: 'yellow' },
+    { symbol: 'AVAX', price: 42.67, change24h: -1.2, color: 'pink' },
+    { symbol: 'MATIC', price: 0.52, change24h: 2.1, color: 'purple' },
+    { symbol: 'DOT', price: 8.94, change24h: 1.5, color: 'pink' },
+    { symbol: 'LINK', price: 23.45, change24h: -0.8, color: 'blue' }
   ]);
+  
+  // CNN-style ticker animation state
+  const [tickerIndex, setTickerIndex] = useState(0);
 
   // Initialize backend connection and load live data
   useEffect(() => {
@@ -477,23 +456,23 @@ const App: React.FC = () => {
     setTimeout(() => setIsRefreshing(false), 1000);
   };
 
-  // Update top coin prices with real ByBit data
+  // Update top coin prices with real ByBit data and CNN-style rotation
   useEffect(() => {
     const updateTopCoinPrices = async () => {
       try {
         // Get real market data from ByBit
         const marketResponse = await bybitApi.getMarketData();
         if (marketResponse.success && marketResponse.data) {
-          const coins = ['BTCUSDT', 'SOLUSDT', 'FARTCOINUSDT'];
+          const coinSymbols = ['BTCUSDT', 'SOLUSDT', 'FARTCOINUSDT', 'ETHUSDT', 'ADAUSDT', 'DOGEUSDT', 'AVAXUSDT', 'MATICUSDT', 'DOTUSDT', 'LINKUSDT'];
           
-          const updatedCoins = coins.map(symbol => {
+          const updatedCoins = coinSymbols.map(symbol => {
             const marketData = marketResponse.data.find(coin => coin.symbol === symbol);
             if (marketData) {
               return {
                 symbol: symbol.replace('USDT', ''),
                 price: parseFloat(marketData.price),
                 change24h: parseFloat(marketData.change24h || '0'),
-                color: symbol.includes('BTC') ? 'orange' : symbol.includes('SOL') ? 'purple' : 'red'
+                color: getSymbolColor(symbol.replace('USDT', ''))
               };
             }
             // Fallback to existing data if not found
@@ -505,30 +484,42 @@ const App: React.FC = () => {
           console.log('📈 Updated coin prices from ByBit:', updatedCoins);
         }
       } catch (error) {
-        console.error('❌ Failed to fetch real coin prices, using simulation:', error);
-        
-        // Fallback to simulation if API fails
-        setTopCoins(prevCoins => 
-          prevCoins.map(coin => {
-            const priceChange = (Math.random() - 0.5) * 0.02;
-            const changeChange = (Math.random() - 0.5) * 0.5;
-            
-            return {
-              ...coin,
-              price: Math.max(0.001, coin.price * (1 + priceChange)),
-              change24h: Math.max(-10, Math.min(10, coin.change24h + changeChange))
-            };
-          })
-        );
+        console.error('❌ Failed to fetch real coin prices:', error);
+        // Keep existing prices instead of simulating new ones
       }
     };
 
-    // Update immediately and then every 10 seconds
+    // CNN-style ticker rotation every 2 seconds
+    const tickerInterval = setInterval(() => {
+      setTickerIndex(prev => (prev + 1) % topCoins.length);
+    }, 2000);
+
+    // Update prices every 10 seconds
     updateTopCoinPrices();
     const priceInterval = setInterval(updateTopCoinPrices, 10000);
     
-    return () => clearInterval(priceInterval);
+    return () => {
+      clearInterval(priceInterval);
+      clearInterval(tickerInterval);
+    };
   }, []); // Empty dependency array to run only once
+
+  // Helper function to get color for each symbol
+  const getSymbolColor = (symbol: string) => {
+    const colorMap: { [key: string]: string } = {
+      'BTC': 'orange',
+      'SOL': 'purple', 
+      'FARTCOIN': 'red',
+      'ETH': 'blue',
+      'ADA': 'cyan',
+      'DOGE': 'yellow',
+      'AVAX': 'pink',
+      'MATIC': 'purple',
+      'DOT': 'pink',
+      'LINK': 'blue'
+    };
+    return colorMap[symbol] || 'gray';
+  };
 
   const testBybitConnection = async () => {
     if (!apiCredentials.bybit.apiKey || !apiCredentials.bybit.secretKey || !apiCredentials.bybit.name) {
@@ -861,247 +852,243 @@ const App: React.FC = () => {
         <div className="absolute top-1/2 left-1/2 w-72 h-72 bg-gradient-to-br from-primary-blue/15 to-primary-purple/15 rounded-full blur-3xl animate-pulse"></div>
       </div>
 
-      {/* Compact Header */}
-      <header className="sticky top-0 z-20 border-b border-gray-700/30 backdrop-blur-xl bg-black/60 p-2 shadow-2xl shadow-black/50">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            {/* Top Coin Tickers */}
-            <div className="hidden lg:flex items-center space-x-2">
-              {topCoins.map((coin) => (
-                <div 
-                  key={coin.symbol}
-                  className="flex items-center space-x-1.5 bg-black/30 backdrop-blur-xl rounded-lg px-2 py-1 border border-primary-blue/30 hover:bg-primary-blue/10 transition-all cursor-pointer"
-                >
-                  <span className="text-primary-blue font-bold text-xs">{coin.symbol}</span>
-                  <span className="text-white font-semibold text-xs">
-                    ${coin.price < 1 ? coin.price.toFixed(3) : coin.price.toLocaleString()}
-                  </span>
-                  <span className={`text-xs font-semibold ${
-                    coin.change24h >= 0 ? 'text-green-400' : 'text-red-400'
-                  }`}>
-                    {coin.change24h >= 0 ? '+' : ''}{coin.change24h.toFixed(1)}%
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            {/* ByBit Portfolio Value */}
-            <div className="flex items-center space-x-1.5 bg-black/50 backdrop-blur-xl rounded-lg px-2 py-1 border border-primary-blue/30 shadow-lg shadow-black/20">
-              <span className="text-primary-blue text-sm">💰</span>
-              <span className="text-xs font-medium text-primary-blue">
-                ${totalValue.toLocaleString()}
-              </span>
-            </div>
-
-            {/* OpenAI Credits */}
-            {openaiConnections.length > 0 && (
-              <div className="flex items-center space-x-1.5 bg-black/50 backdrop-blur-xl rounded-lg px-2 py-1 border border-green-600/30 shadow-lg shadow-black/20">
-                <span className="text-green-400 text-sm">🤖</span>
-                <span className="text-xs font-medium text-green-300">
-                  ${openaiConnections[0]?.subscription?.remainingCredits?.toFixed(2) || '0.00'}
-                </span>
+      {/* Unified Ultra-Thick Glass Navigation Bar */}
+      <nav className="sticky top-0 z-50 glass-card rounded-none">
+        {/* Main Navigation Container */}
+        <div className="relative px-8 py-6">
+          <div className="flex items-center justify-between gap-6">
+            
+            {/* Left Section: Logo and Navigation Tabs */}
+            <div className="flex items-center gap-6">
+              {/* ArIe Logo Icon Only */}
+              <div className="relative group">
+                <div className="absolute -inset-3 bg-gradient-to-r from-neon-cyan via-neon-purple to-neon-pink rounded-full blur-xl opacity-30 group-hover:opacity-60 transition-opacity duration-500"></div>
+                <img 
+                  src="/arie-logo.png" 
+                  alt="ArIe" 
+                  className="relative h-12 w-12 rounded-full border-2 border-neon-cyan/50 shadow-[0_0_40px_rgba(0,255,255,0.6)] hover:shadow-[0_0_60px_rgba(0,255,255,0.8)] transition-all duration-300 cursor-pointer hover:scale-110"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    const parent = target.parentElement;
+                    if (parent) {
+                      parent.innerHTML = '<div class="h-12 w-12 rounded-full bg-gradient-to-br from-neon-cyan to-neon-purple flex items-center justify-center text-white font-orbitron font-black text-xl shadow-[0_0_40px_rgba(0,255,255,0.6)]">A</div>';
+                    }
+                  }}
+                />
               </div>
-            )}
-
-            {/* Storage Status Indicator */}
-            <div className="flex items-center space-x-1.5 bg-black/50 backdrop-blur-xl rounded-lg px-2 py-1 border border-blue-600/30 shadow-lg shadow-black/20">
-              <div className={`w-1.5 h-1.5 rounded-full ${
-                hasStoredCredentials ? 'bg-blue-400' : 'bg-gray-400'
-              }`}></div>
-              <span className={`text-xs font-medium ${
-                hasStoredCredentials ? 'text-blue-300' : 'text-gray-300'
-              }`}>
-                {hasStoredCredentials ? currentUser.name : 'NO DATA'}
-              </span>
+              
+              {/* Navigation Tabs */}
+              <div className="flex items-center gap-2 p-2 glass-panel rounded-2xl">
+                {[
+                  { path: '/dashboard', label: 'Dashboard', icon: '📊', glow: 'cyan' },
+                  { path: '/manual-order', label: 'Manual Order', icon: '⚡', glow: 'yellow' },
+                  { path: '/positions-orders', label: 'Positions & Orders', icon: '📈', glow: 'green' },
+                  { path: '/strategies', label: 'Strategies', icon: '🧠', glow: 'purple' },
+                  { path: '/api', label: 'API Config', icon: '🔧', glow: 'pink' }
+                ].map((tab) => (
+                  <button
+                    key={tab.path}
+                    onClick={() => navigate(tab.path)}
+                    className={`
+                      relative px-6 py-3 rounded-xl font-rajdhani font-bold transition-all duration-300
+                      ${location.pathname === tab.path
+                        ? `bg-neon-${tab.glow}/20 text-neon-${tab.glow} 
+                           shadow-[0_0_30px_rgba(0,255,255,0.4)] 
+                           border border-neon-${tab.glow}/50`
+                        : `text-gray-400 hover:text-white hover:bg-white/5 
+                           hover:shadow-[0_0_20px_rgba(255,255,255,0.1)] 
+                           hover:border hover:border-white/20`
+                      }
+                    `}
+                    style={{
+                      letterSpacing: '0.05em',
+                      textShadow: location.pathname === tab.path ? `0 0 20px var(--neon-${tab.glow})` : 'none'
+                    }}
+                  >
+                    <span className="relative z-10 flex items-center gap-3">
+                      <span className="text-xl filter drop-shadow-lg">{tab.icon}</span>
+                      <span className="text-sm uppercase tracking-wider">{tab.label}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
             
-            <button
-              onClick={handleRefresh}
-              className={`p-1.5 rounded-lg bg-black/50 backdrop-blur-xl border border-gray-600/30 hover:border-primary-blue/40 hover:bg-primary-blue/10 transition-all duration-300 ${
-                isRefreshing ? 'animate-spin' : ''
-              }`}
-            >
-              <span className="text-primary-blue text-sm">🔄</span>
-            </button>
-            <div className={`flex items-center space-x-1.5 bg-black/50 backdrop-blur-xl rounded-lg px-2 py-1 border ${
-              backendStatus === 'connected' 
-                ? 'border-green-600/30' 
-                : backendStatus === 'connecting'
-                ? 'border-primary-blue/30'
-                : 'border-red-600/30'
-            }`}>
-              <div className={`w-1.5 h-1.5 rounded-full ${
-                backendStatus === 'connected' 
-                  ? 'bg-green-400 animate-pulse' 
-                  : backendStatus === 'connecting'
-                  ? 'bg-primary-blue animate-pulse'
-                  : 'bg-red-400'
-              }`}></div>
-              <span className={`text-xs font-medium ${
-                backendStatus === 'connected' 
-                  ? 'text-green-300' 
-                  : backendStatus === 'connecting'
-                  ? 'text-primary-blue'
-                  : 'text-red-300'
-              }`}>
-                {backendStatus === 'connected' ? 'LIVE' : backendStatus === 'connecting' ? 'CONN' : 'OFF'}
-              </span>
+            {/* Middle Section: CNN-Style Rotating Coin Ticker */}
+            <div className="flex-1 flex items-center justify-center">
+              <div className="relative overflow-hidden w-full max-w-md">
+                {/* CNN-style news ticker container */}
+                <div className="relative glass-panel px-6 py-4 rounded-2xl border-2 border-neon-cyan/30">
+                  <div className="flex items-center gap-4">
+                    {/* Live indicator */}
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-neon-cyan rounded-full animate-pulse shadow-[0_0_10px_rgba(0,255,255,0.8)]"></div>
+                      <span className="text-neon-cyan font-orbitron font-black text-xs uppercase tracking-wider">LIVE</span>
+                    </div>
+                    
+                    {/* Rotating coin display */}
+                    <div className="flex-1 relative h-8 overflow-hidden">
+                      <div 
+                        className="absolute inset-0 flex flex-col justify-start transition-transform duration-500 ease-in-out"
+                        style={{ transform: `translateY(${-tickerIndex * 32}px)` }}
+                      >
+                        {topCoins.map((coin, index) => (
+                          <div key={coin.symbol} className="w-full h-8 flex items-center justify-center gap-3 flex-shrink-0 ticker-item">
+                            <span 
+                              className="font-orbitron font-black text-lg uppercase tracking-wider" 
+                              style={{
+                                color: `var(--neon-${coin.color})`,
+                                textShadow: `0 0 15px var(--neon-${coin.color})`
+                              }}
+                            >
+                              {coin.symbol}
+                            </span>
+                            <span className="text-white font-orbitron font-bold text-lg">
+                              ${coin.price < 1 ? coin.price.toFixed(3) : coin.price.toLocaleString()}
+                            </span>
+                            <span 
+                              className={`text-sm font-rajdhani font-black ${
+                                coin.change24h >= 0 ? 'text-neon-green' : 'text-neon-red'
+                              }`}
+                              style={{
+                                textShadow: `0 0 10px ${coin.change24h >= 0 ? 'var(--neon-green)' : 'var(--neon-red)'}`
+                              }}
+                            >
+                              {coin.change24h >= 0 ? '▲' : '▼'} {Math.abs(coin.change24h).toFixed(1)}%
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    {/* Ticker indicator */}
+                    <div className="flex items-center gap-1">
+                      {topCoins.map((_, index) => (
+                        <div 
+                          key={index}
+                          className={`w-1 h-1 rounded-full transition-all duration-300 ${
+                            index === tickerIndex ? 'bg-neon-cyan shadow-[0_0_5px_var(--neon-cyan)]' : 'bg-gray-600'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  
+                  {/* Animated border effect */}
+                  <div className="absolute inset-0 rounded-2xl">
+                    <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-neon-cyan to-transparent opacity-60 animate-pulse"></div>
+                    <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-neon-cyan to-transparent opacity-60 animate-pulse"></div>
+                  </div>
+                </div>
+                
+                {/* Background glow effect */}
+                <div className="absolute -inset-4 bg-gradient-to-r from-neon-cyan/10 via-neon-blue/10 to-neon-cyan/10 rounded-3xl blur-xl opacity-50 animate-pulse"></div>
+              </div>
             </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Navigation Bar */}
-      <nav className="sticky top-[45px] z-10 border-b border-gray-700/30 backdrop-blur-xl bg-black/50 p-4 shadow-lg">
-        <div className="flex items-center justify-between">
-          {/* ArIe Logo and Branding */}
-          <div className="flex items-center space-x-3">
-            <img 
-              src="/arie-logo.png" 
-              alt="ArIe Logo" 
-              className="h-8 w-8 rounded-full drop-shadow-lg border border-primary-blue/30"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = 'none';
-              }}
-            />
-            <div>
-              <h1 className="text-sm font-bold bg-gradient-to-r from-white via-primary-blue/70 to-primary-blue bg-clip-text text-transparent">
-                ArIe
-              </h1>
-              <p className="text-xs text-gray-400">AI Trading Platform</p>
-            </div>
-          </div>
-          
-          {/* Navigation Tabs */}
-          <div className="flex items-center space-x-1 bg-black/50 backdrop-blur-xl rounded-xl p-1 border border-gray-600/30 shadow-2xl shadow-black/30">
-            {[
-              { path: '/dashboard', label: 'Dashboard', icon: '📊' },
-              { path: '/manual-order', label: 'Manual Order', icon: '⚡' },
-              { path: '/trades', label: 'Trades', icon: '💹' },
-              { path: '/strategies', label: 'Strategies', icon: '🧠' },
-              { path: '/api', label: 'API Config', icon: '🔧' }
-            ].map((tab) => (
-              <button
-                key={tab.path}
-                onClick={() => navigate(tab.path)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 flex items-center space-x-2 ${
-                  location.pathname === tab.path
-                    ? 'bg-gradient-to-r from-primary-blue to-primary-blue-dark text-white shadow-xl shadow-primary-blue/25 font-bold'
-                    : 'text-gray-300 hover:text-white hover:bg-white/5 hover:shadow-lg hover:shadow-white/10'
-                }`}
-              >
-                <span>{tab.icon}</span>
-                <span>{tab.label}</span>
-              </button>
-            ))}
-          </div>
-          
-          {/* Dashboard Controls */}
-          {location.pathname === '/dashboard' && (
-            <div className="flex items-center space-x-4">
-              {/* Coin List Status Indicator */}
-              <div className="flex items-center space-x-3 bg-gray-900/50 px-4 py-2 rounded-lg border border-gray-600/30">
-                <div className="flex flex-col">
-                  <div className="flex items-center space-x-2">
-                    <span className="text-xs text-gray-400">Coin List:</span>
-                    <span className={`w-2 h-2 rounded-full ${
-                      true // We'll add coin list state later
-                        ? 'bg-green-400'
-                        : 'bg-red-400'
-                    }`}></span>
-                    <span className="text-xs text-white font-medium">
-                      {(() => {
-                        const cachedCoins = localStorage.getItem('cachedCoins');
-                        return cachedCoins ? `${JSON.parse(cachedCoins).length} coins` : '0 coins';
-                      })()}
+            
+            {/* Right Section: Portfolio, Credits, and Status */}
+            <div className="flex items-center gap-4">
+              {/* ByBit Portfolio */}
+              <div className="relative group">
+                <div className="absolute -inset-2 bg-gradient-to-r from-neon-cyan to-neon-blue rounded-xl blur-md opacity-30 group-hover:opacity-60 transition-opacity duration-300"></div>
+                <div className="relative flex items-center gap-3 px-5 py-3 glass-panel">
+                  <span className="text-neon-cyan text-xl filter drop-shadow-[0_0_10px_rgba(0,255,255,0.8)]">💎</span>
+                  <span className="text-sm font-orbitron font-bold text-neon-cyan" 
+                    style={{
+                      textShadow: '0 0 15px rgba(0,255,255,0.6)'
+                    }}
+                  >
+                    ${totalValue.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+              
+              {/* OpenAI Credits */}
+              {openaiConnections.length > 0 && (
+                <div className="relative group">
+                  <div className="absolute -inset-2 bg-gradient-to-r from-neon-green to-emerald-600 rounded-xl blur-md opacity-30 group-hover:opacity-60 transition-opacity duration-300"></div>
+                  <div className="relative flex items-center gap-3 px-5 py-3 glass-panel">
+                    <span className="text-neon-green text-xl filter drop-shadow-[0_0_10px_rgba(0,255,136,0.8)]">🤖</span>
+                    <span className="text-sm font-orbitron font-bold text-neon-green"
+                      style={{
+                        textShadow: '0 0 15px rgba(0,255,136,0.6)'
+                      }}
+                    >
+                      ${openaiConnections[0]?.subscription?.remainingCredits?.toFixed(2) || '0.00'}
                     </span>
                   </div>
                 </div>
-                <button
-                  onClick={async () => {
-                    setIsRefreshingCoins(true);
-                    try {
-                      // Enhanced coin list refresh with full coin list
-                      const manualCoinList = [
-                        // Top Market Cap
-                        'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'XRPUSDT', 'ADAUSDT',
-                        'SOLUSDT', 'DOGEUSDT', 'AVAXUSDT', 'TRXUSDT', 'LINKUSDT',
-                        'TONUSDT', 'SHIBUSDT', 'DOTUSDT', 'BCHUSDT', 'NEARUSDT',
-                        'MATICUSDT', 'ICPUSDT', 'UNIUSDT', 'LTCUSDT', 'APTUSDT',
-                        'STXUSDT', 'FILUSDT', 'ATOMUSDT', 'XLMUSDT', 'VETUSDT',
-                        'WLDUSDT', 'RENDERUSDT', 'FETUSDT', 'AIUSDT', 'ARKMUSDT',
-                        
-                        // Trending & Meme Coins  
-                        'TRUMPUSDT', 'PEPEUSDT', 'WIFUSDT', 'BONKUSDT', 'FLOKIUSDT',
-                        'MEMECUSDT', 'DOGSUSDT', 'CATUSDT', 'BABYDOGEUSDT', 'SATSUSDT',
-                        'FARTCOINUSDT', 'PNUTUSDT', 'GOATUSDT', 'ACTUSDT', 'NEIROUSDT',
-                        'MOODENGUSDT', 'POPUSDT', 'CHILLGUYUSDT', 'BANAUSDT', 'PONKEUSDT',
-                        
-                        // DeFi Tokens
-                        'AAVEUSDT', 'MKRUSDT', 'COMPUSDT', 'YFIUSDT', 'CRVUSDT',
-                        'SNXUSDT', 'BALAUSDT', 'SUSHIUSDT', '1INCHUSDT', 'DYDXUSDT',
-                        'PENGUUSDT', 'EIGENUSDT', 'MORPHOUSDT', 'USUAL', 'COWUSDT',
-                        
-                        // Layer 1 & 2
-                        'ARBUSDT', 'OPUSDT', 'SUIUSDT', 'SEIUSDT', 'INJUSDT',
-                        'TIAUSDT', 'THETAUSDT', 'FTMUSDT', 'ALGOUSDT', 'EGLDUSDT',
-                        'BASUSDT', 'MANTAUSDT', 'STRAXUSDT', 'KLAYUSDT', 'QTUMUSDT',
-                        
-                        // AI & Tech
-                        'FETCHUSDT', 'RENDERUSDT', 'OCEANUSDT', 'AGIXUSDT', 'TAUUSDT',
-                        'AIUSDT', 'ARKMUSDT', 'PHBUSDT', 'NMRUSDT', 'GRTUSDT',
-                        'RAIUSDT', 'CTSIUSDT', 'MOVRUSDT', 'VIRTUUSDT', 'AIOZUSDT',
-                        
-                        // Gaming & Metaverse
-                        'AXSUSDT', 'SANDUSDT', 'MANAUSDT', 'ENJUSDT', 'GALAUSDT',
-                        'IMXUSDT', 'BEAMXUSDT', 'RNDRUSDT', 'YGGUSDT', 'ALICEUSDT',
-                        'PIXELUSDT', 'ACEUSDT', 'XAIUSDT', 'SAGAUSDT', 'VANRYUSDT',
-                        
-                        // Infrastructure & RWA
-                        'ORDIUSDT', 'KASUSDT', 'MINAUSDT', 'ROSEUSDT', 'QNTUSDT',
-                        'FLOWUSDT', 'XTZUSDT', 'IOTAUSDT', 'ZILUSDT', 'HBARUSDT',
-                        'OMNIUSDT', 'ONDOUSDT', 'RLCUSDT', 'ENSUSDT', 'STORJUSDT',
-                        
-                        // New & Popular
-                        'BOMEUSDT', 'WUSDT', 'JUPUSDT', 'PYTHUSDT', 'ALTUSDT',
-                        'JTOUSDT', 'MYROUSDT', 'LISTAUSDT', 'BANUSDT', 'RAYUSDT',
-                        'JITOUSDT', 'SLEEPLESSAIUSDT', 'HIPPOUSDT'
-                      ];
-                      
-                      const now = Date.now();
-                      localStorage.setItem('cachedCoins', JSON.stringify(manualCoinList));
-                      localStorage.setItem('coinsCacheTimestamp', now.toString());
-                      
-                      console.log(`✅ Coin list refreshed: ${manualCoinList.length} coins`);
-                    } catch (error) {
-                      console.error('❌ Coin refresh failed:', error);
-                    } finally {
-                      setIsRefreshingCoins(false);
-                    }
-                  }}
-                  disabled={isRefreshingCoins}
-                  className="flex items-center space-x-1 bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 disabled:from-gray-600 disabled:to-gray-500 text-white px-3 py-1 rounded text-xs font-medium transition-all duration-300"
-                >
-                  <span className={isRefreshingCoins ? 'animate-spin' : ''}>↻</span>
-                  <span>{isRefreshingCoins ? 'Refreshing...' : 'Refresh'}</span>
-                </button>
+              )}
+              
+              {/* Storage Status */}
+              <div className="relative group">
+                <div className={`absolute -inset-2 rounded-xl blur-md opacity-30 group-hover:opacity-60 transition-opacity duration-300
+                  ${hasStoredCredentials ? 'bg-gradient-to-r from-neon-blue to-neon-purple' : 'bg-gray-600'}`}
+                ></div>
+                <div className="relative flex items-center gap-3 px-5 py-3 glass-panel">
+                  <div className={`w-3 h-3 rounded-full ${
+                    hasStoredCredentials ? 'bg-neon-blue shadow-[0_0_15px_rgba(0,128,255,0.8)]' : 'bg-gray-400'
+                  } animate-pulse`}></div>
+                  <span className={`text-xs font-orbitron font-black uppercase tracking-wider ${
+                    hasStoredCredentials ? 'text-neon-blue' : 'text-gray-400'
+                  }`}
+                    style={{
+                      textShadow: hasStoredCredentials ? '0 0 10px rgba(0,128,255,0.6)' : 'none'
+                    }}
+                  >
+                    {hasStoredCredentials ? currentUser.name : 'NO DATA'}
+                  </span>
+                </div>
               </div>
-
+              
+              {/* Backend Status */}
+              <div className="relative group">
+                <div className={`absolute -inset-2 rounded-xl blur-md opacity-30 group-hover:opacity-60 transition-opacity duration-300
+                  ${backendStatus === 'connected' ? 'bg-gradient-to-r from-neon-green to-emerald-600' : 
+                    backendStatus === 'connecting' ? 'bg-gradient-to-r from-neon-yellow to-neon-orange' : 
+                    'bg-gradient-to-r from-neon-red to-neon-pink'}`}
+                ></div>
+                <div className="relative flex items-center gap-3 px-5 py-3 glass-panel">
+                  <div className={`w-3 h-3 rounded-full ${
+                    backendStatus === 'connected' ? 'bg-neon-green shadow-[0_0_15px_var(--neon-green)]' : 
+                    backendStatus === 'connecting' ? 'bg-neon-yellow shadow-[0_0_15px_var(--neon-yellow)]' : 
+                    'bg-neon-red shadow-[0_0_15px_var(--neon-red)]'
+                  } animate-pulse`}></div>
+                  <span className={`text-xs font-orbitron font-black uppercase tracking-wider ${
+                    backendStatus === 'connected' ? 'text-neon-green' : 
+                    backendStatus === 'connecting' ? 'text-neon-yellow' : 
+                    'text-neon-red'
+                  }`}
+                    style={{
+                      textShadow: `0 0 10px ${
+                        backendStatus === 'connected' ? 'var(--neon-green)' : 
+                        backendStatus === 'connecting' ? 'var(--neon-yellow)' : 
+                        'var(--neon-red)'
+                      }`
+                    }}
+                  >
+                    {backendStatus === 'connected' ? 'LIVE' : backendStatus === 'connecting' ? 'CONN' : 'OFF'}
+                  </span>
+                </div>
+              </div>
+              
+              {/* Refresh Button */}
               <button
-                onClick={() => setShowWidgetConfig(true)}
-                className="p-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white rounded-lg transition-all duration-300 shadow-lg"
-                title="Configure Widgets"
+                onClick={handleRefresh}
+                className={`relative group p-3 ${isRefreshing ? 'animate-spin' : ''}`}
               >
-                <span>⚙️</span>
+                <div className="absolute -inset-2 bg-gradient-to-r from-neon-cyan to-neon-purple rounded-xl blur-md opacity-30 group-hover:opacity-60 transition-opacity duration-300"></div>
+                <div className="relative glass-panel px-4 py-3">
+                  <span className="text-neon-cyan text-xl filter drop-shadow-[0_0_10px_rgba(0,255,255,0.8)]">⚡</span>
+                </div>
               </button>
             </div>
-          )}
-          
-          {/* Spacer for other pages */}
-          {location.pathname !== '/dashboard' && <div className="w-24"></div>}
+          </div>
         </div>
+        
+        {/* Bottom Glow Effect */}
+        <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-neon-cyan/50 to-transparent"></div>
       </nav>
 
       {/* Main Content Area */}
