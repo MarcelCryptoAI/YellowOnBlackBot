@@ -1,5 +1,6 @@
 // Header.tsx
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { api } from '../services/api';
 
 interface HeaderProps {
   currentTab: string;
@@ -8,13 +9,107 @@ interface HeaderProps {
   onRefresh: () => void;
 }
 
+interface SystemStatus {
+  backend: {
+    online: boolean;
+    version?: string;
+  };
+  bybit: {
+    online: boolean;
+    totalBalance: number;
+    activeConnections: number;
+  };
+  openai: {
+    online: boolean;
+    monthlyUsage: number;
+    remainingCredits: number;
+  };
+  strategies: {
+    online: boolean;
+    activeCount: number;
+    pendingCount: number;
+  };
+}
+
 export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab, isRefreshing, onRefresh }) => {
+  const [systemStatus, setSystemStatus] = useState<SystemStatus>({
+    backend: { online: false },
+    bybit: { online: false, totalBalance: 0, activeConnections: 0 },
+    openai: { online: false, monthlyUsage: 0, remainingCredits: 0 },
+    strategies: { online: false, activeCount: 0, pendingCount: 0 }
+  });
+
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: '🚀', color: 'cyan' },
     { id: 'trades', label: 'Trades', icon: '⚡', color: 'purple' },
     { id: 'strategies', label: 'Strategies', icon: '🧠', color: 'pink' },
     { id: 'api-config', label: 'API Config', icon: '🔧', color: 'green' },
   ];
+
+  // Fetch system status
+  useEffect(() => {
+    const fetchStatus = async () => {
+      try {
+        // Check backend health
+        const backendHealth = await api.healthCheck();
+        
+        // Get ByBit connections and calculate total balance
+        const connections = await api.bybit.getConnections();
+        let totalBalance = 0;
+        let activeConnections = 0;
+        
+        if (connections.success && connections.connections) {
+          activeConnections = connections.connections.length;
+          connections.connections.forEach((conn: any) => {
+            if (conn.data?.balance?.total) {
+              totalBalance += conn.data.balance.total;
+            }
+          });
+        }
+
+        // Get OpenAI status (mock for now - will need actual API)
+        const openaiStatus = {
+          online: true,
+          monthlyUsage: 12.45,
+          remainingCredits: 87.55
+        };
+
+        // Get strategies status (mock for now - will need actual API)
+        const strategiesStatus = {
+          online: true,
+          activeCount: 2,
+          pendingCount: 1
+        };
+
+        setSystemStatus({
+          backend: {
+            online: backendHealth.success,
+            version: backendHealth.version
+          },
+          bybit: {
+            online: connections.success,
+            totalBalance,
+            activeConnections
+          },
+          openai: openaiStatus,
+          strategies: strategiesStatus
+        });
+      } catch (error) {
+        console.error('Failed to fetch system status:', error);
+        setSystemStatus(prev => ({
+          ...prev,
+          backend: { online: false }
+        }));
+      }
+    };
+
+    fetchStatus();
+    // Refresh status every 30 seconds
+    const interval = setInterval(fetchStatus, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const formatCurrency = (amount: number) => `$${amount.toFixed(2)}`;
 
   return (
     <header className="relative z-50 overflow-hidden">
@@ -91,35 +186,69 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab, isRef
             </nav>
           </div>
           
-          {/* Action Section */}
-          <div className="flex items-center space-x-6">
-            {/* Status Indicator with Holographic Effect */}
-            <div className="glass-panel px-6 py-3 flex items-center space-x-3 border-neon-green/30 animate-fade-in">
-              <div className="status-dot status-online"></div>
-              <span className="text-neon-green font-rajdhani font-semibold tracking-wider uppercase">
-                Live Trading
+          {/* Status Section */}
+          <div className="flex items-center space-x-4">
+            {/* Backend Status */}
+            <div className={`glass-panel px-4 py-2 flex items-center space-x-2 ${systemStatus.backend.online ? 'border-neon-green/30' : 'border-neon-red/30'}`}>
+              <div className={`status-dot ${systemStatus.backend.online ? 'status-online' : 'status-offline'}`}></div>
+              <span className={`font-rajdhani font-semibold text-sm ${systemStatus.backend.online ? 'text-neon-green' : 'text-neon-red'}`}>
+                Backend
               </span>
-              <div className="text-xs text-gray-400 font-mono">
-                {new Date().toLocaleTimeString()}
-              </div>
             </div>
             
-            {/* Refresh Button with Neon Effect */}
+            {/* ByBit API Status */}
+            <div className={`glass-panel px-4 py-2 flex items-center space-x-2 ${systemStatus.bybit.online ? 'border-neon-blue/30' : 'border-neon-red/30'}`}>
+              <div className={`status-dot ${systemStatus.bybit.online ? 'status-online' : 'status-offline'}`}></div>
+              <span className={`font-rajdhani font-semibold text-sm ${systemStatus.bybit.online ? 'text-neon-blue' : 'text-neon-red'}`}>
+                ByBit API
+              </span>
+              {systemStatus.bybit.online && (
+                <span className="text-xs text-gray-400 font-mono">
+                  {formatCurrency(systemStatus.bybit.totalBalance)}
+                </span>
+              )}
+            </div>
+            
+            {/* OpenAI API Status */}
+            <div className={`glass-panel px-4 py-2 flex items-center space-x-2 ${systemStatus.openai.online ? 'border-neon-purple/30' : 'border-neon-red/30'}`}>
+              <div className={`status-dot ${systemStatus.openai.online ? 'status-online' : 'status-offline'}`}></div>
+              <span className={`font-rajdhani font-semibold text-sm ${systemStatus.openai.online ? 'text-neon-purple' : 'text-neon-red'}`}>
+                OpenAI API
+              </span>
+              {systemStatus.openai.online && (
+                <span className="text-xs text-gray-400 font-mono">
+                  {formatCurrency(systemStatus.openai.monthlyUsage)}
+                </span>
+              )}
+            </div>
+            
+            {/* Strategies Status */}
+            <div className={`glass-panel px-4 py-2 flex items-center space-x-2 ${systemStatus.strategies.online ? 'border-neon-yellow/30' : 'border-neon-red/30'}`}>
+              <div className={`status-dot ${systemStatus.strategies.online ? (systemStatus.strategies.activeCount > 0 ? 'status-online' : 'status-warning') : 'status-offline'}`}></div>
+              <span className={`font-rajdhani font-semibold text-sm ${systemStatus.strategies.online ? 'text-neon-yellow' : 'text-neon-red'}`}>
+                Strategies
+              </span>
+              {systemStatus.strategies.online && (
+                <span className="text-xs text-gray-400 font-mono">
+                  {systemStatus.strategies.activeCount} Active
+                </span>
+              )}
+            </div>
+            
+            {/* Refresh Button */}
             <button
               onClick={onRefresh}
               disabled={isRefreshing}
               className={`
-                btn-neon-cyan
+                btn-neon-cyan px-4 py-2
                 disabled:opacity-50 disabled:cursor-not-allowed
-                flex items-center space-x-3
+                flex items-center space-x-2
                 ${isRefreshing ? 'animate-pulse' : ''}
               `}
             >
-              <span className={`text-xl ${isRefreshing ? 'animate-spin' : ''}`}>
-                ⚡
-              </span>
-              <span className="font-rajdhani font-bold">
-                {isRefreshing ? 'SYNCING...' : 'REFRESH'}
+              <span className={`text-lg ${isRefreshing ? 'animate-spin' : ''}`}>⚡</span>
+              <span className="font-rajdhani font-bold text-sm">
+                {isRefreshing ? 'SYNC' : 'REFRESH'}
               </span>
             </button>
           </div>

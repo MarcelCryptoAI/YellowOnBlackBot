@@ -345,6 +345,16 @@ class WebSocketManager {
   }
 }
 
+// Health check function
+export const getHealth = async (): Promise<{ success: boolean; version?: string; message?: string }> => {
+  try {
+    const response = await apiClient.get('/health');
+    return response.data;
+  } catch (error) {
+    return { success: false, message: 'Backend unreachable' };
+  }
+};
+
 // API functions
 export const bybitApi = {
   // Test ByBit connection
