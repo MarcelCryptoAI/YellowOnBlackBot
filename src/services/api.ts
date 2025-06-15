@@ -2,7 +2,7 @@
 import axios from 'axios';
 import { io, Socket } from 'socket.io-client';
 
-const API_BASE_URL = 'http://localhost:6789/api';
+const API_BASE_URL = 'https://arie-backend-api-d916579ecc97.herokuapp.com/api';
 
 // API Client setup
 const apiClient = axios.create({
