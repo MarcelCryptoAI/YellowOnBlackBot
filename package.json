@@ -18,11 +18,12 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,css,md}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,css,md}\"",
     "analyze": "vite-bundle-analyzer",
-    "start": "cd backend_new && python live_main.py",
-    "heroku-postbuild": "npm run build:prod && cd backend_new && npm install",
+    "start": "node server.js",
+    "heroku-postbuild": "npm run build:prod",
     "install:all": "npm install && cd backend && npm install"
   },
   "dependencies": {
+    "express": "^4.18.2",
     "@hookform/resolvers": "^3.3.0",
     "@types/react-router-dom": "^5.3.3",
     "axios": "^1.5.0",
