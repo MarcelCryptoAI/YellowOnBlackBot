@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "vite --host",
     "build": "tsc && vite build",
+    "build:prod": "vite build --mode production",
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "lint:fix": "eslint . --ext ts,tsx --fix",
@@ -17,8 +18,8 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,css,md}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,css,md}\"",
     "analyze": "vite-bundle-analyzer",
-    "start": "cd backend && node server.js",
-    "heroku-postbuild": "npm run build && cd backend && npm install",
+    "start": "cd backend_new && python live_main.py",
+    "heroku-postbuild": "npm run build:prod && cd backend_new && npm install",
     "install:all": "npm install && cd backend && npm install"
   },
   "dependencies": {

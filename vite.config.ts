@@ -24,6 +24,17 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: true,
+    sourcemap: false, // Disable sourcemaps for production
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          api: ['axios', 'socket.io-client'],
+        },
+      },
+    },
+  },
+  esbuild: {
+    drop: ['console', 'debugger'], // Remove console logs in production
   },
 })

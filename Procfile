@@ -1,1 +1,1 @@
-web: npm start
+web: cd backend_new && python -m uvicorn live_main:app --host 0.0.0.0 --port $PORT
