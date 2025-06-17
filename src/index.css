@@ -83,7 +83,7 @@ body::before {
     radial-gradient(ellipse at bottom left, rgba(255, 0, 128, 0.15) 0%, transparent 40%),
     radial-gradient(ellipse at bottom right, rgba(0, 255, 136, 0.15) 0%, transparent 40%),
     radial-gradient(circle at center, rgba(0, 128, 255, 0.1) 0%, transparent 60%);
-  animation: gradient-xy 20s ease infinite;
+  /* animation: gradient-xy 20s ease infinite; */
   background-size: 200% 200%;
   pointer-events: none;
   z-index: -2;
@@ -120,8 +120,8 @@ body::after {
   .glass-card {
     @apply relative overflow-hidden;
     background: linear-gradient(135deg, rgba(20, 25, 40, 0.95) 0%, rgba(10, 15, 30, 0.9) 100%);
-    backdrop-filter: blur(40px) saturate(200%);
-    -webkit-backdrop-filter: blur(40px) saturate(200%);
+    backdrop-filter: blur(3px) saturate(120%);
+    -webkit-backdrop-filter: blur(3px) saturate(120%);
     border: 2px solid rgba(255, 255, 255, 0.15);
     border-radius: 24px;
     box-shadow: 
@@ -137,7 +137,7 @@ body::after {
       0 0 80px rgba(0, 255, 255, 0.15),
       0 0 120px rgba(0, 255, 255, 0.05);
     transform-style: preserve-3d;
-    transform: perspective(1500px) rotateX(2deg) translateZ(20px);
+    transform: translateY(-2px);
     transition: all 0.6s cubic-bezier(0.23, 1, 0.32, 1);
     /* Extreme thickness effect */
     padding: 2rem;
@@ -175,7 +175,7 @@ body::after {
   }
 
   .glass-card:hover {
-    transform: perspective(1500px) rotateX(1deg) translateY(-20px) translateZ(40px) scale(1.02);
+    transform: translateY(-5px) scale(1.02);
     box-shadow: 
       /* Even more extreme shadow on hover */
       0 70px 140px -20px rgba(0, 0, 0, 0.95),
@@ -199,8 +199,8 @@ body::after {
   .glass-panel {
     @apply relative overflow-hidden;
     background: linear-gradient(135deg, rgba(30, 35, 50, 0.9) 0%, rgba(20, 25, 40, 0.85) 100%);
-    backdrop-filter: blur(30px) saturate(180%);
-    -webkit-backdrop-filter: blur(30px) saturate(180%);
+    backdrop-filter: blur(2px) saturate(110%);
+    -webkit-backdrop-filter: blur(2px) saturate(110%);
     border: 2px solid rgba(255, 255, 255, 0.1);
     border-radius: 20px;
     box-shadow: 
@@ -335,7 +335,7 @@ body::after {
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
-    animation: gradient-x 3s ease infinite;
+    /* animation: gradient-x 3s ease infinite; */
     filter: var(--glow-cyan);
   }
 
@@ -345,9 +345,9 @@ body::after {
     background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%);
     border: 2px solid rgba(255, 255, 255, 0.15);
     border-radius: 16px;
-    backdrop-filter: blur(20px);
+    backdrop-filter: blur(2px);
     transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
-    transform: perspective(1000px) rotateX(0deg) translateZ(0px);
+    transform: translateY(0);
     box-shadow: 
       inset 0 2px 4px rgba(0, 0, 0, 0.4),
       0 8px 32px rgba(0, 0, 0, 0.3),
@@ -357,7 +357,7 @@ body::after {
   .input-3d:focus, .glass-input:focus, input:focus, select:focus, textarea:focus {
     outline: none;
     border-color: var(--neon-cyan);
-    transform: perspective(1000px) rotateX(-3deg) translateZ(20px);
+    transform: translateY(-3px);
     box-shadow: 
       inset 0 3px 6px rgba(0, 0, 0, 0.4),
       0 15px 60px rgba(0, 255, 255, 0.3),
@@ -423,11 +423,11 @@ body::after {
 
   /* Floating Elements */
   .floating {
-    animation: float 6s ease-in-out infinite;
+    /* animation: float 6s ease-in-out infinite; */
   }
 
   .floating-delayed {
-    animation: float 6s ease-in-out 3s infinite;
+    /* animation: float 6s ease-in-out 3s infinite; */
   }
 
   /* Glow Lines */
@@ -441,7 +441,7 @@ body::after {
       var(--neon-cyan) 50%, 
       transparent 100%
     );
-    animation: shimmer 3s linear infinite;
+    /* animation: shimmer 3s linear infinite; */
   }
 
   .glow-line-y {
@@ -461,8 +461,8 @@ body::after {
   .metric-card {
     @apply relative overflow-hidden;
     background: linear-gradient(135deg, rgba(25, 30, 45, 0.95) 0%, rgba(15, 20, 35, 0.9) 100%);
-    backdrop-filter: blur(35px) saturate(190%);
-    -webkit-backdrop-filter: blur(35px) saturate(190%);
+    backdrop-filter: blur(3px) saturate(120%);
+    -webkit-backdrop-filter: blur(3px) saturate(120%);
     border: 2px solid rgba(255, 255, 255, 0.12);
     border-radius: 24px;
     padding: 2rem;
@@ -478,13 +478,13 @@ body::after {
       inset 0 -3px 5px rgba(0, 0, 0, 0.8),
       /* Glow effects */
       0 0 100px rgba(100, 200, 255, 0.08);
-    transform: perspective(1200px) rotateX(3deg) rotateY(-2deg) translateZ(30px);
+    transform: translateY(-3px);
     transform-style: preserve-3d;
     transition: all 0.5s cubic-bezier(0.23, 1, 0.32, 1);
   }
 
   .metric-card:hover {
-    transform: perspective(1200px) rotateX(2deg) rotateY(-1deg) translateY(-15px) translateZ(50px) scale(1.03);
+    transform: translateY(-8px) scale(1.03);
     box-shadow: 
       /* Ultra extreme hover shadows */
       0 80px 160px -20px rgba(0, 0, 0, 0.95),
@@ -579,7 +579,7 @@ body::after {
 
 /* Utility Classes */
 .text-gradient {
-  @apply bg-gradient-to-r from-neon-cyan via-neon-purple to-neon-pink bg-clip-text text-transparent;
+  @apply text-neon-cyan;
 }
 
 .border-gradient {
@@ -609,10 +609,10 @@ body::after {
 /* Animations */
 @keyframes float {
   0%, 100% { 
-    transform: translateY(0) translateZ(0) rotateX(0deg); 
+    transform: translateY(0); 
   }
   50% { 
-    transform: translateY(-20px) translateZ(50px) rotateX(2deg); 
+    transform: translateY(-20px); 
   }
 }
 

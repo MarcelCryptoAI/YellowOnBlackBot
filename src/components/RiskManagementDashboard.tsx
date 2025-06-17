@@ -45,7 +45,7 @@ export const RiskManagementDashboard: React.FC = () => {
     // Refresh data periodically
     const interval = setInterval(() => {
       loadRiskSummary();
-    }, 10000);
+    }, 60000);
     
     return () => {
       clearInterval(interval);

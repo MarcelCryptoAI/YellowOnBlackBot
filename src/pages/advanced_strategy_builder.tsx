@@ -449,7 +449,7 @@ const ProcessLog: React.FC<{ logs: string[], isVisible: boolean, onClose: () => 
           <div className="text-center text-gray-500 mt-8">
             <div className="text-red-400 font-bold">PROCES / CONSOLE LOG</div>
             <div className="mt-2">TIJDENS DE RUN HIER TONEN</div>
-            <div className="mt-4 text-blue-400 animate-pulse">●</div>
+            <div className="mt-4 text-blue-400">●</div>
           </div>
         ) : (
           <div className="space-y-1">
@@ -462,7 +462,7 @@ const ProcessLog: React.FC<{ logs: string[], isVisible: boolean, onClose: () => 
               </div>
             ))}
             {logs.length > 0 && (
-              <div className="text-blue-400 animate-pulse mt-2">● Ready</div>
+              <div className="text-blue-400 mt-2">● Ready</div>
             )}
           </div>
         )}

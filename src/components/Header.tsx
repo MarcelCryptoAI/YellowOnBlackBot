@@ -115,7 +115,7 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab, isRef
     <header className="relative z-50 overflow-hidden">
       {/* Animated Background */}
       <div className="absolute inset-0 bg-black/40 backdrop-blur-2xl"></div>
-      <div className="absolute inset-0 bg-gradient-to-r from-neon-cyan/10 via-neon-purple/10 to-neon-pink/10 animate-gradient-x"></div>
+      <div className="absolute inset-0 bg-neon-cyan/10"></div>
       
       {/* Top Glow Line */}
       <div className="glow-line-x top-0"></div>
@@ -178,7 +178,7 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab, isRef
                     
                     {/* Active Indicator */}
                     {currentTab === item.id && (
-                      <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-full h-0.5 bg-gradient-to-r from-transparent via-current to-transparent animate-pulse"></div>
+                      <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-full h-0.5 bg-gradient-to-r from-transparent via-current to-transparent"></div>
                     )}
                   </button>
                 ))}
@@ -243,7 +243,6 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab, isRef
                 btn-neon-cyan px-4 py-2
                 disabled:opacity-50 disabled:cursor-not-allowed
                 flex items-center space-x-2
-                ${isRefreshing ? 'animate-pulse' : ''}
               `}
             >
               <span className={`text-lg ${isRefreshing ? 'animate-spin' : ''}`}>⚡</span>

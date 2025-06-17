@@ -23,7 +23,7 @@ export const UnifiedHeader: React.FC<UnifiedHeaderProps> = ({ isRefreshing, onRe
     <header className="relative z-50 overflow-hidden">
       {/* Ultra Deep Background */}
       <div className="absolute inset-0 bg-black/60 backdrop-blur-3xl"></div>
-      <div className="absolute inset-0 bg-gradient-to-r from-neon-cyan/8 via-neon-purple/8 to-neon-pink/8 animate-gradient-x"></div>
+      <div className="absolute inset-0 bg-neon-cyan/8"></div>
       
       {/* Holographic Grid Lines */}
       <div className="absolute inset-0 opacity-20">
@@ -85,9 +85,9 @@ export const UnifiedHeader: React.FC<UnifiedHeaderProps> = ({ isRefreshing, onRe
                       {/* Quantum Active Indicator */}
                       {isActive && (
                         <>
-                          <div className="absolute inset-0 rounded-xl opacity-30 animate-pulse"
+                          <div className="absolute inset-0 rounded-xl opacity-30"
                                style={{ background: `radial-gradient(circle at center, ${colorVar}20 0%, transparent 70%)` }}></div>
-                          <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-8 h-1 rounded-full animate-pulse"
+                          <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-8 h-1 rounded-full"
                                style={{ backgroundColor: colorVar }}></div>
                         </>
                       )}

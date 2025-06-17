@@ -125,7 +125,7 @@ const MiniPnLChart: React.FC = () => {
           </span>
         </div>
         <div className="flex items-center space-x-1">
-          <span className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></span>
+          <span className="w-2 h-2 bg-blue-400 rounded-full"></span>
           <span className="text-xs text-gray-400">Live</span>
         </div>
       </div>
@@ -165,7 +165,7 @@ const MiniPnLChart: React.FC = () => {
                 cy={30 - (currentPnL / range) * 30}
                 r="2"
                 fill={currentPnL >= 0 ? "#22c55e" : "#ef4444"}
-                className="animate-pulse"
+                className=""
               />
             </>
           )}
@@ -200,9 +200,9 @@ const ManualOrderPage: React.FC = () => {
   const [tradingState, setTradingState] = useState<TradingState>({
     selectedAccount: '',
     symbol: 'BTCUSDT',
-    amount: 23.52,
-    amountPercent: 7.57,
-    usePercent: false,
+    amount: 0,
+    amountPercent: 5,
+    usePercent: true,
     
     // Trading direction and margin
     direction: 'long',
@@ -211,27 +211,18 @@ const ManualOrderPage: React.FC = () => {
     
     entryStrategy: 'evenly-divided',
     numberOfEntries: 4,
-    entryPriceFrom: 94985.9,
-    entryPriceTo: 105539.9,
-    entryTargets: [
-      { id: '1', price: 105539.9, ratio: 25, amount: 5.88 },
-      { id: '2', price: 102021.9, ratio: 25, amount: 5.88 },
-      { id: '3', price: 98503.9, ratio: 25, amount: 5.88 },
-      { id: '4', price: 94985.9, ratio: 25, amount: 5.88 },
-    ],
+    entryPriceFrom: 0,
+    entryPriceTo: 0,
+    entryTargets: [],
     trailingEntry: false,
     trailingEntryPercent: 1.0,
     
     takeProfitsEnabled: true,
     takeProfitStrategy: 'evenly-divided',
     numberOfTakeProfits: 3,
-    takeProfitPriceFrom: 110816.8,
-    takeProfitPriceTo: 111111,
-    takeProfitTargets: [
-      { id: '1', price: 110816.8, ratio: 33.34, amount: 0, distance: 10.53 },
-      { id: '2', price: 110963.9, ratio: 33.33, amount: 0, distance: 10.67 },
-      { id: '3', price: 111111, ratio: 33.33, amount: 0, distance: 10.82 },
-    ],
+    takeProfitPriceFrom: 0,
+    takeProfitPriceTo: 0,
+    takeProfitTargets: [],
     trailingTakeProfit: false,
     trailingTakeProfitPercent: 1.0,
     

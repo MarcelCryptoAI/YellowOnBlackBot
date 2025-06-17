@@ -372,7 +372,7 @@ const ApiConfigPage: React.FC = () => {
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
-        <h2 className="text-3xl font-bold bg-gradient-to-r from-white via-gray-200 to-primary-blue bg-clip-text text-transparent drop-shadow-lg">
+        <h2 className="text-3xl font-bold text-white drop-shadow-lg">
           API CONFIGURATION
         </h2>
         <div className="flex items-center space-x-4 text-sm text-gray-400">
@@ -413,7 +413,7 @@ const ApiConfigPage: React.FC = () => {
       <div className="relative group">
         <div className="absolute inset-0 bg-gradient-to-br from-primary-blue/10 to-white/5 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
         <div className="relative bg-gradient-to-br from-black to-gray-900 p-6 rounded-xl border border-gray-600/30 hover:border-primary-blue/40 transition-all duration-300 shadow-2xl shadow-black/50">
-          <h3 className="text-xl font-bold mb-6 bg-gradient-to-r from-primary-blue to-white bg-clip-text text-transparent drop-shadow-lg">
+          <h3 className="text-xl font-bold mb-6 text-primary-blue drop-shadow-lg">
             🟡 BYBIT CONNECTIONS ({bybitConnections.length})
           </h3>
           
@@ -546,7 +546,7 @@ const ApiConfigPage: React.FC = () => {
       <div className="relative group">
         <div className="absolute inset-0 bg-gradient-to-br from-green-400/10 to-green-600/10 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
         <div className="relative bg-gradient-to-br from-black to-gray-900 p-6 rounded-xl border border-gray-600/30 hover:border-green-400/40 transition-all duration-300 shadow-2xl shadow-black/50">
-          <h3 className="text-xl font-bold mb-6 bg-gradient-to-r from-green-400 to-white bg-clip-text text-transparent drop-shadow-lg">
+          <h3 className="text-xl font-bold mb-6 text-green-400 drop-shadow-lg">
             🤖 OPENAI CONNECTIONS ({openaiConnections.length})
           </h3>
           
@@ -663,7 +663,7 @@ const ApiConfigPage: React.FC = () => {
         <div className="relative group">
           <div className="absolute inset-0 bg-gradient-to-br from-primary-blue/10 to-white/5 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
           <div className="relative bg-gradient-to-br from-black to-gray-900 p-6 rounded-xl border border-gray-600/30 hover:border-primary-blue/40 transition-all duration-300 shadow-2xl shadow-black/50">
-            <h3 className="text-xl font-bold mb-6 bg-gradient-to-r from-primary-blue to-white bg-clip-text text-transparent drop-shadow-lg">
+            <h3 className="text-xl font-bold mb-6 text-primary-blue drop-shadow-lg">
               🟡 NEW BYBIT CONNECTION
             </h3>
             
@@ -797,7 +797,7 @@ const ApiConfigPage: React.FC = () => {
         <div className="relative group">
           <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-primary-blue/5 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
           <div className="relative bg-gradient-to-br from-black to-gray-900 p-6 rounded-xl border border-gray-600/30 hover:border-white/30 transition-all duration-300 shadow-2xl shadow-black/50">
-            <h3 className="text-xl font-bold mb-6 bg-gradient-to-r from-white to-primary-blue bg-clip-text text-transparent drop-shadow-lg">
+            <h3 className="text-xl font-bold mb-6 text-white drop-shadow-lg">
               🤖 OPENAI API
             </h3>
             

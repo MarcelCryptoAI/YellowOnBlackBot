@@ -510,7 +510,7 @@ const StrategiesPage: React.FC = () => {
               variant={liveMonitoring ? "red" : "green"}
               className="flex items-center space-x-3"
             >
-              <span className={liveMonitoring ? 'animate-pulse' : ''}>
+              <span>
                 {liveMonitoring ? '🔴' : '⭕'}
               </span>
               <span>{liveMonitoring ? 'Stop Monitor' : 'Start Monitor'}</span>

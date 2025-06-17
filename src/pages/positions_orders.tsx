@@ -342,7 +342,7 @@ const PositionsOrdersPage: React.FC = () => {
                       {connection.metadata?.name || 'ByBit Neural Link'}
                     </h3>
                     <div className={`
-                      status-dot animate-pulse
+                      status-dot
                       ${connection.status === 'active' ? 'status-online' : 'status-offline'}
                     `}></div>
                   </div>
@@ -528,7 +528,7 @@ const PositionsOrdersPage: React.FC = () => {
                         <td className="px-8 py-6">
                           <div className="flex items-center space-x-4">
                             <div className={`
-                              status-dot animate-pulse
+                              status-dot
                               ${order.side === 'Buy' ? 'status-online' : 'status-offline'}
                             `} />
                             <span className="font-orbitron font-bold text-white text-xl tracking-wide">{order.symbol}</span>
@@ -591,7 +591,7 @@ const PositionsOrdersPage: React.FC = () => {
                         <td className="px-8 py-6">
                           <div className="flex items-center space-x-4">
                             <div className={`
-                              status-dot animate-pulse
+                              status-dot
                               ${(trade.direction === 'LONG' || trade.side === 'Buy') ? 'status-online' : 'status-offline'}
                             `} />
                             <span className="font-orbitron font-bold text-white text-xl tracking-wide">{trade.symbol}</span>

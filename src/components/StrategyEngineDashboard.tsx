@@ -78,7 +78,7 @@ export const StrategyEngineDashboard: React.FC = () => {
     // Refresh data periodically
     const interval = setInterval(() => {
       loadEngineStatus();
-    }, 5000);
+    }, 60000);
     
     return () => {
       clearInterval(interval);

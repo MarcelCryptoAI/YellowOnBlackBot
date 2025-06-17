@@ -26,7 +26,7 @@ export const MonitoringDashboard: React.FC = () => {
     // Refresh data periodically
     const interval = setInterval(() => {
       loadDashboard();
-    }, 10000);
+    }, 60000);
     
     return () => {
       clearInterval(interval);
@@ -525,7 +525,7 @@ export const MonitoringDashboard: React.FC = () => {
               <div className="flex items-center space-x-2">
                 <div className={`w-3 h-3 rounded-full ${
                   dashboard.is_monitoring ? 'bg-neon-green' : 'bg-gray-500'
-                } animate-pulse`}></div>
+                }`}></div>
                 <span className={`font-bold ${
                   dashboard.is_monitoring ? 'text-neon-green' : 'text-gray-500'
                 }`}>

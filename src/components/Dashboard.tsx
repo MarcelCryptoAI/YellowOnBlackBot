@@ -39,7 +39,7 @@ const PositionCard: React.FC<{ position: Position }> = ({ position }) => (
     <div className="flex items-center justify-between">
       <div className="flex items-center space-x-4">
         <div className={`
-          status-dot animate-pulse
+          status-dot
           ${position.direction === 'LONG' ? 'status-online' : 'status-offline'}
         `}></div>
         <div>
@@ -66,7 +66,7 @@ const StrategyCard: React.FC<{ strategy: Strategy }> = ({ strategy }) => (
     <div className="flex items-center justify-between">
       <div className="flex items-center space-x-4">
         <div className={`
-          status-dot animate-pulse
+          status-dot
           ${strategy.status === 'ACTIVE' ? 'status-online' : 'status-offline'}
         `}></div>
         <div>

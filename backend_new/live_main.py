@@ -392,7 +392,9 @@ app.add_middleware(
         "http://localhost:3001", 
         "http://127.0.0.1:3001",
         "http://localhost:3333",  # New frontend port
-        "http://127.0.0.1:3333"   # New frontend port
+        "http://127.0.0.1:3333",   # New frontend port
+        "https://arie-ai-trading-system-8ff5b3675055.herokuapp.com",  # Heroku frontend
+        "*"  # Allow all origins for development
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -716,18 +718,10 @@ async def add_connection(connection: ConnectionCreate, current_user: dict = Depe
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.get("/api/bybit/connections")
-async def get_connections(current_user: dict = Depends(require_viewer)):
+async def get_connections():
     """Get all live connections"""
     try:
-        # Generate cache key based on user and connection data
-        cache_key = performance_optimizer.generate_cache_key(
-            "connections", current_user["user_id"], list(connections_store.keys())
-        )
-        
-        # Try to get from cache first
-        cached_connections = await performance_optimizer.cache.get(cache_key)
-        if cached_connections is not None:
-            return cached_connections
+        # Skip caching for now to avoid errors
         
         connections = []
         
@@ -771,12 +765,7 @@ async def get_connections(current_user: dict = Depends(require_viewer)):
                     "error": str(e)
                 })
         
-        result = {"success": True, "connections": connections}
-        
-        # Cache the result for 5 seconds (frequent updates needed)
-        await performance_optimizer.cache.set(cache_key, result, ttl=5)
-        
-        return result
+        return {"success": True, "connections": connections}
         
     except Exception as e:
         logger.error(f"Failed to get connections: {e}")

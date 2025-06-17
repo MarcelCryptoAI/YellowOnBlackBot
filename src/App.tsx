@@ -210,7 +210,7 @@ const SystemStatusCard: React.FC<{ status: SystemStatus }> = ({ status }) => (
     <div className="relative bg-gradient-to-br from-black to-gray-900 p-6 rounded-xl border border-gray-600/30 hover:border-white/30 transition-all duration-300 shadow-2xl shadow-black/50">
       <h3 className="text-xl font-bold mb-6 flex items-center">
         <span className="mr-3 text-2xl">🛡️</span>
-        <span className="bg-gradient-to-r from-white via-gray-200 to-primary-blue bg-clip-text text-transparent drop-shadow-lg">
+        <span className="text-white drop-shadow-lg">
           SYSTEM STATUS
         </span>
       </h3>
@@ -290,18 +290,7 @@ const App: React.FC = () => {
   const [lastSaved, setLastSaved] = useState<string>('');
   
   // Top 10 coin tickers state for CNN-style news ticker
-  const [topCoins, setTopCoins] = useState([
-    { symbol: 'BTC', price: 105371, change24h: 2.4, color: 'orange' },
-    { symbol: 'SOL', price: 203.45, change24h: 5.2, color: 'purple' },
-    { symbol: 'FARTCOIN', price: 0.87, change24h: -1.8, color: 'red' },
-    { symbol: 'ETH', price: 3967, change24h: 1.8, color: 'blue' },
-    { symbol: 'ADA', price: 1.12, change24h: -0.5, color: 'cyan' },
-    { symbol: 'DOGE', price: 0.34, change24h: 3.2, color: 'yellow' },
-    { symbol: 'AVAX', price: 42.67, change24h: -1.2, color: 'pink' },
-    { symbol: 'MATIC', price: 0.52, change24h: 2.1, color: 'purple' },
-    { symbol: 'DOT', price: 8.94, change24h: 1.5, color: 'pink' },
-    { symbol: 'LINK', price: 23.45, change24h: -0.8, color: 'blue' }
-  ]);
+  const [topCoins, setTopCoins] = useState<Array<{ symbol: string; price: number; change24h: number; color: string }>>([]);
   
   // CNN-style ticker animation state
   const [tickerIndex, setTickerIndex] = useState(0);
@@ -489,14 +478,14 @@ const App: React.FC = () => {
       }
     };
 
-    // CNN-style ticker rotation every 2 seconds
+    // CNN-style ticker rotation every 5 seconds (optimized)
     const tickerInterval = setInterval(() => {
       setTickerIndex(prev => (prev + 1) % topCoins.length);
-    }, 2000);
+    }, 5000);
 
-    // Update prices every 10 seconds
+    // Initial load and update prices every 30 seconds (optimized)
     updateTopCoinPrices();
-    const priceInterval = setInterval(updateTopCoinPrices, 10000);
+    const priceInterval = setInterval(updateTopCoinPrices, 30000);
     
     return () => {
       clearInterval(priceInterval);
@@ -847,9 +836,9 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black relative overflow-hidden">
       {/* Elegant Background */}
       <div className="absolute inset-0 opacity-10">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gradient-to-br from-primary-blue/20 to-secondary-purple/20 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute top-3/4 right-1/4 w-80 h-80 bg-gradient-to-br from-white/10 to-gray-300/10 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute top-1/2 left-1/2 w-72 h-72 bg-gradient-to-br from-primary-blue/15 to-primary-purple/15 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gradient-to-br from-primary-blue/20 to-secondary-purple/20 rounded-full blur-3xl"></div>
+        <div className="absolute top-3/4 right-1/4 w-80 h-80 bg-gradient-to-br from-white/10 to-gray-300/10 rounded-full blur-3xl"></div>
+        <div className="absolute top-1/2 left-1/2 w-72 h-72 bg-gradient-to-br from-primary-blue/15 to-primary-purple/15 rounded-full blur-3xl"></div>
       </div>
 
       {/* Unified Ultra-Thick Glass Navigation Bar */}
@@ -923,7 +912,7 @@ const App: React.FC = () => {
                   <div className="flex items-center gap-4">
                     {/* Live indicator */}
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-neon-cyan rounded-full animate-pulse shadow-[0_0_10px_rgba(0,255,255,0.8)]"></div>
+                      <div className="w-2 h-2 bg-neon-cyan rounded-full shadow-[0_0_10px_rgba(0,255,255,0.8)]"></div>
                       <span className="text-neon-cyan font-orbitron font-black text-xs uppercase tracking-wider">LIVE</span>
                     </div>
                     
@@ -977,13 +966,13 @@ const App: React.FC = () => {
                   
                   {/* Animated border effect */}
                   <div className="absolute inset-0 rounded-2xl">
-                    <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-neon-cyan to-transparent opacity-60 animate-pulse"></div>
-                    <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-neon-cyan to-transparent opacity-60 animate-pulse"></div>
+                    <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-neon-cyan to-transparent opacity-60"></div>
+                    <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-neon-cyan to-transparent opacity-60"></div>
                   </div>
                 </div>
                 
                 {/* Background glow effect */}
-                <div className="absolute -inset-4 bg-gradient-to-r from-neon-cyan/10 via-neon-blue/10 to-neon-cyan/10 rounded-3xl blur-xl opacity-50 animate-pulse"></div>
+                <div className="absolute -inset-4 bg-gradient-to-r from-neon-cyan/10 via-neon-blue/10 to-neon-cyan/10 rounded-3xl blur-xl opacity-50"></div>
               </div>
             </div>
             
@@ -1029,7 +1018,7 @@ const App: React.FC = () => {
                 <div className="relative flex items-center gap-3 px-5 py-3 glass-panel">
                   <div className={`w-3 h-3 rounded-full ${
                     hasStoredCredentials ? 'bg-neon-blue shadow-[0_0_15px_rgba(0,128,255,0.8)]' : 'bg-gray-400'
-                  } animate-pulse`}></div>
+                  }`}></div>
                   <span className={`text-xs font-orbitron font-black uppercase tracking-wider ${
                     hasStoredCredentials ? 'text-neon-blue' : 'text-gray-400'
                   }`}
@@ -1054,7 +1043,7 @@ const App: React.FC = () => {
                     backendStatus === 'connected' ? 'bg-neon-green shadow-[0_0_15px_var(--neon-green)]' : 
                     backendStatus === 'connecting' ? 'bg-neon-yellow shadow-[0_0_15px_var(--neon-yellow)]' : 
                     'bg-neon-red shadow-[0_0_15px_var(--neon-red)]'
-                  } animate-pulse`}></div>
+                  }`}></div>
                   <span className={`text-xs font-orbitron font-black uppercase tracking-wider ${
                     backendStatus === 'connected' ? 'text-neon-green' : 
                     backendStatus === 'connecting' ? 'text-neon-yellow' : 

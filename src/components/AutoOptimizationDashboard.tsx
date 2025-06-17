@@ -134,7 +134,7 @@ const AutoOptimizationDashboard: React.FC = () => {
           <div className="space-y-4">
             {actions.length === 0 ? (
               <div className="text-center py-8">
-                <div className="text-6xl mb-4 animate-pulse">✨</div>
+                <div className="text-6xl mb-4">✨</div>
                 <p className="text-neon-green font-rajdhani font-bold text-lg">
                   SYSTEM RUNNING OPTIMALLY
                 </p>
@@ -203,7 +203,7 @@ const AutoOptimizationDashboard: React.FC = () => {
               optimizationHistory.map((entry, index) => (
                 <div key={index} className="glass-panel p-3 text-sm">
                   <div className="flex items-center space-x-3">
-                    <div className="w-2 h-2 bg-neon-green rounded-full animate-pulse"></div>
+                    <div className="w-2 h-2 bg-neon-green rounded-full"></div>
                     <span className="text-white font-rajdhani">{entry}</span>
                   </div>
                 </div>
@@ -227,7 +227,7 @@ const AutoOptimizationDashboard: React.FC = () => {
           
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
-              <div className="status-dot status-online animate-pulse"></div>
+              <div className="status-dot status-online"></div>
               <span className="text-neon-green font-rajdhani font-bold">ACTIVE</span>
             </div>
             

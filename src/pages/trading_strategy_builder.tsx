@@ -2532,7 +2532,7 @@ const TradingStrategyBuilder: React.FC = () => {
               />
             </div>
             <div className="text-center mt-4">
-              <div className="animate-pulse text-primary-blue text-sm">Analyzing {tradeHistory.length} historical patterns...</div>
+              <div className="text-primary-blue text-sm">Analyzing {tradeHistory.length} historical patterns...</div>
             </div>
           </div>
         )}
@@ -2656,7 +2656,7 @@ const TradingStrategyBuilder: React.FC = () => {
           >
             <span className="text-gray-400">←</span>
           </button>
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-white via-primary-blue to-primary-purple bg-clip-text text-transparent">
+          <h1 className="text-2xl font-bold text-white">
             🧠 AI Strategy Builder
           </h1>
           {strategyData.name && (

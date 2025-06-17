@@ -202,7 +202,7 @@ export const TradingChart: React.FC<TradingChartProps> = ({
         
         {/* Live indicator */}
         <div className="flex items-center space-x-2">
-          <div className="w-2 h-2 bg-success-green rounded-full animate-pulse"></div>
+          <div className="w-2 h-2 bg-success-green rounded-full"></div>
           <span className="text-success-green-light text-sm font-medium">Live</span>
         </div>
       </div>
