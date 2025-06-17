@@ -27,3 +27,7 @@ Thumbs.db
 # Cache
 .cache/
 storage/
+
+# API Connections (contain secrets)
+live_openai_connections.json
+live_connections.json
