@@ -119,24 +119,56 @@ export const AccountsAllocation: React.FC<{ connections: BybitConnection[] }> = 
         </div>
       </div>
 
-      {/* Account list - match design styling */}
-      <div className="space-y-3">
-        {connections.map((conn) => (
-          <div key={conn.connectionId} className="flex items-center space-x-3">
-            <div className="w-2 h-2 rounded-full bg-white"></div>
-            <div className="flex-1">
-              <div className="text-white text-sm">{conn.metadata?.name || conn.name}</div>
-              <div className="text-gray-400 text-xs">ByBit USDT</div>
+      {/* Enhanced Account List with Balance and 24h P&L */}
+      <div className="space-y-4">
+        {connections.map((conn) => {
+          const accountBalance = conn.data?.balance?.total || 0;
+          const percentage = totalValue > 0 ? (accountBalance / totalValue) * 100 : 0;
+          const orderHistory = conn.data?.orderHistory || [];
+          
+          // Calculate 24h P&L from recent trades
+          const now = new Date();
+          const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+          const trades24h = orderHistory.filter(order => 
+            order.status === 'CLOSED' && 
+            new Date(order.timestamp) >= yesterday
+          );
+          const pnl24h = trades24h.reduce((sum, trade) => sum + (Number(trade.pnl) || 0), 0);
+          const pnlPercentage = accountBalance > 0 ? (pnl24h / accountBalance) * 100 : 0;
+          
+          return (
+            <div key={conn.connectionId} className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="w-3 h-3 rounded-full bg-gradient-to-r from-blue-400 to-blue-600"></div>
+                  <div>
+                    <div className="text-white text-sm font-medium">{conn.metadata?.name || conn.name}</div>
+                    <div className="text-gray-400 text-xs">ByBit USDT • {percentage.toFixed(1)}%</div>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-white text-sm font-medium">${accountBalance.toFixed(2)}</div>
+                  <div className={`text-xs ${pnl24h >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {pnl24h >= 0 ? '+' : ''}{pnl24h.toFixed(2)} ({pnlPercentage >= 0 ? '+' : ''}{pnlPercentage.toFixed(1)}%)
+                  </div>
+                </div>
+              </div>
+              <div className="bg-gray-700 rounded-full h-1.5">
+                <div 
+                  className="bg-gradient-to-r from-blue-400 to-blue-600 h-1.5 rounded-full transition-all duration-500"
+                  style={{ width: `${Math.max(5, percentage)}%` }}
+                />
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
         
         {connections.length === 0 && (
           <div className="flex items-center space-x-3">
-            <div className="w-2 h-2 rounded-full bg-gray-600"></div>
+            <div className="w-3 h-3 rounded-full bg-gray-600"></div>
             <div className="flex-1">
               <div className="text-gray-500 text-sm">No accounts connected</div>
-              <div className="text-gray-600 text-xs">Connect ByBit account</div>
+              <div className="text-gray-600 text-xs">Connect ByBit account to start trading</div>
             </div>
           </div>
         )}
@@ -467,6 +499,170 @@ export const LivePositionsSection: React.FC<{ connections: BybitConnection[] }> 
           ))}
         </div>
       )}
+    </div>
+  );
+};
+
+// Recent Closed Trades Section - Fancy new component
+export const RecentClosedTrades: React.FC<{ connections: BybitConnection[] }> = ({ connections }) => {
+  const [recentTrades, setRecentTrades] = useState<any[]>([]);
+
+  useEffect(() => {
+    // Collect all closed trades from all connections
+    const allTrades: any[] = [];
+    
+    connections.forEach(conn => {
+      if (conn.data?.orderHistory) {
+        conn.data.orderHistory.forEach((trade: any) => {
+          if (trade.status === 'CLOSED' || trade.status === 'FILLED') {
+            allTrades.push({
+              ...trade,
+              accountName: conn.metadata?.name || conn.name,
+              connectionId: conn.connectionId
+            });
+          }
+        });
+      }
+    });
+
+    // Sort by timestamp (newest first) and take last 25
+    const sortedTrades = allTrades
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .slice(0, 25);
+    
+    setRecentTrades(sortedTrades);
+  }, [connections]);
+
+  const formatTime = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMinutes / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffDays > 0) return `${diffDays}d ago`;
+    if (diffHours > 0) return `${diffHours}h ago`;
+    if (diffMinutes > 0) return `${diffMinutes}m ago`;
+    return 'Just now';
+  };
+
+  return (
+    <div className="bg-gradient-to-br from-gray-800 via-gray-800 to-gray-900 rounded-xl p-6 border border-gray-700/50 shadow-2xl backdrop-blur-sm">
+      {/* Header with glass effect */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center space-x-3">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center">
+            <span className="text-white text-sm font-bold">📊</span>
+          </div>
+          <div>
+            <h3 className="text-white font-bold text-lg">Recent Closed Trades</h3>
+            <p className="text-gray-400 text-sm">Last 25 completed trades across all accounts</p>
+          </div>
+        </div>
+        <div className="bg-gray-700/50 backdrop-blur-sm rounded-lg px-3 py-1 border border-gray-600/30">
+          <span className="text-gray-300 text-sm font-medium">{recentTrades.length} trades</span>
+        </div>
+      </div>
+
+      {/* Trades List with fancy styling */}
+      <div className="space-y-2 max-h-96 overflow-y-auto custom-scrollbar">
+        {recentTrades.length > 0 ? (
+          recentTrades.map((trade, index) => {
+            const pnl = Number(trade.pnl) || 0;
+            const amount = Number(trade.amount) || 0;
+            const price = Number(trade.entryPrice || trade.price) || 0;
+            const value = amount * price;
+            
+            return (
+              <div 
+                key={`${trade.connectionId}-${trade.orderId || index}`}
+                className="group relative bg-gradient-to-r from-gray-800/60 to-gray-900/60 backdrop-blur-sm border border-gray-700/30 rounded-lg p-3 hover:from-gray-700/60 hover:to-gray-800/60 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/10"
+              >
+                {/* Animated gradient background on hover */}
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-purple-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-lg"></div>
+                
+                <div className="relative flex items-center justify-between text-sm">
+                  {/* Left side - Symbol and direction */}
+                  <div className="flex items-center space-x-3 flex-shrink-0">
+                    <div className={`w-2 h-2 rounded-full ${trade.direction === 'LONG' || trade.side === 'Buy' ? 'bg-green-400' : 'bg-red-400'} shadow-lg`}></div>
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-white font-medium">{trade.symbol || 'Unknown'}</span>
+                        <span className={`px-2 py-0.5 rounded text-xs font-bold ${
+                          trade.direction === 'LONG' || trade.side === 'Buy' 
+                            ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
+                            : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                        }`}>
+                          {trade.direction || trade.side || 'Unknown'}
+                        </span>
+                      </div>
+                      <div className="text-gray-400 text-xs">{trade.accountName}</div>
+                    </div>
+                  </div>
+
+                  {/* Center - Trade details */}
+                  <div className="flex items-center space-x-6 text-xs">
+                    <div className="text-center">
+                      <div className="text-gray-400">Amount</div>
+                      <div className="text-white font-medium">{amount.toFixed(4)}</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-gray-400">Price</div>
+                      <div className="text-white font-medium">${price.toFixed(2)}</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-gray-400">Value</div>
+                      <div className="text-white font-medium">${value.toFixed(2)}</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-gray-400">P&L</div>
+                      <div className={`font-bold ${pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                        {pnl >= 0 ? '+' : ''}{pnl.toFixed(2)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right side - Time and status */}
+                  <div className="text-right flex-shrink-0">
+                    <div className="text-gray-300 font-medium">{formatTime(trade.timestamp)}</div>
+                    <div className="text-gray-500 text-xs">{new Date(trade.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+                  </div>
+                </div>
+
+                {/* Subtle border gradient on hover */}
+                <div className="absolute inset-0 rounded-lg border border-transparent bg-gradient-to-r from-purple-500/20 via-blue-500/20 to-purple-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+              </div>
+            );
+          })
+        ) : (
+          <div className="text-center py-12">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-r from-gray-700 to-gray-600 flex items-center justify-center">
+              <span className="text-2xl">📈</span>
+            </div>
+            <div className="text-gray-400 text-lg font-medium">No trades yet</div>
+            <div className="text-gray-500 text-sm mt-1">Start trading to see your trade history here</div>
+          </div>
+        )}
+      </div>
+
+      {/* Custom scrollbar styles */}
+      <style jsx>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: rgba(75, 85, 99, 0.3);
+          border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: linear-gradient(to bottom, #8b5cf6, #3b82f6);
+          border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: linear-gradient(to bottom, #7c3aed, #2563eb);
+        }
+      `}</style>
     </div>
   );
 };

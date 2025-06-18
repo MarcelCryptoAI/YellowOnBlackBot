@@ -114,9 +114,9 @@ const TradingViewBacktest: React.FC<TradingViewBacktestProps> = ({
           const totalPnL = allTrades.reduce((sum, trade) => sum + (Number(trade.pnl) || 0), 0);
           const totalPnLPercent = totalBalance > 0 ? (totalPnL / totalBalance) * 100 : 0;
           
-          const grossProfit = profitableTrades.reduce((sum, trade) => sum + (Number(trade.pnl) || 0), 0);
-          const grossLoss = Math.abs(unprofitableTrades.reduce((sum, trade) => sum + (Number(trade.pnl) || 0), 0));
-          const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : grossProfit > 0 ? 999 : 1;
+          const grossProfit = Math.max(0, profitableTrades.reduce((sum, trade) => sum + (Number(trade.pnl) || 0), 0));
+          const grossLoss = Math.max(0, Math.abs(unprofitableTrades.reduce((sum, trade) => sum + (Number(trade.pnl) || 0), 0)));
+          const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : (grossProfit > 0 ? 10 : 1);
           
           // Generate equity curve from real trades
           const equityCurve: { x: number; y: number }[] = [];
@@ -146,12 +146,20 @@ const TradingViewBacktest: React.FC<TradingViewBacktestProps> = ({
           const avgWinPercent = avgWin > 0 && totalBalance > 0 ? (avgWin / totalBalance) * 100 : 0;
           const avgLossPercent = avgLoss > 0 && totalBalance > 0 ? (avgLoss / totalBalance) * 100 : 0;
           
-          // Calculate simple Sharpe ratio estimate (assuming risk-free rate of 2%)
+          // Calculate Sharpe ratio safely
           const returns = allTrades.map(trade => Number(trade.pnl) || 0);
-          const avgReturn = returns.length > 0 ? returns.reduce((sum, ret) => sum + ret, 0) / returns.length : 0;
-          const returnStdDev = returns.length > 1 ? 
-            Math.sqrt(returns.reduce((sum, ret) => sum + Math.pow(ret - avgReturn, 2), 0) / (returns.length - 1)) : 1;
-          const sharpeRatio = returnStdDev > 0 ? (avgReturn - 0.02) / returnStdDev : 0;
+          let sharpeRatio = 0;
+          
+          if (returns.length > 1) {
+            const avgReturn = returns.reduce((sum, ret) => sum + ret, 0) / returns.length;
+            const variance = returns.reduce((sum, ret) => sum + Math.pow(ret - avgReturn, 2), 0) / (returns.length - 1);
+            const stdDev = Math.sqrt(variance);
+            
+            if (stdDev > 0 && totalBalance > 0) {
+              const avgReturnPercent = (avgReturn / totalBalance) * 100;
+              sharpeRatio = Math.max(-5, Math.min(5, avgReturnPercent / stdDev)); // Clamp between -5 and 5
+            }
+          }
           
           return {
             totalPnL,
@@ -184,7 +192,7 @@ const TradingViewBacktest: React.FC<TradingViewBacktestProps> = ({
             // Additional calculated metrics for risk analysis
             avgWinPercent,
             avgLossPercent,
-            sharpeRatio: Math.max(0, Number(sharpeRatio.toFixed(2)))
+            sharpeRatio: Number(sharpeRatio.toFixed(2))
           };
         }
       }

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { bybitApi, Position } from '../services/api';
-import { AccountsAllocation, PortfolioChange, LivePositionsSection, BybitConnection } from '../components/NewDashboardSections';
+import { AccountsAllocation, PortfolioChange, LivePositionsSection, RecentClosedTrades, BybitConnection } from '../components/NewDashboardSections';
 import MassStrategyGenerator from '../components/MassStrategyGenerator';
 
 // Widget types
@@ -527,6 +527,11 @@ const NewDashboard: React.FC = () => {
         {/* Mass Strategy Generator */}
         <div className="mb-6">
           <MassStrategyGenerator />
+        </div>
+
+        {/* Recent Closed Trades */}
+        <div className="mb-6">
+          <RecentClosedTrades connections={connections} />
         </div>
 
         {/* Dashboard Grid */}
