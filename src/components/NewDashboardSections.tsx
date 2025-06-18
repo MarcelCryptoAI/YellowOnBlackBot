@@ -514,11 +514,71 @@ export const RecentClosedTrades: React.FC<{ connections: BybitConnection[] }> = 
     connections.forEach(conn => {
       if (conn.data?.orderHistory) {
         conn.data.orderHistory.forEach((trade: any) => {
-          if (trade.status === 'CLOSED' || trade.status === 'FILLED') {
+          if (trade.status === 'CLOSED' || trade.status === 'FILLED' || trade.orderStatus === 'Filled') {
+            // Enhanced trade data parsing
+            const entryPrice = Number(trade.entryPrice || trade.price || trade.avgPrice) || 0;
+            const exitPrice = Number(trade.currentPrice || trade.avgPrice || trade.price) || 0;
+            const quantity = Number(trade.amount || trade.qty || trade.filledQty) || 0;
+            const totalValue = Number(trade.cumExecValue) || (quantity * entryPrice);
+            
+            // Calculate estimated PnL if not provided
+            let estimatedPnL = Number(trade.pnl) || 0;
+            if (estimatedPnL === 0 && entryPrice > 0 && exitPrice > 0 && quantity > 0) {
+              const isLong = trade.direction === 'LONG' || trade.side === 'Buy';
+              if (isLong) {
+                estimatedPnL = (exitPrice - entryPrice) * quantity;
+              } else {
+                estimatedPnL = (entryPrice - exitPrice) * quantity;
+              }
+              // Subtract estimated fees (0.1% of trade value)
+              estimatedPnL -= totalValue * 0.001;
+            }
+            
             allTrades.push({
               ...trade,
               accountName: conn.metadata?.name || conn.name,
-              connectionId: conn.connectionId
+              connectionId: conn.connectionId,
+              // Enhanced fields
+              parsedEntryPrice: entryPrice,
+              parsedExitPrice: exitPrice,
+              parsedQuantity: quantity,
+              parsedPnL: estimatedPnL,
+              parsedValue: totalValue,
+              takeProfit: Number(trade.takeProfit) || null,
+              stopLoss: Number(trade.stopLoss) || null,
+              leverage: Number(trade.leverage) || null,
+              orderType: trade.orderType || 'Unknown',
+              fees: totalValue * 0.001, // Estimated fees
+              // Better timestamp parsing
+              parsedTimestamp: trade.updatedTime || trade.timestamp || trade.createdTime
+            });
+          }
+        });
+      }
+      
+      // Also collect from positions for more complete data
+      if (conn.data?.positions) {
+        conn.data.positions.forEach((pos: any) => {
+          if (pos.status === 'CLOSED' && pos.pnl !== undefined) {
+            const timestamp = pos.timestamp || new Date().toISOString();
+            allTrades.push({
+              symbol: pos.symbol,
+              direction: pos.direction || 'UNKNOWN',
+              side: pos.direction === 'LONG' ? 'Buy' : 'Sell',
+              accountName: conn.metadata?.name || conn.name,
+              connectionId: conn.connectionId,
+              status: 'CLOSED',
+              parsedEntryPrice: Number(pos.entryPrice) || 0,
+              parsedExitPrice: Number(pos.currentPrice || pos.markPrice) || 0,
+              parsedQuantity: Number(pos.amount || pos.size) || 0,
+              parsedPnL: Number(pos.pnl) || 0,
+              parsedValue: Number(pos.value) || 0,
+              leverage: Number(pos.leverage) || null,
+              takeProfit: Number(pos.takeProfit) || null,
+              stopLoss: Number(pos.stopLoss) || null,
+              parsedTimestamp: timestamp,
+              orderType: 'Position',
+              fees: 0
             });
           }
         });
@@ -527,14 +587,34 @@ export const RecentClosedTrades: React.FC<{ connections: BybitConnection[] }> = 
 
     // Sort by timestamp (newest first) and take last 25
     const sortedTrades = allTrades
-      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .sort((a, b) => {
+        const timeA = new Date(a.parsedTimestamp || a.timestamp || 0).getTime();
+        const timeB = new Date(b.parsedTimestamp || b.timestamp || 0).getTime();
+        return timeB - timeA;
+      })
       .slice(0, 25);
     
     setRecentTrades(sortedTrades);
   }, [connections]);
 
   const formatTime = (timestamp: string) => {
-    const date = new Date(timestamp);
+    if (!timestamp) return 'Unknown';
+    
+    // Handle ByBit timestamp format (milliseconds)
+    let date: Date;
+    if (timestamp.length === 13) {
+      // Milliseconds timestamp
+      date = new Date(Number(timestamp));
+    } else if (timestamp.length === 10) {
+      // Seconds timestamp
+      date = new Date(Number(timestamp) * 1000);
+    } else {
+      // ISO string
+      date = new Date(timestamp);
+    }
+    
+    if (isNaN(date.getTime())) return 'Invalid date';
+    
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffMinutes = Math.floor(diffMs / (1000 * 60));
@@ -544,7 +624,31 @@ export const RecentClosedTrades: React.FC<{ connections: BybitConnection[] }> = 
     if (diffDays > 0) return `${diffDays}d ago`;
     if (diffHours > 0) return `${diffHours}h ago`;
     if (diffMinutes > 0) return `${diffMinutes}m ago`;
-    return 'Just now';
+    if (diffMs > 0) return 'Just now';
+    return 'Future';
+  };
+
+  const formatDate = (timestamp: string) => {
+    if (!timestamp) return 'Unknown';
+    
+    let date: Date;
+    if (timestamp.length === 13) {
+      date = new Date(Number(timestamp));
+    } else if (timestamp.length === 10) {
+      date = new Date(Number(timestamp) * 1000);
+    } else {
+      date = new Date(timestamp);
+    }
+    
+    if (isNaN(date.getTime())) return 'Invalid';
+    
+    return date.toLocaleString('nl-NL', {
+      day: '2-digit',
+      month: '2-digit',
+      year: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   return (
@@ -569,47 +673,66 @@ export const RecentClosedTrades: React.FC<{ connections: BybitConnection[] }> = 
       <div className="space-y-2 max-h-96 overflow-y-auto custom-scrollbar">
         {recentTrades.length > 0 ? (
           recentTrades.map((trade, index) => {
-            const pnl = Number(trade.pnl) || 0;
-            const amount = Number(trade.amount) || 0;
-            const price = Number(trade.entryPrice || trade.price) || 0;
-            const value = amount * price;
+            const pnl = trade.parsedPnL || 0;
+            const amount = trade.parsedQuantity || 0;
+            const entryPrice = trade.parsedEntryPrice || 0;
+            const exitPrice = trade.parsedExitPrice || 0;
+            const value = trade.parsedValue || 0;
+            const leverage = trade.leverage;
+            const takeProfit = trade.takeProfit;
+            const stopLoss = trade.stopLoss;
+            const timestamp = trade.parsedTimestamp || trade.timestamp;
             
             return (
               <div 
                 key={`${trade.connectionId}-${trade.orderId || index}`}
-                className="group relative bg-gradient-to-r from-gray-800/60 to-gray-900/60 backdrop-blur-sm border border-gray-700/30 rounded-lg p-3 hover:from-gray-700/60 hover:to-gray-800/60 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/10"
+                className="group relative bg-gradient-to-r from-gray-800/60 to-gray-900/60 backdrop-blur-sm border border-gray-700/30 rounded-lg p-4 hover:from-gray-700/60 hover:to-gray-800/60 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/10"
               >
                 {/* Animated gradient background on hover */}
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-purple-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-lg"></div>
                 
-                <div className="relative flex items-center justify-between text-sm">
-                  {/* Left side - Symbol and direction */}
-                  <div className="flex items-center space-x-3 flex-shrink-0">
-                    <div className={`w-2 h-2 rounded-full ${trade.direction === 'LONG' || trade.side === 'Buy' ? 'bg-green-400' : 'bg-red-400'} shadow-lg`}></div>
-                    <div>
+                <div className="relative space-y-3">
+                  {/* Header Row - Symbol, Direction, and Time */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-3 h-3 rounded-full ${trade.direction === 'LONG' || trade.side === 'Buy' ? 'bg-green-400' : 'bg-red-400'} shadow-lg`}></div>
                       <div className="flex items-center space-x-2">
-                        <span className="text-white font-medium">{trade.symbol || 'Unknown'}</span>
-                        <span className={`px-2 py-0.5 rounded text-xs font-bold ${
+                        <span className="text-white font-bold text-base">{trade.symbol || 'Unknown'}</span>
+                        <span className={`px-2 py-1 rounded text-xs font-bold ${
                           trade.direction === 'LONG' || trade.side === 'Buy' 
                             ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
                             : 'bg-red-500/20 text-red-400 border border-red-500/30'
                         }`}>
                           {trade.direction || trade.side || 'Unknown'}
                         </span>
+                        {leverage && (
+                          <span className="px-2 py-1 rounded text-xs font-bold bg-orange-500/20 text-orange-400 border border-orange-500/30">
+                            {leverage}x
+                          </span>
+                        )}
                       </div>
-                      <div className="text-gray-400 text-xs">{trade.accountName}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-gray-300 font-medium text-sm">{formatTime(timestamp)}</div>
+                      <div className="text-gray-500 text-xs">{formatDate(timestamp)}</div>
                     </div>
                   </div>
 
-                  {/* Center - Trade details */}
-                  <div className="flex items-center space-x-6 text-xs">
+                  {/* Trade Details Grid */}
+                  <div className="grid grid-cols-6 gap-3 text-xs">
                     <div className="text-center">
                       <div className="text-gray-400">Amount</div>
                       <div className="text-white font-medium">{amount.toFixed(4)}</div>
                     </div>
                     <div className="text-center">
-                      <div className="text-gray-400">Price</div>
-                      <div className="text-white font-medium">${price.toFixed(2)}</div>
+                      <div className="text-gray-400">Entry</div>
+                      <div className="text-white font-medium">${entryPrice.toFixed(4)}</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-gray-400">Exit</div>
+                      <div className="text-white font-medium">
+                        {exitPrice > 0 ? `$${exitPrice.toFixed(4)}` : 'N/A'}
+                      </div>
                     </div>
                     <div className="text-center">
                       <div className="text-gray-400">Value</div>
@@ -621,13 +744,38 @@ export const RecentClosedTrades: React.FC<{ connections: BybitConnection[] }> = 
                         {pnl >= 0 ? '+' : ''}{pnl.toFixed(2)}
                       </div>
                     </div>
+                    <div className="text-center">
+                      <div className="text-gray-400">Account</div>
+                      <div className="text-gray-300 font-medium text-xs truncate">{trade.accountName}</div>
+                    </div>
                   </div>
 
-                  {/* Right side - Time and status */}
-                  <div className="text-right flex-shrink-0">
-                    <div className="text-gray-300 font-medium">{formatTime(trade.timestamp)}</div>
-                    <div className="text-gray-500 text-xs">{new Date(trade.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
-                  </div>
+                  {/* TP/SL Row (if available) */}
+                  {(takeProfit || stopLoss) && (
+                    <div className="flex items-center justify-between pt-2 border-t border-gray-700/30 text-xs">
+                      <div className="flex items-center space-x-4">
+                        {takeProfit && (
+                          <div className="flex items-center space-x-1">
+                            <span className="text-gray-400">TP:</span>
+                            <span className="text-green-400 font-medium">${takeProfit.toFixed(4)}</span>
+                          </div>
+                        )}
+                        {stopLoss && (
+                          <div className="flex items-center space-x-1">
+                            <span className="text-gray-400">SL:</span>
+                            <span className="text-red-400 font-medium">${stopLoss.toFixed(4)}</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-gray-500">
+                        {trade.orderType && (
+                          <span className="px-2 py-0.5 bg-gray-600/30 rounded text-xs">
+                            {trade.orderType}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Subtle border gradient on hover */}
