@@ -2,7 +2,7 @@
 import axios from 'axios';
 import { io, Socket } from 'socket.io-client';
 
-const API_BASE_URL = 'https://arie-backend-api-d916579ecc97.herokuapp.com/api';
+const API_BASE_URL = 'https://ctb-backend-api-5b94a2e25dad.herokuapp.com/api';
 
 // API Client setup
 const apiClient = axios.create({
@@ -274,7 +274,7 @@ class WebSocketManager {
 
     // Create WebSocket connection to live backend
     console.log('🔌 Connecting WebSocket to live backend...');
-    this.socket = io('https://arie-backend-api-d916579ecc97.herokuapp.com', {
+    this.socket = io('https://ctb-backend-api-5b94a2e25dad.herokuapp.com', {
       reconnection: true,
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
