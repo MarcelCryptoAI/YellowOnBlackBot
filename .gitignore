@@ -52,3 +52,7 @@ venv.bak/
 .temp/
 coverage/
 .eslintcache
+backend_new/live_openai_connections.json
+src/.env
+*.env
+*_connections.json
