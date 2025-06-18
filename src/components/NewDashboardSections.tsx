@@ -229,9 +229,8 @@ export const PortfolioChange: React.FC<{ connections: BybitConnection[] }> = ({ 
     
     for (let i = 0; i < points; i++) {
       const progress = i / (points - 1);
-      // Create realistic price movement
-      const randomVariation = (Math.random() - 0.5) * (Math.abs(change24h) * 0.1);
-      const value = startValue + (change24h * progress) + randomVariation;
+      // Linear progression without random variation
+      const value = startValue + (change24h * progress);
       
       const time = new Date(Date.now() - (points - 1 - i) * 60 * 60 * 1000);
       data.push({

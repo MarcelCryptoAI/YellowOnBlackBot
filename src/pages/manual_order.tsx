@@ -363,12 +363,19 @@ const ManualOrderPage: React.FC = () => {
         }));
         setAccounts(accountList);
         
-        // Auto-select first account if none selected (immediate selection)
+        // Auto-select Revolution X as default, or first account if Revolution X not found
         if (accountList.length > 0 && !tradingState.selectedAccount) {
-          console.log('🎯 Auto-selecting first account in loadAccounts:', accountList[0].id, accountList[0].name);
+          // Try to find Revolution X account first
+          const revolutionX = accountList.find(account => 
+            account.name.toLowerCase().includes('revolution') || 
+            account.id === 'marcel_1749306779188'
+          );
+          
+          const defaultAccount = revolutionX || accountList[0];
+          console.log('🎯 Auto-selecting default account:', defaultAccount.id, defaultAccount.name);
           setTradingState(prev => ({ 
             ...prev, 
-            selectedAccount: accountList[0].id 
+            selectedAccount: defaultAccount.id 
           }));
         }
         

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Line, Bar } from 'react-chartjs-2';
+import { bybitApi } from '../services/api';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -49,6 +50,10 @@ interface BacktestData {
     pnlPercent: number;
     commission: number;
   }[];
+  // Additional calculated metrics
+  avgWinPercent?: number;
+  avgLossPercent?: number;
+  sharpeRatio?: number;
 }
 
 interface TradingViewBacktestProps {
@@ -68,67 +73,213 @@ const TradingViewBacktest: React.FC<TradingViewBacktestProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'performance' | 'trades' | 'risk'>('performance');
   const [isDeepBacktesting, setIsDeepBacktesting] = useState(false);
+  const [backtestData, setBacktestData] = useState<BacktestData | null>(null);
+  const [dataLoading, setDataLoading] = useState(true);
 
-  // Generate realistic backtest data based on strategy
-  const generateBacktestData = (): BacktestData => {
-    // Extract coin from strategy name for more realistic data
-    const coin = strategyName.includes('BTC') ? 'BTC' : 
-                 strategyName.includes('ETH') ? 'ETH' : 
-                 strategyName.includes('SOL') ? 'SOL' : 'CRYPTO';
-    
-    // More realistic base values
-    const basePrice = coin === 'BTC' ? 45000 : coin === 'ETH' ? 2800 : coin === 'SOL' ? 95 : 100;
-    const volatility = coin === 'BTC' ? 0.02 : coin === 'ETH' ? 0.03 : 0.05;
-    
-    // Generate progressive equity curve
-    const trades = 50 + Math.floor(Math.random() * 30);
-    const equityCurve: { x: number; y: number }[] = [];
-    let equity = 1000; // Starting equity
-    
-    for (let i = 0; i < trades; i++) {
-      const dailyReturn = (Math.random() - 0.35) * 0.05; // Slight positive bias
-      equity *= (1 + dailyReturn);
-      equityCurve.push({ x: i, y: equity });
+  // Generate real backtest data from actual trading history
+  const generateBacktestData = async (): Promise<BacktestData> => {
+    try {
+      // Get real trading data from ByBit connections
+      const response = await bybitApi.getConnections();
+      
+      if (response.success && response.connections.length > 0) {
+        console.log('📊 Using real trading data for backtest');
+        
+        // Combine all order history from all accounts
+        const allTrades: any[] = [];
+        let totalBalance = 0;
+        
+        response.connections.forEach(conn => {
+          if (conn.data?.orderHistory) {
+            const accountTrades = conn.data.orderHistory
+              .filter(order => order.status === 'CLOSED')
+              .map(order => ({
+                ...order,
+                accountName: conn.metadata?.name || conn.connectionId || 'Unknown'
+              }));
+            allTrades.push(...accountTrades);
+          }
+          totalBalance += conn.data?.balance?.total || 0;
+        });
+        
+        console.log(`📈 Found ${allTrades.length} real trades from ${response.connections.length} accounts`);
+        
+        if (allTrades.length > 0) {
+          // Sort by timestamp
+          allTrades.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+          
+          // Calculate real metrics
+          const profitableTrades = allTrades.filter(trade => (Number(trade.pnl) || 0) > 0);
+          const unprofitableTrades = allTrades.filter(trade => (Number(trade.pnl) || 0) <= 0);
+          const totalPnL = allTrades.reduce((sum, trade) => sum + (Number(trade.pnl) || 0), 0);
+          const totalPnLPercent = totalBalance > 0 ? (totalPnL / totalBalance) * 100 : 0;
+          
+          const grossProfit = profitableTrades.reduce((sum, trade) => sum + (Number(trade.pnl) || 0), 0);
+          const grossLoss = Math.abs(unprofitableTrades.reduce((sum, trade) => sum + (Number(trade.pnl) || 0), 0));
+          const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : grossProfit > 0 ? 999 : 1;
+          
+          // Generate equity curve from real trades
+          const equityCurve: { x: number; y: number }[] = [];
+          let runningEquity = 1000; // Starting equity for visualization
+          
+          allTrades.forEach((trade, index) => {
+            const pnl = Number(trade.pnl) || 0;
+            runningEquity += pnl;
+            equityCurve.push({ x: index, y: runningEquity });
+          });
+          
+          // Calculate max drawdown
+          let maxEquity = 1000;
+          let maxDrawdown = 0;
+          equityCurve.forEach(point => {
+            maxEquity = Math.max(maxEquity, point.y);
+            const drawdown = maxEquity - point.y;
+            maxDrawdown = Math.max(maxDrawdown, drawdown);
+          });
+          
+          // Calculate additional metrics from real trades
+          const avgWin = profitableTrades.length > 0 ? 
+            profitableTrades.reduce((sum, trade) => sum + Number(trade.pnl), 0) / profitableTrades.length : 0;
+          const avgLoss = unprofitableTrades.length > 0 ?
+            Math.abs(unprofitableTrades.reduce((sum, trade) => sum + Number(trade.pnl), 0) / unprofitableTrades.length) : 0;
+          
+          const avgWinPercent = avgWin > 0 && totalBalance > 0 ? (avgWin / totalBalance) * 100 : 0;
+          const avgLossPercent = avgLoss > 0 && totalBalance > 0 ? (avgLoss / totalBalance) * 100 : 0;
+          
+          // Calculate simple Sharpe ratio estimate (assuming risk-free rate of 2%)
+          const returns = allTrades.map(trade => Number(trade.pnl) || 0);
+          const avgReturn = returns.length > 0 ? returns.reduce((sum, ret) => sum + ret, 0) / returns.length : 0;
+          const returnStdDev = returns.length > 1 ? 
+            Math.sqrt(returns.reduce((sum, ret) => sum + Math.pow(ret - avgReturn, 2), 0) / (returns.length - 1)) : 1;
+          const sharpeRatio = returnStdDev > 0 ? (avgReturn - 0.02) / returnStdDev : 0;
+          
+          return {
+            totalPnL,
+            totalPnLPercent,
+            maxDrawdown: -maxDrawdown,
+            maxDrawdownPercent: maxEquity > 0 ? -(maxDrawdown / maxEquity) * 100 : 0,
+            totalTrades: allTrades.length,
+            profitableTrades: profitableTrades.length,
+            profitableTradesPercent: (profitableTrades.length / allTrades.length) * 100,
+            unprofitableTrades: unprofitableTrades.length,
+            profitFactor,
+            equityCurve,
+            drawdownBars: equityCurve.map((point, i) => ({
+              x: i,
+              y: point.y < (equityCurve[Math.max(0, i-1)]?.y || point.y) ? 
+                  -(point.y - (equityCurve[Math.max(0, i-1)]?.y || point.y)) : 0
+            })),
+            trades: allTrades.slice(0, 20).map((trade, i) => ({
+              id: i + 1,
+              entryTime: new Date(trade.timestamp).toISOString(),
+              exitTime: new Date(Number(trade.timestamp) + 300000).toISOString(),
+              direction: trade.direction === 'LONG' ? 'Long' : 'Short',
+              quantity: Number(trade.amount) || 0,
+              entryPrice: Number(trade.entryPrice) || 0,
+              exitPrice: Number(trade.currentPrice) || Number(trade.entryPrice) || 0,
+              pnl: Number(trade.pnl) || 0,
+              pnlPercent: Number(trade.pnlPercent) || 0,
+              commission: Math.abs(Number(trade.pnl) || 0) * 0.001 // Estimate 0.1% commission
+            })),
+            // Additional calculated metrics for risk analysis
+            avgWinPercent,
+            avgLossPercent,
+            sharpeRatio: Math.max(0, Number(sharpeRatio.toFixed(2)))
+          };
+        }
+      }
+      
+      console.log('⚠️ No real trading data found, using fallback');
+      // Fallback to basic structure if no real data
+      return {
+        totalPnL: 0,
+        totalPnLPercent: 0,
+        maxDrawdown: 0,
+        maxDrawdownPercent: 0,
+        totalTrades: 0,
+        profitableTrades: 0,
+        profitableTradesPercent: 0,
+        unprofitableTrades: 0,
+        profitFactor: 1,
+        equityCurve: [{ x: 0, y: 1000 }],
+        drawdownBars: [],
+        trades: [],
+        avgWinPercent: 0,
+        avgLossPercent: 0,
+        sharpeRatio: 0
+      };
+    } catch (error) {
+      console.error('❌ Error fetching real trading data:', error);
+      // Return empty data structure on error
+      return {
+        totalPnL: 0,
+        totalPnLPercent: 0,
+        maxDrawdown: 0,
+        maxDrawdownPercent: 0,
+        totalTrades: 0,
+        profitableTrades: 0,
+        profitableTradesPercent: 0,
+        unprofitableTrades: 0,
+        profitFactor: 1,
+        equityCurve: [{ x: 0, y: 1000 }],
+        drawdownBars: [],
+        trades: [],
+        avgWinPercent: 0,
+        avgLossPercent: 0,
+        sharpeRatio: 0
+      };
     }
-    
-    const finalEquity = equityCurve[equityCurve.length - 1].y;
-    const totalReturn = ((finalEquity - 1000) / 1000) * 100;
-    
-    // Calculate realistic metrics
-    const profitableTrades = Math.floor(trades * (0.6 + Math.random() * 0.3)); // 60-90% win rate
-    const winRate = (profitableTrades / trades) * 100;
-    
-    return {
-      totalPnL: finalEquity - 1000,
-      totalPnLPercent: totalReturn,
-      maxDrawdown: -Math.abs(Math.min(...equityCurve.map(p => p.y - 1000))) * 0.8,
-      maxDrawdownPercent: -Math.abs(totalReturn * 0.2),
-      totalTrades: trades,
-      profitableTrades,
-      profitableTradesPercent: winRate,
-      unprofitableTrades: trades - profitableTrades,
-      profitFactor: 1.2 + Math.random() * 0.8,
-      equityCurve,
-      drawdownBars: equityCurve.map((p, i) => ({
-        x: i,
-        y: p.y < (equityCurve[Math.max(0, i-5)]?.y || p.y) ? -(p.y - (equityCurve[Math.max(0, i-5)]?.y || p.y)) / 10 : 0
-      })),
-      trades: Array.from({ length: Math.min(trades, 20) }, (_, i) => ({
-        id: i + 1,
-        entryTime: new Date(Date.now() - (trades - i) * 3600000).toISOString(),
-        exitTime: new Date(Date.now() - (trades - i) * 3600000 + 300000).toISOString(),
-        direction: Math.random() > 0.5 ? 'Long' : 'Short',
-        quantity: 0.01 + Math.random() * 0.1,
-        entryPrice: basePrice * (0.98 + Math.random() * 0.04),
-        exitPrice: basePrice * (0.98 + Math.random() * 0.04),
-        pnl: (Math.random() - 0.35) * 50,
-        pnlPercent: (Math.random() - 0.35) * 3,
-        commission: 0.5 + Math.random() * 1.5
-      }))
-    };
   };
 
-  const backtestData = data || generateBacktestData();
+  // Load real data on component mount
+  useEffect(() => {
+    const loadData = async () => {
+      if (data) {
+        setBacktestData(data);
+        setDataLoading(false);
+      } else {
+        try {
+          const realData = await generateBacktestData();
+          setBacktestData(realData);
+        } catch (error) {
+          console.error('❌ Failed to load backtest data:', error);
+          // Set fallback empty data
+          setBacktestData({
+            totalPnL: 0,
+            totalPnLPercent: 0,
+            maxDrawdown: 0,
+            maxDrawdownPercent: 0,
+            totalTrades: 0,
+            profitableTrades: 0,
+            profitableTradesPercent: 0,
+            unprofitableTrades: 0,
+            profitFactor: 1,
+            equityCurve: [{ x: 0, y: 1000 }],
+            drawdownBars: [],
+            trades: [],
+            avgWinPercent: 0,
+            avgLossPercent: 0,
+            sharpeRatio: 0
+          });
+        }
+        setDataLoading(false);
+      }
+    };
+
+    loadData();
+  }, [data]);
+
+  // Show loading state
+  if (dataLoading || !backtestData) {
+    return (
+      <div className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center">
+        <div className="text-white text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-4"></div>
+          <p>Loading real trading data...</p>
+        </div>
+      </div>
+    );
+  }
 
   const equityChartData = {
     labels: backtestData.equityCurve.map(p => p.x),
@@ -202,6 +353,17 @@ const TradingViewBacktest: React.FC<TradingViewBacktestProps> = ({
   };
 
   if (compact) {
+    if (dataLoading || !backtestData) {
+      return (
+        <div className="h-full bg-gray-950 flex items-center justify-center">
+          <div className="text-white text-center">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mx-auto mb-2"></div>
+            <p className="text-sm">Loading...</p>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="h-full bg-gray-950 flex flex-col">
         {/* Compact Header */}
@@ -464,15 +626,17 @@ const TradingViewBacktest: React.FC<TradingViewBacktestProps> = ({
               <div className="space-y-3">
                 <div className="flex justify-between">
                   <span className="text-gray-400">Sharpe Ratio</span>
-                  <span className="text-white font-medium">1.85</span>
+                  <span className="text-white font-medium">{backtestData.sharpeRatio || 'N/A'}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-400">Sortino Ratio</span>
-                  <span className="text-white font-medium">2.34</span>
+                  <span className="text-gray-400">Profit Factor</span>
+                  <span className="text-white font-medium">{backtestData.profitFactor.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-400">Calmar Ratio</span>
-                  <span className="text-white font-medium">1.72</span>
+                  <span className="text-gray-400">Total Return</span>
+                  <span className={`font-medium ${backtestData.totalPnLPercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {backtestData.totalPnLPercent >= 0 ? '+' : ''}{backtestData.totalPnLPercent.toFixed(2)}%
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Win Rate</span>
@@ -480,11 +644,15 @@ const TradingViewBacktest: React.FC<TradingViewBacktestProps> = ({
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Average Win</span>
-                  <span className="text-green-400 font-medium">+2.45%</span>
+                  <span className="text-green-400 font-medium">
+                    +{backtestData.avgWinPercent ? backtestData.avgWinPercent.toFixed(2) : '0.00'}%
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Average Loss</span>
-                  <span className="text-red-400 font-medium">-1.12%</span>
+                  <span className="text-red-400 font-medium">
+                    -{backtestData.avgLossPercent ? backtestData.avgLossPercent.toFixed(2) : '0.00'}%
+                  </span>
                 </div>
               </div>
             </div>
@@ -497,24 +665,24 @@ const TradingViewBacktest: React.FC<TradingViewBacktestProps> = ({
                   <span className="text-red-400 font-medium">{backtestData.maxDrawdownPercent.toFixed(2)}%</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-400">Max Drawdown Duration</span>
-                  <span className="text-white font-medium">18 days</span>
+                  <span className="text-gray-400">Total Trades</span>
+                  <span className="text-white font-medium">{backtestData.totalTrades}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-400">Risk of Ruin</span>
-                  <span className="text-white font-medium">0.2%</span>
+                  <span className="text-gray-400">Winning Trades</span>
+                  <span className="text-green-400 font-medium">{backtestData.profitableTrades}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-400">Value at Risk (95%)</span>
-                  <span className="text-orange-400 font-medium">-3.2%</span>
+                  <span className="text-gray-400">Losing Trades</span>
+                  <span className="text-red-400 font-medium">{backtestData.unprofitableTrades}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-400">Expected Shortfall</span>
-                  <span className="text-orange-400 font-medium">-4.8%</span>
+                  <span className="text-gray-400">Max Drawdown ($)</span>
+                  <span className="text-red-400 font-medium">${Math.abs(backtestData.maxDrawdown).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-400">Tail Ratio</span>
-                  <span className="text-white font-medium">1.45</span>
+                  <span className="text-gray-400">Data Source</span>
+                  <span className="text-blue-400 font-medium">Live ByBit</span>
                 </div>
               </div>
             </div>

@@ -543,13 +543,6 @@ const MassStrategyGenerator: React.FC = () => {
 
   return (
     <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-      {/* Demo Mode Warning */}
-      <div className="bg-orange-600/20 border border-orange-500/40 rounded-lg p-3 mb-4">
-        <div className="flex items-center space-x-2">
-          <span className="text-orange-400">⚠️</span>
-          <span className="text-orange-200 text-sm font-medium">DEMO MODE: Generated strategies are for simulation only</span>
-        </div>
-      </div>
 
       <div className="flex items-center justify-between mb-6">
         <div>
