@@ -927,6 +927,15 @@ Consider current market volatility, support/resistance levels, and the ${trading
     try {
       console.log(`🤖 Getting AI order advice for ${tradingState.symbol} - ${timeframe} timeframe`);
       
+      // Get current market data first
+      const marketResponse = await bybitApi.getMarketData([tradingState.symbol]);
+      if (!marketResponse.success || marketResponse.data.length === 0) {
+        throw new Error('Unable to fetch market data');
+      }
+      
+      const marketData = marketResponse.data[0];
+      const currentPrice = marketData.price;
+      
       // Get multi-timeframe technical analysis
       const intervals = timeframe === '5-15m' ? ['5m', '15m'] : ['1h', '4h'];
       const technicalData: any = {};
@@ -989,15 +998,6 @@ Consider current market volatility, support/resistance levels, and the ${trading
           };
         }
       }
-      
-      // Get current market data
-      const marketResponse = await bybitApi.getMarketData([tradingState.symbol]);
-      if (!marketResponse.success || marketResponse.data.length === 0) {
-        throw new Error('Unable to fetch market data');
-      }
-      
-      const marketData = marketResponse.data[0];
-      const currentPrice = marketData.price;
       
       // Calculate risk-adjusted position size
       const availableBalance = accounts.find(acc => acc.id === tradingState.selectedAccount)?.balance.available || 1000;
