@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { bybitApi, openaiApi } from '../services/api';
 import { coinsService } from '../services/coinsService';
-import { calculateTechnicalIndicators, type TechnicalIndicators } from '../services/technicalIndicators';
+import { calculateTechnicalIndicators, calculateRSI, calculateMACD, type TechnicalIndicators } from '../services/technicalIndicators';
 
 // Types
 interface Account {
@@ -779,12 +779,12 @@ const ManualOrderPage: React.FC = () => {
       
       // Get OpenAI connections for analysis
       const openaiConnections = await openaiApi.getConnections();
-      if (!openaiConnections.success || openaiConnections.data.length === 0) {
+      if (!openaiConnections.success || openaiConnections.connections.length === 0) {
         console.warn('No OpenAI connections available for TP/SL analysis');
         return;
       }
       
-      const connection = openaiConnections.data[0];
+      const connection = openaiConnections.connections[0];
       
       // Prepare comprehensive market analysis for OpenAI
       const analysisPrompt = `
@@ -928,18 +928,58 @@ Consider current market volatility, support/resistance levels, and the ${trading
       // Get technical indicators for both timeframes
       for (const interval of intervals) {
         console.log(`📊 Analyzing ${interval} timeframe...`);
-        const klineData = await fetch(`/api/market/klines?symbol=${tradingState.symbol}&interval=${interval}&limit=100`);
-        const klineResult = await klineData.json();
-        
-        if (klineResult.success) {
-          const closePrices = klineResult.data.map((k: any) => k[4]); // Close prices
+        try {
+          const klineData = await fetch(`/api/market/klines?symbol=${tradingState.symbol}&interval=${interval}&limit=100`);
+          const klineResult = await klineData.json();
+          
+          console.log(`Kline result for ${interval}:`, klineResult);
+          
+          if (klineResult.success && klineResult.data && Array.isArray(klineResult.data) && klineResult.data.length > 0) {
+            const closePrices = klineResult.data.map((k: any) => parseFloat(k[4])).filter(price => !isNaN(price)); // Close prices
+            
+            if (closePrices.length >= 14) { // Need at least 14 periods for RSI
+              technicalData[interval] = {
+                prices: closePrices,
+                rsi: calculateRSI(closePrices, 14),
+                macd: calculateMACD(closePrices, 12, 26, 9),
+                support: Math.min(...klineResult.data.map((k: any) => parseFloat(k[3]))), // Low prices
+                resistance: Math.max(...klineResult.data.map((k: any) => parseFloat(k[2]))), // High prices
+                latestPrice: closePrices[closePrices.length - 1]
+              };
+            } else {
+              console.warn(`Insufficient data for ${interval}: only ${closePrices.length} periods`);
+              // Use mock data as fallback
+              technicalData[interval] = {
+                prices: [currentPrice],
+                rsi: 50,
+                macd: { macd: 0, signal: 0, histogram: 0, trend: 'Neutral' },
+                support: currentPrice * 0.95,
+                resistance: currentPrice * 1.05,
+                latestPrice: currentPrice
+              };
+            }
+          } else {
+            console.warn(`No valid kline data for ${interval}, using fallback`);
+            // Use current price as fallback
+            technicalData[interval] = {
+              prices: [currentPrice],
+              rsi: 50,
+              macd: { macd: 0, signal: 0, histogram: 0, trend: 'Neutral' },
+              support: currentPrice * 0.95,
+              resistance: currentPrice * 1.05,
+              latestPrice: currentPrice
+            };
+          }
+        } catch (error) {
+          console.error(`Error fetching kline data for ${interval}:`, error);
+          // Use fallback data
           technicalData[interval] = {
-            prices: closePrices,
-            rsi: calculateRSI(closePrices, 14),
-            macd: calculateMACD(closePrices, 12, 26, 9),
-            support: Math.min(...klineResult.data.map((k: any) => k[3])), // Low prices
-            resistance: Math.max(...klineResult.data.map((k: any) => k[2])), // High prices
-            latestPrice: closePrices[closePrices.length - 1]
+            prices: [currentPrice],
+            rsi: 50,
+            macd: { macd: 0, signal: 0, histogram: 0, trend: 'Neutral' },
+            support: currentPrice * 0.95,
+            resistance: currentPrice * 1.05,
+            latestPrice: currentPrice
           };
         }
       }
@@ -972,12 +1012,20 @@ Consider current market volatility, support/resistance levels, and the ${trading
       }
       
       // Get OpenAI connections
+      console.log('🔍 Checking OpenAI connections...');
       const openaiConnections = await openaiApi.getConnections();
-      if (!openaiConnections.success || openaiConnections.data.length === 0) {
-        throw new Error('No OpenAI connections available');
+      console.log('OpenAI response:', openaiConnections);
+      
+      if (!openaiConnections.success) {
+        throw new Error(`OpenAI API error: ${openaiConnections.error || 'Unknown error'}`);
       }
       
-      const connection = openaiConnections.data[0];
+      if (!openaiConnections.connections || !Array.isArray(openaiConnections.connections) || openaiConnections.connections.length === 0) {
+        throw new Error('No OpenAI connections available. Please configure OpenAI API first.');
+      }
+      
+      const connection = openaiConnections.connections[0];
+      console.log('Using OpenAI connection:', connection.id);
       
       // Create comprehensive analysis prompt
       const analysisPrompt = `

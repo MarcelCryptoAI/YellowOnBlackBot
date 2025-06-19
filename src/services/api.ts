@@ -789,6 +789,21 @@ export const openaiApi = {
     });
     return response.data;
   },
+
+  // Generate analysis for trading decisions
+  generateAnalysis: async (connectionId: string, analysisData: {
+    prompt: string;
+    symbol: string;
+    marketData: any;
+    technicals: any;
+    tradingState: any;
+  }): Promise<{ success: boolean; data: any }> => {
+    const response = await apiClient.post('/openai/generate-analysis', {
+      connectionId,
+      ...analysisData
+    });
+    return response.data;
+  },
 };
 
 // Coins API
