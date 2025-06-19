@@ -4,19 +4,6 @@ import { userStorage, apiStorage } from './utils/storage';
 import { bybitApi, openaiApi, websocketManager, healthCheck, type BalanceData, type Position, type ConnectionData, type MarketData, type OpenAIConnection } from './services/api';
 
 // Types
-interface Trade {
-  id: string;
-  symbol: string;
-  direction: 'LONG' | 'SHORT';
-  amount: number;
-  entryPrice: number;
-  currentPrice: number;
-  pnl: number;
-  pnlPercent: number;
-  status: 'OPEN' | 'CLOSED' | 'PENDING';
-  exchange: string;
-  timestamp: string;
-}
 
 interface Strategy {
   id: string;
