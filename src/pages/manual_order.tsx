@@ -198,6 +198,9 @@ const ManualOrderPage: React.FC = () => {
   const [showAiAdvice, setShowAiAdvice] = useState(false);
   const [aiAdvice, setAiAdvice] = useState<any>(null);
   const [isGeneratingAdvice, setIsGeneratingAdvice] = useState(false);
+  const [isGettingOrderAdvice, setIsGettingOrderAdvice] = useState(false);
+  const [orderAdvice, setOrderAdvice] = useState<any>(null);
+  const [showOrderAdvice, setShowOrderAdvice] = useState(false);
   const [leverageLimits, setLeverageLimits] = useState<{[key: string]: {min: number, max: number}}>({});
   
   const [tradingState, setTradingState] = useState<TradingState>({
@@ -904,6 +907,228 @@ Consider current market volatility, support/resistance levels, and the ${trading
       
     } catch (error) {
       console.error('❌ Error applying AI recommendations:', error);
+    }
+  };
+
+  const getAiOrderAdvice = async (timeframe: '5-15m' | '1-4h') => {
+    if (!tradingState.symbol) {
+      alert('Please select a symbol first');
+      return;
+    }
+
+    setIsGettingOrderAdvice(true);
+    
+    try {
+      console.log(`🤖 Getting AI order advice for ${tradingState.symbol} - ${timeframe} timeframe`);
+      
+      // Get multi-timeframe technical analysis
+      const intervals = timeframe === '5-15m' ? ['5m', '15m'] : ['1h', '4h'];
+      const technicalData: any = {};
+      
+      // Get technical indicators for both timeframes
+      for (const interval of intervals) {
+        console.log(`📊 Analyzing ${interval} timeframe...`);
+        const klineData = await fetch(`/api/market/klines?symbol=${tradingState.symbol}&interval=${interval}&limit=100`);
+        const klineResult = await klineData.json();
+        
+        if (klineResult.success) {
+          const closePrices = klineResult.data.map((k: any) => k[4]); // Close prices
+          technicalData[interval] = {
+            prices: closePrices,
+            rsi: calculateRSI(closePrices, 14),
+            macd: calculateMACD(closePrices, 12, 26, 9),
+            support: Math.min(...klineResult.data.map((k: any) => k[3])), // Low prices
+            resistance: Math.max(...klineResult.data.map((k: any) => k[2])), // High prices
+            latestPrice: closePrices[closePrices.length - 1]
+          };
+        }
+      }
+      
+      // Get current market data
+      const marketResponse = await bybitApi.getMarketData([tradingState.symbol]);
+      if (!marketResponse.success || marketResponse.data.length === 0) {
+        throw new Error('Unable to fetch market data');
+      }
+      
+      const marketData = marketResponse.data[0];
+      const currentPrice = marketData.price;
+      
+      // Calculate risk-adjusted position size
+      const availableBalance = accounts.find(acc => acc.id === tradingState.selectedAccount)?.balance.available || 1000;
+      const volatility = Math.abs(marketData.change24h) / 100;
+      const baseRiskPercent = timeframe === '5-15m' ? 2 : 3; // Lower risk for shorter timeframes
+      const riskAdjustedPercent = Math.max(0.5, baseRiskPercent - (volatility * 10)); // Reduce risk if volatile
+      const recommendedMargin = (availableBalance * riskAdjustedPercent) / 100;
+      
+      // Calculate safe multiplier based on RSI and volatility
+      const primaryRSI = technicalData[intervals[0]]?.rsi || 50;
+      const confirmRSI = technicalData[intervals[1]]?.rsi || 50;
+      
+      let multiplier = 1;
+      if (primaryRSI > 30 && primaryRSI < 70 && confirmRSI > 30 && confirmRSI < 70) {
+        multiplier = volatility < 0.05 ? 3 : volatility < 0.08 ? 2.5 : 2; // Lower leverage for higher volatility
+      } else if (primaryRSI > 70 || primaryRSI < 30) {
+        multiplier = 1.5; // Reduced leverage in overbought/oversold conditions
+      }
+      
+      // Get OpenAI connections
+      const openaiConnections = await openaiApi.getConnections();
+      if (!openaiConnections.success || openaiConnections.data.length === 0) {
+        throw new Error('No OpenAI connections available');
+      }
+      
+      const connection = openaiConnections.data[0];
+      
+      // Create comprehensive analysis prompt
+      const analysisPrompt = `
+As a professional crypto trading analyst, provide a specific trading recommendation for ${tradingState.symbol} using ${timeframe} timeframe analysis.
+
+MARKET DATA:
+- Symbol: ${tradingState.symbol}
+- Current Price: $${currentPrice}
+- 24h Change: ${marketData.change24h}%
+- Volume: $${(marketData.volume24h / 1000000).toFixed(1)}M
+
+MULTI-TIMEFRAME TECHNICAL ANALYSIS:
+${intervals[0]} Analysis:
+- RSI: ${technicalData[intervals[0]]?.rsi?.toFixed(1) || 'N/A'}
+- MACD: ${technicalData[intervals[0]]?.macd?.trend || 'N/A'}
+- Support: $${technicalData[intervals[0]]?.support?.toFixed(4) || 'N/A'}
+- Resistance: $${technicalData[intervals[0]]?.resistance?.toFixed(4) || 'N/A'}
+
+${intervals[1]} Analysis (Confirmation):
+- RSI: ${technicalData[intervals[1]]?.rsi?.toFixed(1) || 'N/A'}
+- MACD: ${technicalData[intervals[1]]?.macd?.trend || 'N/A'}
+- Support: $${technicalData[intervals[1]]?.support?.toFixed(4) || 'N/A'}
+- Resistance: $${technicalData[intervals[1]]?.resistance?.toFixed(4) || 'N/A'}
+
+RISK MANAGEMENT:
+- Available Balance: $${availableBalance.toFixed(2)}
+- Recommended Margin: $${recommendedMargin.toFixed(2)} (${riskAdjustedPercent.toFixed(1)}%)
+- Safe Multiplier: ${multiplier}x
+- Market Volatility: ${(volatility * 100).toFixed(1)}%
+
+Please provide a specific trading setup with:
+1. Direction (LONG/SHORT) based on multi-timeframe confluence
+2. Entry price (precise level based on support/resistance)
+3. Take profit levels (3 levels with percentages)
+4. Stop loss (risk-adjusted)
+5. Confidence percentage (0-100%)
+6. Reasoning for the setup
+
+Format as JSON:
+{
+  "direction": "LONG/SHORT",
+  "entry": {
+    "price": 0.0000,
+    "reasoning": "Why this entry level"
+  },
+  "takeProfits": [
+    {"level": 1, "price": 0.0000, "percentage": 0.0, "allocation": 40},
+    {"level": 2, "price": 0.0000, "percentage": 0.0, "allocation": 35},
+    {"level": 3, "price": 0.0000, "percentage": 0.0, "allocation": 25}
+  ],
+  "stopLoss": {
+    "price": 0.0000,
+    "percentage": 0.0,
+    "reasoning": "Risk management logic"
+  },
+  "marginRecommendation": {
+    "amount": ${recommendedMargin.toFixed(2)},
+    "percentage": ${riskAdjustedPercent.toFixed(1)},
+    "multiplier": ${multiplier}
+  },
+  "confidence": 0,
+  "timeframe": "${timeframe}",
+  "analysis": "Brief market analysis",
+  "riskLevel": "LOW/MEDIUM/HIGH",
+  "expectedDuration": "Expected trade duration"
+}
+
+Consider the ${timeframe} timeframe confluence and current market structure for ${tradingState.symbol}.
+`;
+
+      // Send to OpenAI
+      const analysisResponse = await openaiApi.generateAnalysis(connection.id, {
+        prompt: analysisPrompt,
+        symbol: tradingState.symbol,
+        timeframe: timeframe,
+        technicalData: technicalData,
+        marketData: marketData
+      });
+      
+      if (analysisResponse.success && analysisResponse.data) {
+        try {
+          const advice = JSON.parse(analysisResponse.data.analysis || '{}');
+          console.log('🎯 AI Order Advice:', advice);
+          
+          setOrderAdvice(advice);
+          setShowOrderAdvice(true);
+          
+        } catch (parseError) {
+          console.error('Error parsing AI advice:', parseError);
+          alert('Error parsing AI response. Please try again.');
+        }
+      } else {
+        throw new Error('Failed to get AI analysis');
+      }
+      
+    } catch (error) {
+      console.error('❌ Error getting AI order advice:', error);
+      alert(`Failed to get AI advice: ${error.message}`);
+    } finally {
+      setIsGettingOrderAdvice(false);
+    }
+  };
+
+  const applyOrderAdvice = () => {
+    if (!orderAdvice) return;
+    
+    try {
+      console.log('🔧 Applying AI order advice to form...');
+      
+      // Apply direction
+      updateTradingState('direction', orderAdvice.direction.toLowerCase());
+      
+      // Apply margin settings
+      if (orderAdvice.marginRecommendation) {
+        updateTradingState('amount', parseFloat(orderAdvice.marginRecommendation.amount));
+        updateTradingState('leverage', orderAdvice.marginRecommendation.multiplier);
+        updateTradingState('marginMode', 'fixed-usdt');
+        updateTradingState('fixedUsdtAmount', parseFloat(orderAdvice.marginRecommendation.amount));
+      }
+      
+      // Apply entry settings
+      if (orderAdvice.entry) {
+        updateTradingState('entryPriceFrom', orderAdvice.entry.price * 0.999); // Slight buffer
+        updateTradingState('entryPriceTo', orderAdvice.entry.price * 1.001);
+      }
+      
+      // Apply take profits
+      if (orderAdvice.takeProfits && orderAdvice.takeProfits.length > 0) {
+        updateTradingState('takeProfitsEnabled', true);
+        updateTradingState('numberOfTakeProfits', Math.min(orderAdvice.takeProfits.length, 3));
+        updateTradingState('takeProfitPriceFrom', orderAdvice.takeProfits[0].price);
+        updateTradingState('takeProfitPriceTo', orderAdvice.takeProfits[orderAdvice.takeProfits.length - 1].price);
+      }
+      
+      // Apply stop loss
+      if (orderAdvice.stopLoss) {
+        updateTradingState('stopEnabled', true);
+        updateTradingState('stopLossPercent', Math.abs(orderAdvice.stopLoss.percentage));
+      }
+      
+      // Switch to appropriate tab
+      setActiveTab('general');
+      
+      // Close advice modal
+      setShowOrderAdvice(false);
+      
+      alert(`✅ AI Order Advice Applied!\n\nDirection: ${orderAdvice.direction}\nEntry: $${orderAdvice.entry?.price}\nMargin: $${orderAdvice.marginRecommendation?.amount}\nLeverage: ${orderAdvice.marginRecommendation?.multiplier}x\nConfidence: ${orderAdvice.confidence}%`);
+      
+    } catch (error) {
+      console.error('❌ Error applying order advice:', error);
+      alert('Error applying advice. Please check the settings manually.');
     }
   };
 
@@ -2408,6 +2633,34 @@ Format your response as a structured analysis with clear sections for each aspec
                 <div className="text-neon-green font-orbitron font-bold text-lg">${currentPrice.toLocaleString()}</div>
               </div>
             </div>
+            
+            {/* AI Order Advice Buttons */}
+            <div className="flex items-center justify-center space-x-4 my-4">
+              <button
+                onClick={() => getAiOrderAdvice('5-15m')}
+                disabled={isGettingOrderAdvice || !tradingState.symbol}
+                className="btn-holographic px-6 py-3 rounded-xl font-orbitron font-bold text-sm relative overflow-hidden group transition-all duration-500 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-600/20 via-cyan-600/20 to-purple-600/20 group-hover:opacity-75 transition-opacity"></div>
+                <div className="relative flex items-center space-x-2">
+                  <span className="text-lg">🎯</span>
+                  <span>{isGettingOrderAdvice ? 'Analyzing...' : 'AI Order Advice 5-15M'}</span>
+                </div>
+              </button>
+              
+              <button
+                onClick={() => getAiOrderAdvice('1-4h')}
+                disabled={isGettingOrderAdvice || !tradingState.symbol}
+                className="btn-holographic px-6 py-3 rounded-xl font-orbitron font-bold text-sm relative overflow-hidden group transition-all duration-500 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-purple-600/20 via-pink-600/20 to-orange-600/20 group-hover:opacity-75 transition-opacity"></div>
+                <div className="relative flex items-center space-x-2">
+                  <span className="text-lg">📊</span>
+                  <span>{isGettingOrderAdvice ? 'Analyzing...' : 'AI Order Advice 1-4H'}</span>
+                </div>
+              </button>
+            </div>
+            
             <div className="flex items-center space-x-3">
               <div className="glass-panel px-3 py-2 rounded-xl">
                 <select 
@@ -2965,6 +3218,210 @@ Format your response as a structured analysis with clear sections for each aspec
                   <button
                     onClick={() => setShowAiAdvice(false)}
                     className="btn-secondary px-4 py-2"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI Order Advice Modal */}
+      {showOrderAdvice && orderAdvice && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-4xl glass-card animate-fadeInUp border border-cyan-400/30">
+            {/* Header */}
+            <div className="p-6 border-b border-cyan-400/20">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <span className="text-3xl">🎯</span>
+                  <div>
+                    <h3 className="text-2xl font-orbitron font-bold text-holographic">AI Order Advice</h3>
+                    <p className="text-neon-cyan text-sm font-rajdhani">
+                      {orderAdvice.timeframe} • {tradingState.symbol} • {orderAdvice.confidence}% Confidence
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowOrderAdvice(false)}
+                  className="btn-secondary p-3 rounded-xl"
+                >
+                  <span className="text-gray-400 text-xl">✕</span>
+                </button>
+              </div>
+            </div>
+            
+            {/* Content */}
+            <div className="p-6 space-y-6">
+              {/* Trading Setup Summary */}
+              <div className="glass-panel p-6 rounded-xl border border-neon-purple/30">
+                <h4 className="text-xl font-orbitron font-bold text-neon-purple mb-4 flex items-center">
+                  <span className="mr-3">⚡</span>
+                  Trading Setup
+                </h4>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="text-center">
+                    <div className="text-gray-400 text-xs font-rajdhani uppercase tracking-wider mb-1">Direction</div>
+                    <div className={`text-xl font-bold ${orderAdvice.direction === 'LONG' ? 'text-green-400' : 'text-red-400'}`}>
+                      {orderAdvice.direction}
+                    </div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-gray-400 text-xs font-rajdhani uppercase tracking-wider mb-1">Entry</div>
+                    <div className="text-xl font-bold text-cyan-400">
+                      ${orderAdvice.entry?.price?.toFixed(4)}
+                    </div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-gray-400 text-xs font-rajdhani uppercase tracking-wider mb-1">Risk Level</div>
+                    <div className={`text-lg font-bold ${
+                      orderAdvice.riskLevel === 'LOW' ? 'text-green-400' : 
+                      orderAdvice.riskLevel === 'MEDIUM' ? 'text-yellow-400' : 'text-red-400'
+                    }`}>
+                      {orderAdvice.riskLevel}
+                    </div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-gray-400 text-xs font-rajdhani uppercase tracking-wider mb-1">Duration</div>
+                    <div className="text-lg font-bold text-purple-400">
+                      {orderAdvice.expectedDuration}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Position Management */}
+                <div className="glass-panel p-6 rounded-xl border border-green-500/30">
+                  <h4 className="text-lg font-orbitron font-bold text-green-400 mb-4 flex items-center">
+                    <span className="mr-3">💰</span>
+                    Position Management
+                  </h4>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <div className="text-sm text-gray-400 mb-2">Recommended Margin</div>
+                      <div className="text-2xl font-bold text-green-400">
+                        ${orderAdvice.marginRecommendation?.amount} 
+                        <span className="text-sm text-gray-400 ml-2">
+                          ({orderAdvice.marginRecommendation?.percentage}%)
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <div className="text-sm text-gray-400 mb-2">Safe Multiplier</div>
+                      <div className="text-xl font-bold text-orange-400">
+                        {orderAdvice.marginRecommendation?.multiplier}x
+                      </div>
+                    </div>
+                    
+                    {orderAdvice.entry?.reasoning && (
+                      <div>
+                        <div className="text-sm text-gray-400 mb-2">Entry Reasoning</div>
+                        <div className="text-sm text-gray-300 bg-gray-800/50 rounded-lg p-3">
+                          {orderAdvice.entry.reasoning}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Risk Management */}
+                <div className="glass-panel p-6 rounded-xl border border-red-500/30">
+                  <h4 className="text-lg font-orbitron font-bold text-red-400 mb-4 flex items-center">
+                    <span className="mr-3">🛡️</span>
+                    Risk Management
+                  </h4>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <div className="text-sm text-gray-400 mb-2">Stop Loss</div>
+                      <div className="text-xl font-bold text-red-400">
+                        ${orderAdvice.stopLoss?.price?.toFixed(4)}
+                        <span className="text-sm text-gray-400 ml-2">
+                          ({orderAdvice.stopLoss?.percentage?.toFixed(1)}%)
+                        </span>
+                      </div>
+                    </div>
+                    
+                    {orderAdvice.stopLoss?.reasoning && (
+                      <div>
+                        <div className="text-sm text-gray-400 mb-2">SL Reasoning</div>
+                        <div className="text-sm text-gray-300 bg-gray-800/50 rounded-lg p-3">
+                          {orderAdvice.stopLoss.reasoning}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Take Profit Levels */}
+              {orderAdvice.takeProfits && orderAdvice.takeProfits.length > 0 && (
+                <div className="glass-panel p-6 rounded-xl border border-blue-500/30">
+                  <h4 className="text-lg font-orbitron font-bold text-blue-400 mb-4 flex items-center">
+                    <span className="mr-3">🎯</span>
+                    Take Profit Levels
+                  </h4>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {orderAdvice.takeProfits.map((tp: any, idx: number) => (
+                      <div key={idx} className="glass-card-small p-4 border border-blue-400/20">
+                        <div className="text-center">
+                          <div className="text-blue-400 font-bold text-lg mb-2">TP {tp.level}</div>
+                          <div className="text-2xl font-bold text-white mb-1">
+                            ${tp.price?.toFixed(4)}
+                          </div>
+                          <div className="text-green-400 text-sm font-medium mb-2">
+                            +{tp.percentage?.toFixed(1)}%
+                          </div>
+                          <div className="text-xs text-gray-400">
+                            {tp.allocation}% allocation
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* AI Analysis */}
+              {orderAdvice.analysis && (
+                <div className="glass-panel p-6 rounded-xl border border-purple-500/30">
+                  <h4 className="text-lg font-orbitron font-bold text-purple-400 mb-4 flex items-center">
+                    <span className="mr-3">🧠</span>
+                    AI Analysis
+                  </h4>
+                  <div className="text-gray-300 bg-gray-800/50 rounded-lg p-4">
+                    {orderAdvice.analysis}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-6 border-t border-cyan-400/20">
+              <div className="flex items-center justify-between">
+                <div className="text-xs text-gray-400 font-rajdhani">
+                  ⚠️ AI-generated advice for {orderAdvice.timeframe} trading. Always manage your risk.
+                </div>
+                <div className="flex space-x-3">
+                  <button
+                    onClick={applyOrderAdvice}
+                    className="btn-holographic px-6 py-3 rounded-xl font-orbitron font-bold relative overflow-hidden group"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-600/20 via-blue-600/20 to-purple-600/20 group-hover:opacity-75 transition-opacity"></div>
+                    <div className="relative flex items-center space-x-2">
+                      <span className="text-lg">⚡</span>
+                      <span>Apply to Form</span>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setShowOrderAdvice(false)}
+                    className="btn-secondary px-6 py-3 rounded-xl font-rajdhani font-bold"
                   >
                     Close
                   </button>
