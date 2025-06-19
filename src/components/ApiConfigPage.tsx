@@ -58,7 +58,14 @@ const ApiConfigPage: React.FC = () => {
     totalValue = 0 
   } = context || {};
   
-  const [currentUser] = useState(() => userStorage.getCurrentUser());
+  const [currentUser] = useState(() => {
+    try {
+      return userStorage.getCurrentUser() || { name: 'Default User', id: 'default' };
+    } catch (error) {
+      console.error('Failed to get current user:', error);
+      return { name: 'Default User', id: 'default' };
+    }
+  });
   const [hasStoredCredentials, setHasStoredCredentials] = useState(false);
   const [storageInfo, setStorageInfo] = useState<any>(null);
   const [bybitConnections, setBybitConnections] = useState<BybitConnection[]>([]);
@@ -94,10 +101,19 @@ const ApiConfigPage: React.FC = () => {
       try {
         setIsLoading(true);
         setLoadError(null);
-        await loadStoredData();
-        await loadConnections();
+        
+        // Load stored data (synchronous)
+        loadStoredData();
+        
+        // Try to load connections from API, but don't fail if it doesn't work
+        try {
+          await loadConnections();
+        } catch (apiError) {
+          console.warn('API connections failed to load, but page will still render:', apiError);
+          // Don't set loadError here - just let the page render without API data
+        }
       } catch (error) {
-        console.error('Error initializing API config page:', error);
+        console.error('Critical error initializing API config page:', error);
         setLoadError(error instanceof Error ? error.message : 'Failed to load page data');
       } finally {
         setIsLoading(false);
@@ -117,31 +133,58 @@ const ApiConfigPage: React.FC = () => {
 
   const loadConnections = async () => {
     try {
-      // Load ByBit connections
-      const bybitResponse = await bybitApi.getConnections();
-      if (bybitResponse.success) {
-        const connections = bybitResponse.connections.map(conn => ({
-          id: conn.connection_id,
-          name: conn.name || 'ByBit Connection',
-          apiKey: '****LIVE',
-          secretKey: '****hidden',
-          testnet: conn.testnet || false,
-          markets: conn.markets || { spot: true, usdtPerpetual: false, inverseUsd: false },
-          status: conn.data ? 'Active' as const : 'Error' as const,
-          balance: conn.data?.balance || null,
-          positions: conn.data?.positions || [],
-          createdAt: conn.last_updated || new Date().toISOString(),
-        }));
-        setBybitConnections(connections);
+      console.log('🔄 Loading API connections...');
+      
+      // Load ByBit connections with error handling
+      try {
+        const bybitResponse = await bybitApi.getConnections();
+        console.log('ByBit response:', bybitResponse);
+        
+        if (bybitResponse.success && bybitResponse.connections) {
+          const connections = bybitResponse.connections.map(conn => ({
+            id: conn.connectionId || conn.connection_id || `bybit_${Date.now()}`,
+            name: conn.name || 'ByBit Connection',
+            apiKey: '****LIVE',
+            secretKey: '****hidden',
+            testnet: conn.testnet || false,
+            markets: conn.markets || { spot: true, usdtPerpetual: false, inverseUsd: false },
+            status: conn.data ? 'Active' as const : 'Error' as const,
+            balance: conn.data?.balance || null,
+            positions: conn.data?.positions || [],
+            createdAt: conn.last_updated || new Date().toISOString(),
+          }));
+          setBybitConnections(connections);
+          console.log('✅ Loaded', connections.length, 'ByBit connections');
+        } else {
+          console.log('No ByBit connections found or failed to load');
+          setBybitConnections([]);
+        }
+      } catch (bybitError) {
+        console.error('Failed to load ByBit connections:', bybitError);
+        setBybitConnections([]);
       }
 
-      // Load OpenAI connections
-      const openaiResponse = await openaiApi.getConnections();
-      if (openaiResponse.success) {
-        setOpenaiConnections(openaiResponse.connections);
+      // Load OpenAI connections with error handling
+      try {
+        const openaiResponse = await openaiApi.getConnections();
+        console.log('OpenAI response:', openaiResponse);
+        
+        if (openaiResponse.success && openaiResponse.connections) {
+          setOpenaiConnections(openaiResponse.connections);
+          console.log('✅ Loaded', openaiResponse.connections.length, 'OpenAI connections');
+        } else {
+          console.log('No OpenAI connections found or failed to load');
+          setOpenaiConnections([]);
+        }
+      } catch (openaiError) {
+        console.error('Failed to load OpenAI connections:', openaiError);
+        setOpenaiConnections([]);
       }
+      
+      console.log('✅ API connections loading complete');
     } catch (error) {
       console.error('Failed to load connections:', error);
+      throw error; // Re-throw to be caught by the parent try-catch
     }
   };
 
