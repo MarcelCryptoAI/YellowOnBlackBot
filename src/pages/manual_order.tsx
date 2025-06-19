@@ -1848,9 +1848,9 @@ Format your response as a structured analysis with clear sections for each aspec
   const availableAmount = accounts.find(acc => acc.id === tradingState.selectedAccount)?.balance.available || 0;
 
   return (
-    <div className="flex min-h-screen gap-8 p-6">
+    <div className="flex h-screen gap-8 p-6 overflow-hidden">
       {/* Left Panel - Trading Interface - WIDER */}
-      <div className="w-[600px] glass-card border-r border-neon-cyan/30 flex flex-col animate-fade-in shadow-3d-lg max-h-screen">
+      <div className="w-[600px] glass-card border-r border-neon-cyan/30 flex flex-col animate-fade-in shadow-3d-lg h-full overflow-hidden">
         {/* Page Title */}
         <div className="p-8 pb-4">
           <h1 className="text-3xl font-orbitron font-black text-holographic mb-2">MANUAL ORDER</h1>
@@ -1928,7 +1928,7 @@ Format your response as a structured analysis with clear sections for each aspec
         </div>
 
         {/* Tab Content - Scrollable, Vertical Layout */}
-        <div className="flex-1 px-8 py-6 space-y-4 overflow-y-auto min-h-0">
+        <div className="flex-1 px-8 py-6 space-y-4 overflow-y-auto">
           {/* Debug indicator */}
           <div className="text-xs text-gray-500 mb-2">Active tab: {activeTab}</div>
           {activeTab === 'general' && (
@@ -2021,8 +2021,8 @@ Format your response as a structured analysis with clear sections for each aspec
                     onClick={() => updateTradingState('direction', 'long')}
                     className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all duration-300 ${
                       tradingState.direction === 'long'
-                        ? 'btn-primary bg-green-500 hover:bg-green-400'
-                        : 'btn-secondary'
+                        ? 'bg-green-500 hover:bg-green-400 text-white border-2 border-green-400 shadow-lg shadow-green-500/50'
+                        : 'bg-gray-700 hover:bg-gray-600 text-gray-300 border-2 border-gray-600'
                     }`}
                   >
                     <span className="flex items-center justify-center space-x-2">
@@ -2034,8 +2034,8 @@ Format your response as a structured analysis with clear sections for each aspec
                     onClick={() => updateTradingState('direction', 'short')}
                     className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all duration-300 ${
                       tradingState.direction === 'short'
-                        ? 'btn-primary bg-red-500 hover:bg-red-400'
-                        : 'btn-secondary'
+                        ? 'bg-red-500 hover:bg-red-400 text-white border-2 border-red-400 shadow-lg shadow-red-500/50'
+                        : 'bg-gray-700 hover:bg-gray-600 text-gray-300 border-2 border-gray-600'
                     }`}
                   >
                     <span className="flex items-center justify-center space-x-2">
@@ -2054,8 +2054,8 @@ Format your response as a structured analysis with clear sections for each aspec
                     onClick={() => updateTradingState('marginType', 'isolated')}
                     className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all duration-300 ${
                       tradingState.marginType === 'isolated'
-                        ? 'btn-primary'
-                        : 'btn-secondary'
+                        ? 'bg-blue-500 hover:bg-blue-400 text-white border-2 border-blue-400 shadow-lg shadow-blue-500/50'
+                        : 'bg-gray-700 hover:bg-gray-600 text-gray-300 border-2 border-gray-600'
                     }`}
                   >
                     <span className="flex items-center justify-center space-x-2">
@@ -2067,8 +2067,8 @@ Format your response as a structured analysis with clear sections for each aspec
                     onClick={() => updateTradingState('marginType', 'cross')}
                     className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all duration-300 ${
                       tradingState.marginType === 'cross'
-                        ? 'btn-primary'
-                        : 'btn-secondary'
+                        ? 'bg-purple-500 hover:bg-purple-400 text-white border-2 border-purple-400 shadow-lg shadow-purple-500/50'
+                        : 'bg-gray-700 hover:bg-gray-600 text-gray-300 border-2 border-gray-600'
                     }`}
                   >
                     <span className="flex items-center justify-center space-x-2">
@@ -2675,7 +2675,7 @@ Format your response as a structured analysis with clear sections for each aspec
       </div>
 
       {/* Right Panel - TradingView Chart - ULTRA THICK */}
-      <div className="flex-1 relative animate-fade-in">
+      <div className="flex-1 relative animate-fade-in h-full overflow-hidden">
         {/* Chart Header - Better Positioning */}
         <div className="absolute top-6 left-6 right-6 z-10 glass-panel rounded-2xl border-neon-purple/30 p-6 shadow-3d-lg">
           <div className="flex items-center justify-between">
@@ -2748,7 +2748,7 @@ Format your response as a structured analysis with clear sections for each aspec
         
         {/* Chart Container - Lowered with More Spacing */}
         <div className="h-full pt-40 px-6 pb-6">
-          <div className="w-full h-full rounded-3xl overflow-hidden relative glass-card shadow-3d-lg">
+          <div className="w-full h-[calc(100%-160px)] rounded-3xl overflow-hidden relative glass-card shadow-3d-lg">
             {!chartLoaded ? (
               <div className="absolute inset-0 flex items-center justify-center text-gray-400">
                 <div className="text-center">
