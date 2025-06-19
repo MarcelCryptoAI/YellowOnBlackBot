@@ -1381,7 +1381,10 @@ Format your response as a structured analysis with clear sections for each aspec
               ].map((tab, index) => (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
+                  onClick={() => {
+                    console.log('Tab clicked:', tab.id);
+                    setActiveTab(tab.id as any);
+                  }}
                   className={`
                     tab-futuristic px-6 py-4 rounded-xl font-rajdhani font-bold text-sm
                     flex flex-col items-center space-y-1 transition-all duration-300
@@ -1402,6 +1405,8 @@ Format your response as a structured analysis with clear sections for each aspec
 
         {/* Tab Content - No Scrollbar, Vertical Layout */}
         <div className="flex-1 px-8 py-6 space-y-4">
+          {/* Debug indicator */}
+          <div className="text-xs text-gray-500 mb-2">Active tab: {activeTab}</div>
           {activeTab === 'general' && (
             <>
               {/* Account Selection */}
