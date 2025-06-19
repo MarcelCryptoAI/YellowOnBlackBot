@@ -786,6 +786,12 @@ const ManualOrderPage: React.FC = () => {
       
       const connection = openaiConnections.connections[0];
       
+      // Check if the connection has an error status (invalid API key)
+      if (connection.status === 'error') {
+        console.warn('OpenAI API key is invalid, skipping TP/SL analysis');
+        return;
+      }
+      
       // Prepare comprehensive market analysis for OpenAI
       const analysisPrompt = `
 As a professional crypto trading analyst, provide precise Take Profit (TP) and Stop Loss (SL) recommendations for ${symbol}.
@@ -1025,6 +1031,11 @@ Consider current market volatility, support/resistance levels, and the ${trading
       }
       
       const connection = openaiConnections.connections[0];
+      
+      // Check if the connection has an error status (invalid API key)
+      if (connection.status === 'error') {
+        throw new Error('OpenAI API key is invalid or not configured properly. Please update your OpenAI API key in the settings.');
+      }
       console.log('Using OpenAI connection:', connection.id);
       
       // Create comprehensive analysis prompt
