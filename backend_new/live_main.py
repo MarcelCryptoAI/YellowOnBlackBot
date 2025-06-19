@@ -1596,7 +1596,7 @@ async def execute_strategy_signal(request: dict):
             "qty": str(quantity),
             "timeInForce": "GTC",
             "reduceOnly": False,
-            "positionIdx": 1 if signal.upper() == "BUY" else 2
+            "positionIdx": 0  # One-Way mode
         }
         
         # Add price for limit orders
@@ -2055,7 +2055,7 @@ async def close_position(request: dict):
             orderType="Market",
             qty=position["size"],
             reduceOnly=True,
-            positionIdx=1 if close_side == "Buy" else 2
+            positionIdx=0  # One-Way mode
         )
         
         if result["retCode"] == 0:
@@ -2103,7 +2103,7 @@ async def modify_position(request: dict):
         modify_params = {
             "category": "linear",
             "symbol": symbol,
-            "positionIdx": 1 if side == "Buy" else 2
+            "positionIdx": 0  # One-Way mode
         }
         
         if "takeProfit" in request:
@@ -2202,7 +2202,7 @@ async def create_order(request: CreateOrderRequest, current_user: dict = Depends
             "qty": str(request.quantity),
             "timeInForce": request.timeInForce,
             "reduceOnly": request.reduceOnly,
-            "positionIdx": 1 if request.side.lower() == "buy" else 2  # 1=Buy side, 2=Sell side in hedge mode
+            "positionIdx": 0  # 0=One-Way mode (both buy/sell use same position)
         }
         
         # Add price for limit orders

@@ -24,6 +24,8 @@ interface TradingState {
   amount: number;
   amountPercent: number;
   usePercent: boolean;
+  marginMode: 'percentage' | 'fixed-usdt';
+  fixedUsdtAmount: number;
   
   // Trading direction and margin
   direction: 'long' | 'short';
@@ -203,6 +205,8 @@ const ManualOrderPage: React.FC = () => {
     amount: 0,
     amountPercent: 5,
     usePercent: true,
+    marginMode: 'percentage',
+    fixedUsdtAmount: 10,
     
     // Trading direction and margin
     direction: 'long',
@@ -1320,13 +1324,50 @@ Format your response as a structured analysis with clear sections for each aspec
   const availableAmount = accounts.find(acc => acc.id === tradingState.selectedAccount)?.balance.available || 0;
 
   return (
-    <div className="flex h-screen gap-12 p-8">
-      {/* Left Panel - Trading Interface - ULTRA THICK */}
-      <div className="w-[480px] glass-card border-r border-neon-cyan/30 flex flex-col animate-fade-in shadow-3d-lg">
+    <div className="flex h-screen gap-8 p-6">
+      {/* Left Panel - Trading Interface - WIDER */}
+      <div className="w-[600px] glass-card border-r border-neon-cyan/30 flex flex-col animate-fade-in shadow-3d-lg">
         {/* Page Title */}
-        <div className="p-8">
-          <h1 className="text-3xl font-orbitron font-black text-holographic mb-2">QUANTUM ORDERS</h1>
+        <div className="p-8 pb-4">
+          <h1 className="text-3xl font-orbitron font-black text-holographic mb-2">MANUAL ORDER</h1>
           <p className="text-sm font-rajdhani text-neon-cyan uppercase tracking-wider">Neural Trading Interface</p>
+        </div>
+
+        {/* AI Momentum Button - Featured at Top */}
+        <div className="px-8 pb-6">
+          <button
+            onClick={analyzeCoins}
+            disabled={isAnalyzingCoins}
+            className="w-full btn-holographic py-6 px-8 rounded-2xl font-orbitron font-bold text-lg relative overflow-hidden group transition-all duration-500 hover:scale-105"
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-purple-600/20 via-blue-600/20 to-cyan-600/20 group-hover:opacity-75 transition-opacity"></div>
+            <div className="relative flex items-center justify-center space-x-3">
+              {isAnalyzingCoins ? (
+                <>
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-neon-cyan"></div>
+                  <span>🧠 AI ANALYZING {analyzeProgress.currentCoin}</span>
+                </>
+              ) : (
+                <>
+                  <span className="text-2xl">🚀</span>
+                  <span className="bg-gradient-to-r from-purple-400 via-blue-400 to-cyan-400 bg-clip-text text-transparent">
+                    AI MOMENTUM ANALYSIS
+                  </span>
+                  <span className="text-2xl">🧠</span>
+                </>
+              )}
+            </div>
+            {isAnalyzingCoins && (
+              <div className="absolute bottom-2 left-8 right-8">
+                <div className="bg-gray-700 rounded-full h-1">
+                  <div 
+                    className="bg-gradient-to-r from-purple-500 to-cyan-500 h-1 rounded-full transition-all duration-300"
+                    style={{ width: `${analyzeProgress.total > 0 ? (analyzeProgress.current / analyzeProgress.total) * 100 : 0}%` }}
+                  ></div>
+                </div>
+              </div>
+            )}
+          </button>
         </div>
         {/* Tab Navigation */}
         <div className="border-b border-neon-cyan/30 px-8 py-6">
@@ -1359,8 +1400,8 @@ Format your response as a structured analysis with clear sections for each aspec
           </div>
         </div>
 
-        {/* Tab Content */}
-        <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6">
+        {/* Tab Content - No Scrollbar, Vertical Layout */}
+        <div className="flex-1 px-8 py-6 space-y-4">
           {activeTab === 'general' && (
             <>
               {/* Account Selection */}
@@ -1381,9 +1422,9 @@ Format your response as a structured analysis with clear sections for each aspec
                 </select>
               </div>
 
-              {/* Symbol Selection */}
+              {/* Symbol Selection - Better Alignment */}
               <div className="animate-fadeInUp animate-delay-2">
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between mb-3">
                   <label className="stat-title">Symbol</label>
                   <div className="flex items-center space-x-2">
                     <button
@@ -1435,7 +1476,7 @@ Format your response as a structured analysis with clear sections for each aspec
                 <select
                   value={tradingState.symbol}
                   onChange={(e) => updateTradingState('symbol', e.target.value)}
-                  className="glass-input"
+                  className="glass-input w-full text-lg font-medium"
                 >
                   {[...new Set(coins)].map(coin => (
                     <option key={coin} value={coin}>{coin}</option>
@@ -1443,8 +1484,8 @@ Format your response as a structured analysis with clear sections for each aspec
                 </select>
               </div>
 
-              {/* Direction Selection */}
-              <div className="animate-fadeInUp animate-delay-3">
+              {/* Direction Selection - Better Spacing */}
+              <div className="animate-fadeInUp animate-delay-3 mt-2">
                 <label className="stat-title">Direction</label>
                 <div className="flex space-x-2">
                   <button
@@ -1476,8 +1517,8 @@ Format your response as a structured analysis with clear sections for each aspec
                 </div>
               </div>
 
-              {/* Margin Type */}
-              <div className="animate-fadeInUp animate-delay-4">
+              {/* Margin Type - Better Spacing */}
+              <div className="animate-fadeInUp animate-delay-4 mt-2">
                 <label className="stat-title">Margin Type</label>
                 <div className="flex space-x-2">
                   <button
@@ -1569,31 +1610,96 @@ Format your response as a structured analysis with clear sections for each aspec
                 </div>
               </div>
 
-              {/* Amount Configuration */}
+              {/* Margin Configuration - Enhanced */}
               <div className="animate-fadeInUp animate-delay-5">
-                <label className="stat-title">
-                  {tradingState.usePercent ? 'Percentage Amount' : 'New Amount (USDT)'}
-                </label>
-                <div className="flex space-x-2">
-                  <input
-                    type="number"
-                    value={tradingState.usePercent ? tradingState.amountPercent : tradingState.amount}
-                    onChange={(e) => updateTradingState(
-                      tradingState.usePercent ? 'amountPercent' : 'amount', 
-                      parseFloat(e.target.value)
-                    )}
-                    className="flex-1 glass-input"
-                    step="0.01"
-                  />
+                <label className="stat-title">Margin Configuration</label>
+                
+                {/* Margin Mode Toggle */}
+                <div className="flex space-x-2 mb-4">
                   <button
-                    onClick={() => updateTradingState('usePercent', !tradingState.usePercent)}
-                    className="btn-secondary px-3 py-2 text-sm"
+                    onClick={() => updateTradingState('marginMode', 'percentage')}
+                    className={`flex-1 px-4 py-3 rounded-lg text-sm font-medium transition-all ${
+                      tradingState.marginMode === 'percentage'
+                        ? 'btn-primary'
+                        : 'btn-secondary'
+                    }`}
                   >
-                    {tradingState.usePercent ? '%' : '$'}
+                    📊 Percentage
+                  </button>
+                  <button
+                    onClick={() => updateTradingState('marginMode', 'fixed-usdt')}
+                    className={`flex-1 px-4 py-3 rounded-lg text-sm font-medium transition-all ${
+                      tradingState.marginMode === 'fixed-usdt'
+                        ? 'btn-primary'
+                        : 'btn-secondary'
+                    }`}
+                  >
+                    💰 Fixed USDT
                   </button>
                 </div>
-                <div className="text-xs text-gray-400 mt-1">
-                  Min: {tradingState.amount.toFixed(2)} Max: {availableAmount.toFixed(2)}
+
+                {/* Input based on selected mode */}
+                {tradingState.marginMode === 'percentage' ? (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-sm text-gray-400 mb-2 block">Percentage of Balance</label>
+                      <input
+                        type="number"
+                        value={tradingState.amountPercent}
+                        onChange={(e) => {
+                          const percent = parseFloat(e.target.value) || 0;
+                          updateTradingState('amountPercent', percent);
+                          updateTradingState('amount', (availableAmount * percent) / 100);
+                        }}
+                        className="w-full glass-input"
+                        step="0.1"
+                        min="0.1"
+                        max="100"
+                      />
+                      <div className="text-xs text-gray-400 mt-1">
+                        = ${((availableAmount * tradingState.amountPercent) / 100).toFixed(2)} USDT
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-sm text-gray-400 mb-2 block">Fixed USDT Amount</label>
+                      <input
+                        type="number"
+                        value={tradingState.fixedUsdtAmount}
+                        onChange={(e) => {
+                          const amount = parseFloat(e.target.value) || 0;
+                          updateTradingState('fixedUsdtAmount', amount);
+                          updateTradingState('amount', amount);
+                          updateTradingState('amountPercent', availableAmount > 0 ? (amount / availableAmount) * 100 : 0);
+                        }}
+                        className="w-full glass-input"
+                        step="1"
+                        min="1"
+                        max={availableAmount}
+                      />
+                      <div className="text-xs text-gray-400 mt-1">
+                        = {availableAmount > 0 ? ((tradingState.fixedUsdtAmount / availableAmount) * 100).toFixed(1) : '0.0'}% of balance
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Summary */}
+                <div className="bg-gray-800/50 rounded-lg p-3 mt-3 space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Position Size:</span>
+                    <span className="text-white font-medium">${tradingState.amount.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Percentage:</span>
+                    <span className="text-cyan-400 font-medium">{tradingState.amountPercent.toFixed(1)}%</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">With {tradingState.leverage}x leverage:</span>
+                    <span className="text-purple-400 font-bold">${(tradingState.amount * tradingState.leverage).toFixed(2)}</span>
+                  </div>
                 </div>
               </div>
 
@@ -1645,16 +1751,16 @@ Format your response as a structured analysis with clear sections for each aspec
                 <div className="flex space-x-2">
                   <input
                     type="number"
-                    value={tradingState.entryPriceFrom}
-                    onChange={(e) => updateTradingState('entryPriceFrom', parseFloat(e.target.value))}
+                    value={tradingState.entryPriceFrom.toFixed(1)}
+                    onChange={(e) => updateTradingState('entryPriceFrom', Math.round(parseFloat(e.target.value) * 10) / 10)}
                     className="flex-1 glass-input"
                     step="0.1"
                   />
                   <span className="text-gray-400 self-center">-</span>
                   <input
                     type="number"
-                    value={tradingState.entryPriceTo}
-                    onChange={(e) => updateTradingState('entryPriceTo', parseFloat(e.target.value))}
+                    value={tradingState.entryPriceTo.toFixed(1)}
+                    onChange={(e) => updateTradingState('entryPriceTo', Math.round(parseFloat(e.target.value) * 10) / 10)}
                     className="flex-1 glass-input"
                     step="0.1"
                   />
@@ -1785,16 +1891,16 @@ Format your response as a structured analysis with clear sections for each aspec
                     <div className="flex space-x-2">
                       <input
                         type="number"
-                        value={tradingState.takeProfitPriceFrom}
-                        onChange={(e) => updateTradingState('takeProfitPriceFrom', parseFloat(e.target.value))}
+                        value={tradingState.takeProfitPriceFrom.toFixed(1)}
+                        onChange={(e) => updateTradingState('takeProfitPriceFrom', Math.round(parseFloat(e.target.value) * 10) / 10)}
                         className="flex-1 glass-input"
                         step="0.1"
                       />
                       <span className="text-gray-400 self-center">-</span>
                       <input
                         type="number"
-                        value={tradingState.takeProfitPriceTo}
-                        onChange={(e) => updateTradingState('takeProfitPriceTo', parseFloat(e.target.value))}
+                        value={tradingState.takeProfitPriceTo.toFixed(1)}
+                        onChange={(e) => updateTradingState('takeProfitPriceTo', Math.round(parseFloat(e.target.value) * 10) / 10)}
                         className="flex-1 glass-input"
                         step="0.1"
                       />
@@ -2032,8 +2138,8 @@ Format your response as a structured analysis with clear sections for each aspec
 
       {/* Right Panel - TradingView Chart - ULTRA THICK */}
       <div className="flex-1 relative animate-fade-in">
-        {/* Chart Header */}
-        <div className="absolute top-4 left-4 right-4 z-10 glass-panel rounded-2xl border-neon-purple/30 p-6 shadow-3d-lg">
+        {/* Chart Header - Better Positioning */}
+        <div className="absolute top-6 left-6 right-6 z-10 glass-panel rounded-2xl border-neon-purple/30 p-6 shadow-3d-lg">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-3">
@@ -2074,8 +2180,8 @@ Format your response as a structured analysis with clear sections for each aspec
           </div>
         </div>
         
-        {/* Chart Container */}
-        <div className="h-full pt-32 px-4 pb-4">
+        {/* Chart Container - Lowered with More Spacing */}
+        <div className="h-full pt-40 px-6 pb-6">
           <div className="w-full h-full rounded-3xl overflow-hidden relative glass-card shadow-3d-lg">
             {!chartLoaded ? (
               <div className="absolute inset-0 flex items-center justify-center text-gray-400">
