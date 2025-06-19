@@ -48,7 +48,7 @@ class WebSocketService {
   private serverUrl = 'https://ctb-backend-api-5b94a2e25dad.herokuapp.com';
   
   constructor() {
-    this.connect();
+    // Don't auto-connect - let the main WebSocketManager handle connections
   }
   
   /**

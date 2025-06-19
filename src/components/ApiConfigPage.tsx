@@ -647,7 +647,7 @@ const ApiConfigPage: React.FC = () => {
           
           <div className="space-y-4">
             {openaiConnections.length > 0 ? (
-              openaiConnections.map((connection) => (
+              openaiConnections.filter(connection => connection && connection.connectionId).map((connection) => (
                 <div key={connection.connectionId} className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-900 to-black rounded-lg border border-gray-700/40 hover:border-green-400/30 transition-all group/item">
                   <div className="flex items-center space-x-4">
                     <div className="flex items-center space-x-3">
