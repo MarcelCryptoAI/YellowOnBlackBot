@@ -268,11 +268,56 @@ def get_live_account_data(api_key: str, secret_key: str, connection_name: str = 
                         "timestamp": datetime.now(timezone.utc).isoformat()
                     })
         
-        # Get recent orders
+        # Get recent orders with proper P&L calculation
         orders_result = session.get_order_history(category="linear")
         order_history = []
         if orders_result["retCode"] == 0:
             for order in orders_result["result"]["list"]:  # All orders
+                # Calculate P&L for filled orders
+                pnl = 0
+                pnl_percent = 0
+                
+                if order.get("orderStatus") == "Filled":
+                    try:
+                        entry_price = float(order.get("avgPrice", "0") or order.get("price", "0") or "0")
+                        qty = float(order.get("qty", "0") or "0")
+                        cumulative_exec_value = float(order.get("cumExecValue", "0") or "0")
+                        cumulative_exec_fee = float(order.get("cumExecFee", "0") or "0")
+                        
+                        if entry_price > 0 and qty > 0:
+                            # Use ByBit's execution data for accurate P&L
+                            # For closed orders, we need to check if this was closing a position
+                            side = order.get("side")
+                            
+                            # Get execution details for better P&L calculation
+                            try:
+                                exec_result = session.get_executions(
+                                    category="linear",
+                                    orderId=order.get("orderId")
+                                )
+                                
+                                if exec_result.get("retCode") == 0 and exec_result.get("result", {}).get("list"):
+                                    total_exec_pnl = 0
+                                    total_exec_fee = 0
+                                    
+                                    for execution in exec_result["result"]["list"]:
+                                        exec_pnl = float(execution.get("closedPnl", "0") or "0")
+                                        exec_fee = float(execution.get("execFee", "0") or "0")
+                                        total_exec_pnl += exec_pnl
+                                        total_exec_fee += exec_fee
+                                    
+                                    pnl = total_exec_pnl - total_exec_fee
+                                    
+                                    if cumulative_exec_value > 0:
+                                        pnl_percent = (pnl / cumulative_exec_value) * 100
+                            except Exception as e:
+                                print(f"Error getting execution details for order {order.get('orderId')}: {e}")
+                                # Fallback to basic calculation
+                                pnl = -cumulative_exec_fee  # At least account for fees
+                                
+                    except (ValueError, TypeError) as e:
+                        print(f"Error calculating P&L for order {order.get('orderId')}: {e}")
+                
                 order_history.append({
                     "id": order.get("orderId"),
                     "symbol": order.get("symbol"),
@@ -280,11 +325,12 @@ def get_live_account_data(api_key: str, secret_key: str, connection_name: str = 
                     "amount": float(order.get("qty", "0") or "0"),
                     "entryPrice": float(order.get("price", "0") or "0"),
                     "currentPrice": float(order.get("avgPrice", "0") or order.get("price", "0") or "0"),
-                    "pnl": 0,
-                    "pnlPercent": 0,
+                    "pnl": round(pnl, 4),
+                    "pnlPercent": round(pnl_percent, 2),
                     "status": "CLOSED" if order.get("orderStatus") == "Filled" else "CANCELLED",
                     "exchange": "ByBit",
-                    "timestamp": order.get("createdTime", datetime.now(timezone.utc).isoformat())
+                    "timestamp": order.get("createdTime", datetime.now(timezone.utc).isoformat()),
+                    "fees": float(order.get("cumExecFee", "0") or "0")
                 })
         
         return {

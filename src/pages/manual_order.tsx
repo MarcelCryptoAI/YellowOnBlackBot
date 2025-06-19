@@ -1336,7 +1336,7 @@ Format your response as a structured analysis with clear sections for each aspec
         {/* AI Momentum Button - Featured at Top */}
         <div className="px-8 pb-6">
           <button
-            onClick={analyzeCoins}
+            onClick={analyzeCoinsWithAI}
             disabled={isAnalyzingCoins}
             className="w-full btn-holographic py-6 px-8 rounded-2xl font-orbitron font-bold text-lg relative overflow-hidden group transition-all duration-500 hover:scale-105"
           >
