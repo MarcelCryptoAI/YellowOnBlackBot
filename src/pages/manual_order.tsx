@@ -1848,21 +1848,21 @@ Format your response as a structured analysis with clear sections for each aspec
   const availableAmount = accounts.find(acc => acc.id === tradingState.selectedAccount)?.balance.available || 0;
 
   return (
-    <div className="flex h-screen gap-8 p-6 overflow-hidden">
+    <div className="flex h-screen gap-4 p-4 overflow-hidden">
       {/* Left Panel - Trading Interface - WIDER */}
       <div className="w-[600px] glass-card border-r border-neon-cyan/30 flex flex-col animate-fade-in shadow-3d-lg h-full overflow-hidden">
         {/* Page Title */}
-        <div className="p-8 pb-4">
-          <h1 className="text-3xl font-orbitron font-black text-holographic mb-2">MANUAL ORDER</h1>
-          <p className="text-sm font-rajdhani text-neon-cyan uppercase tracking-wider">Neural Trading Interface</p>
+        <div className="p-4 pb-2">
+          <h1 className="text-2xl font-orbitron font-black text-holographic mb-1">MANUAL ORDER</h1>
+          <p className="text-xs font-rajdhani text-neon-cyan uppercase tracking-wider">Neural Trading Interface</p>
         </div>
 
         {/* AI Momentum Button - Featured at Top */}
-        <div className="px-8 pb-6">
+        <div className="px-4 pb-3">
           <button
             onClick={analyzeCoinsWithAI}
             disabled={isAnalyzingCoins}
-            className="w-full btn-holographic py-6 px-8 rounded-2xl font-orbitron font-bold text-lg relative overflow-hidden group transition-all duration-500 hover:scale-105"
+            className="w-full btn-holographic py-3 px-6 rounded-2xl font-orbitron font-bold text-base relative overflow-hidden group transition-all duration-500 hover:scale-105"
           >
             <div className="absolute inset-0 bg-gradient-to-r from-purple-600/20 via-blue-600/20 to-cyan-600/20 group-hover:opacity-75 transition-opacity"></div>
             <div className="relative flex items-center justify-center space-x-3">
@@ -1894,8 +1894,8 @@ Format your response as a structured analysis with clear sections for each aspec
           </button>
         </div>
         {/* Tab Navigation */}
-        <div className="border-b border-neon-cyan/30 px-8 py-6">
-          <div className="glass-panel px-3 py-3 rounded-2xl border-neon-cyan/20">
+        <div className="border-b border-neon-cyan/30 px-4 py-3">
+          <div className="glass-panel px-2 py-2 rounded-2xl border-neon-cyan/20">
             <div className="flex space-x-2">
               {[
                 { id: 'general', label: 'Neural Core', icon: '🧠' },
@@ -1928,7 +1928,7 @@ Format your response as a structured analysis with clear sections for each aspec
         </div>
 
         {/* Tab Content - Scrollable, Vertical Layout */}
-        <div className="flex-1 px-8 py-6 space-y-4 overflow-y-auto">
+        <div className="flex-1 px-4 py-3 space-y-3 overflow-y-auto min-h-0">
           {/* Debug indicator */}
           <div className="text-xs text-gray-500 mb-2">Active tab: {activeTab}</div>
           {activeTab === 'general' && (
@@ -2677,7 +2677,7 @@ Format your response as a structured analysis with clear sections for each aspec
       {/* Right Panel - TradingView Chart - ULTRA THICK */}
       <div className="flex-1 relative animate-fade-in h-full overflow-hidden">
         {/* Chart Header - Better Positioning */}
-        <div className="absolute top-6 left-6 right-6 z-10 glass-panel rounded-2xl border-neon-purple/30 p-6 shadow-3d-lg">
+        <div className="absolute top-4 left-4 right-4 z-10 glass-panel rounded-2xl border-neon-purple/30 p-4 shadow-3d-lg">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-3">
@@ -2747,8 +2747,8 @@ Format your response as a structured analysis with clear sections for each aspec
         </div>
         
         {/* Chart Container - Lowered with More Spacing */}
-        <div className="h-full pt-40 px-6 pb-6">
-          <div className="w-full h-[calc(100%-160px)] rounded-3xl overflow-hidden relative glass-card shadow-3d-lg">
+        <div className="h-full pt-24 px-4 pb-4">
+          <div className="w-full h-[calc(100%-96px)] rounded-3xl overflow-hidden relative glass-card shadow-3d-lg">
             {!chartLoaded ? (
               <div className="absolute inset-0 flex items-center justify-center text-gray-400">
                 <div className="text-center">
