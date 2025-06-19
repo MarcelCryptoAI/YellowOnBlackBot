@@ -687,6 +687,68 @@ const ManualOrderPage: React.FC = () => {
           timeframe = '4H-1D observation';
         }
         
+        // Calculate TP and SL levels based on score and technicals
+        const isLongBias = score >= 60;
+        const currentPrice = price;
+        let takeProfits = [];
+        let stopLoss = null;
+        
+        if (isLongBias) {
+          // LONG trade levels
+          takeProfits = [
+            {
+              level: 1,
+              price: currentPrice * 1.02, // 2% TP
+              percentage: 2.0,
+              description: "Conservative TP"
+            },
+            {
+              level: 2, 
+              price: currentPrice * 1.04, // 4% TP
+              percentage: 4.0,
+              description: "Moderate TP"
+            },
+            {
+              level: 3,
+              price: Math.min(technicals.resistance, currentPrice * 1.08), // 8% or resistance
+              percentage: ((Math.min(technicals.resistance, currentPrice * 1.08) - currentPrice) / currentPrice * 100),
+              description: "Aggressive TP"
+            }
+          ];
+          stopLoss = {
+            price: Math.max(technicals.support, currentPrice * 0.96), // 4% SL or support
+            percentage: -Math.abs((Math.max(technicals.support, currentPrice * 0.96) - currentPrice) / currentPrice * 100),
+            description: "Support-based SL"
+          };
+        } else {
+          // SHORT trade levels  
+          takeProfits = [
+            {
+              level: 1,
+              price: currentPrice * 0.98, // 2% TP
+              percentage: -2.0,
+              description: "Conservative TP"
+            },
+            {
+              level: 2,
+              price: currentPrice * 0.96, // 4% TP 
+              percentage: -4.0,
+              description: "Moderate TP"
+            },
+            {
+              level: 3,
+              price: Math.max(technicals.support, currentPrice * 0.92), // 8% or support
+              percentage: -Math.abs((currentPrice - Math.max(technicals.support, currentPrice * 0.92)) / currentPrice * 100),
+              description: "Aggressive TP"
+            }
+          ];
+          stopLoss = {
+            price: Math.min(technicals.resistance, currentPrice * 1.04), // 4% SL or resistance
+            percentage: Math.abs((Math.min(technicals.resistance, currentPrice * 1.04) - currentPrice) / currentPrice * 100),
+            description: "Resistance-based SL"
+          };
+        }
+
         return {
           symbol: coinData.symbol,
           score: Math.round(Math.max(0, Math.min(100, score))),
@@ -706,7 +768,17 @@ const ManualOrderPage: React.FC = () => {
           riskLevel,
           timeframe,
           confidence: `${Math.floor(score * 0.9 + 10)}%`,
-          marketData: coinData
+          marketData: coinData,
+          tradeAdvice: {
+            direction: isLongBias ? 'LONG' : 'SHORT',
+            takeProfits,
+            stopLoss,
+            entryZone: {
+              min: isLongBias ? technicals.support : Math.min(technicals.resistance, currentPrice * 1.02),
+              max: isLongBias ? (technicals.support + currentPrice) / 2 : technicals.resistance,
+              current: currentPrice
+            }
+          }
         };
       }));
       
@@ -2877,6 +2949,29 @@ Format your response as a structured analysis with clear sections for each aspec
                         </div>
                       </div>
 
+                      {/* Trade Recommendation */}
+                      <div className="mb-4 p-4 bg-gradient-to-r from-gray-800/50 to-gray-900/50 rounded-lg border border-cyan-400/30">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            <span className="text-xl">🎯</span>
+                            <div>
+                              <div className="text-white font-bold">TRADE RECOMMENDATION</div>
+                              <div className={`text-lg font-bold ${
+                                coin.score >= 60 ? 'text-green-300' : coin.score >= 40 ? 'text-orange-300' : 'text-red-300'
+                              }`}>
+                                {coin.score >= 60 ? '📈 LONG BIAS' : coin.score >= 40 ? '⚠️ NEUTRAL' : '📉 SHORT BIAS'}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-gray-400 text-sm">Entry Zone</div>
+                            <div className="text-cyan-300 font-bold">
+                              ${coin.tradeAdvice?.entryZone?.min?.toFixed(4) || 'N/A'} - ${coin.tradeAdvice?.entryZone?.max?.toFixed(4) || 'N/A'}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
                       {/* Main Content */}
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         {/* Reasons */}
@@ -2903,50 +2998,62 @@ Format your response as a structured analysis with clear sections for each aspec
                           </h4>
                           <div className="space-y-2 text-sm">
                             <div className="flex justify-between">
+                              <span className="text-gray-400">24h Change:</span>
+                              <span className={`font-medium ${
+                                coin.marketData?.change24h >= 0 ? 'text-green-300' : 'text-red-300'
+                              }`}>{coin.marketData?.change24h >= 0 ? '+' : ''}{coin.marketData?.change24h?.toFixed(2) || 'N/A'}%</span>
+                            </div>
+                            <div className="flex justify-between">
                               <span className="text-gray-400">RSI (14):</span>
                               <span className={`font-medium ${
                                 coin.technicals.rsi > 70 ? 'text-red-300' :
                                 coin.technicals.rsi > 50 ? 'text-orange-300' :
                                 'text-green-300'
-                              }`}>{coin.technicals.rsi}</span>
+                              }`}>{coin.technicals.rsi?.toFixed(1) || 'N/A'}</span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-gray-400">MACD:</span>
                               <span className="text-green-300 font-medium">{coin.technicals.macd}</span>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-gray-400">EMA20:</span>
-                              <span className="text-blue-300 font-medium">{coin.technicals.ema20}</span>
+                              <span className="text-gray-400">Support:</span>
+                              <span className="text-cyan-300 font-medium">${coin.technicals.support?.toFixed(4) || 'N/A'}</span>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-gray-400">Volume:</span>
-                              <span className="text-purple-300 font-medium">{coin.technicals.volume}</span>
+                              <span className="text-gray-400">Resistance:</span>
+                              <span className="text-orange-300 font-medium">${coin.technicals.resistance?.toFixed(4) || 'N/A'}</span>
                             </div>
                           </div>
                         </div>
 
-                        {/* Prediction & Risk */}
+                        {/* TP & SL Levels */}
                         <div>
                           <h4 className="text-white font-medium mb-3 flex items-center">
-                            <span className="mr-2">🎯</span>
-                            Outlook
+                            <span className="mr-2">💰</span>
+                            Trade Levels
                           </h4>
-                          <div className="space-y-3 text-sm">
-                            <div>
-                              <span className="text-gray-400 block mb-1">Prediction:</span>
-                              <span className="text-green-300">{coin.prediction}</span>
+                          <div className="space-y-2 text-sm">
+                            {coin.tradeAdvice?.takeProfits?.map((tp, index) => (
+                              <div key={index} className="flex justify-between">
+                                <span className="text-gray-400">TP{tp.level}:</span>
+                                <span className="text-green-300 font-medium">
+                                  ${tp.price?.toFixed(4)} ({tp.percentage?.toFixed(1)}%)
+                                </span>
+                              </div>
+                            ))}
+                            <div className="flex justify-between border-t border-gray-600 pt-2">
+                              <span className="text-gray-400">Stop Loss:</span>
+                              <span className="text-red-300 font-medium">
+                                ${coin.tradeAdvice?.stopLoss?.price?.toFixed(4)} ({coin.tradeAdvice?.stopLoss?.percentage?.toFixed(1)}%)
+                              </span>
                             </div>
-                            <div>
-                              <span className="text-gray-400 block mb-1">Risk Level:</span>
+                            <div className="flex justify-between">
+                              <span className="text-gray-400">Risk Level:</span>
                               <span className={`font-medium ${
-                                coin.riskLevel === 'Medium-Low' ? 'text-green-300' :
+                                coin.riskLevel === 'Low' ? 'text-green-300' :
                                 coin.riskLevel === 'Medium' ? 'text-orange-300' :
-                                'text-orange-300'
+                                'text-red-300'
                               }`}>{coin.riskLevel}</span>
-                            </div>
-                            <div>
-                              <span className="text-gray-400 block mb-1">Optimal Timeframe:</span>
-                              <span className="text-blue-300">{coin.timeframe}</span>
                             </div>
                           </div>
                         </div>
