@@ -50,7 +50,13 @@ interface OutletContext {
 
 const ApiConfigPage: React.FC = () => {
   const context = useOutletContext<OutletContext>();
-  const { systemStatus, backendStatus, totalValue } = context;
+  
+  // Provide fallback values if context is undefined
+  const { 
+    systemStatus = { openai: false, bybit: false, backend: false, frontend: true, mexc: false, binance: false }, 
+    backendStatus = 'disconnected', 
+    totalValue = 0 
+  } = context || {};
   
   const [currentUser] = useState(() => userStorage.getCurrentUser());
   const [hasStoredCredentials, setHasStoredCredentials] = useState(false);
@@ -61,6 +67,8 @@ const ApiConfigPage: React.FC = () => {
   const [showConnectionDetails, setShowConnectionDetails] = useState(false);
   const [isTesting, setIsTesting] = useState({ bybit: false, openai: false });
   const [lastSaved, setLastSaved] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const [apiCredentials, setApiCredentials] = useState<ApiCredentials>({
     bybit: {
@@ -82,8 +90,21 @@ const ApiConfigPage: React.FC = () => {
 
   // Load data on mount
   useEffect(() => {
-    loadStoredData();
-    loadConnections();
+    const initializePage = async () => {
+      try {
+        setIsLoading(true);
+        setLoadError(null);
+        await loadStoredData();
+        await loadConnections();
+      } catch (error) {
+        console.error('Error initializing API config page:', error);
+        setLoadError(error instanceof Error ? error.message : 'Failed to load page data');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    initializePage();
   }, []);
 
   const loadStoredData = () => {
@@ -368,6 +389,37 @@ const ApiConfigPage: React.FC = () => {
       default: return 'text-gray-500';
     }
   };
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-blue mx-auto mb-4"></div>
+          <p className="text-white text-lg">Loading API Configuration...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (loadError) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="text-red-400 text-6xl mb-4">⚠️</div>
+          <p className="text-white text-lg mb-4">Failed to load API Configuration</p>
+          <p className="text-gray-400 text-sm mb-6">{loadError}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="bg-primary-blue hover:bg-primary-blue-dark text-white px-6 py-2 rounded-lg transition-all"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
