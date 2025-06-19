@@ -45,9 +45,7 @@ class WebSocketService {
   private isConnecting = false;
   private listeners: Map<string, Function[]> = new Map();
   
-  private serverUrl = process.env.NODE_ENV === 'production' 
-    ? window.location.origin.replace(/^http/, 'ws') 
-    : 'http://localhost:6789';
+  private serverUrl = 'https://ctb-backend-api-5b94a2e25dad.herokuapp.com';
   
   constructor() {
     this.connect();

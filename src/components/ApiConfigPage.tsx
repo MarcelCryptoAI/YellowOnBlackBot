@@ -655,12 +655,12 @@ const ApiConfigPage: React.FC = () => {
                       <div>
                         <div className="flex items-center space-x-2">
                           <span className="text-white font-bold text-base">OpenAI API</span>
-                          <span className="px-2 py-1 text-xs bg-green-500/20 text-green-300 border border-green-500/40 rounded">{connection.subscription.plan}</span>
+                          <span className="px-2 py-1 text-xs bg-green-500/20 text-green-300 border border-green-500/40 rounded">{connection.subscription?.plan || 'Unknown'}</span>
                         </div>
                         <div className="flex items-center space-x-2 text-xs text-gray-400">
-                          <span>Credits: ${connection.subscription.remainingCredits.toFixed(2)} / ${connection.subscription.creditLimit}</span>
+                          <span>Credits: ${connection.subscription?.remainingCredits?.toFixed(2) || '0.00'} / ${connection.subscription?.creditLimit || '0'}</span>
                           <span>•</span>
-                          <span>{connection.subscription.status}</span>
+                          <span>{connection.subscription?.status || 'Unknown'}</span>
                         </div>
                       </div>
                     </div>
@@ -668,11 +668,11 @@ const ApiConfigPage: React.FC = () => {
                   
                   <div className="flex items-center space-x-6">
                     <div className="text-right">
-                      <div className="text-white font-bold">${connection.usage.month.cost.toFixed(2)}</div>
+                      <div className="text-white font-bold">${connection.usage?.month?.cost?.toFixed(2) || '0.00'}</div>
                       <div className="text-xs text-gray-400">This month</div>
                       <div className="flex items-center space-x-1 text-xs">
-                        <span className={connection.usage.trends.daily >= 0 ? 'text-green-400' : 'text-red-400'}>
-                          {connection.usage.trends.daily >= 0 ? '+' : ''}{connection.usage.trends.daily.toFixed(1)}%
+                        <span className={(connection.usage?.trends?.daily || 0) >= 0 ? 'text-green-400' : 'text-red-400'}>
+                          {(connection.usage?.trends?.daily || 0) >= 0 ? '+' : ''}{(connection.usage?.trends?.daily || 0).toFixed(1)}%
                         </span>
                         <span className="text-gray-500">daily</span>
                       </div>
@@ -683,14 +683,14 @@ const ApiConfigPage: React.FC = () => {
                       <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
                         <div 
                           className={`h-full transition-all duration-300 ${
-                            connection.subscription.usagePercentage > 80 ? 'bg-red-400' : 
-                            connection.subscription.usagePercentage > 60 ? 'bg-accent-orange' : 'bg-green-400'
+                            (connection.subscription?.usagePercentage || 0) > 80 ? 'bg-red-400' : 
+                            (connection.subscription?.usagePercentage || 0) > 60 ? 'bg-accent-orange' : 'bg-green-400'
                           }`}
-                          style={{ width: `${Math.min(connection.subscription.usagePercentage, 100)}%` }}
+                          style={{ width: `${Math.min(connection.subscription?.usagePercentage || 0, 100)}%` }}
                         />
                       </div>
                       <div className="text-center text-xs text-gray-400 mt-1">
-                        {connection.subscription.usagePercentage.toFixed(0)}%
+                        {(connection.subscription?.usagePercentage || 0).toFixed(0)}%
                       </div>
                     </div>
                     
