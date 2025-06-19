@@ -1789,9 +1789,9 @@ Format your response as a structured analysis with clear sections for each aspec
   const availableAmount = accounts.find(acc => acc.id === tradingState.selectedAccount)?.balance.available || 0;
 
   return (
-    <div className="flex h-screen gap-8 p-6">
+    <div className="flex min-h-screen gap-8 p-6">
       {/* Left Panel - Trading Interface - WIDER */}
-      <div className="w-[600px] glass-card border-r border-neon-cyan/30 flex flex-col animate-fade-in shadow-3d-lg">
+      <div className="w-[600px] glass-card border-r border-neon-cyan/30 flex flex-col animate-fade-in shadow-3d-lg max-h-screen">
         {/* Page Title */}
         <div className="p-8 pb-4">
           <h1 className="text-3xl font-orbitron font-black text-holographic mb-2">MANUAL ORDER</h1>
@@ -1868,8 +1868,8 @@ Format your response as a structured analysis with clear sections for each aspec
           </div>
         </div>
 
-        {/* Tab Content - No Scrollbar, Vertical Layout */}
-        <div className="flex-1 px-8 py-6 space-y-4">
+        {/* Tab Content - Scrollable, Vertical Layout */}
+        <div className="flex-1 px-8 py-6 space-y-4 overflow-y-auto min-h-0">
           {/* Debug indicator */}
           <div className="text-xs text-gray-500 mb-2">Active tab: {activeTab}</div>
           {activeTab === 'general' && (
@@ -2557,8 +2557,8 @@ Format your response as a structured analysis with clear sections for each aspec
           )}
         </div>
 
-        {/* Bottom Section */}
-        <div className="border-t border-cyan-400/20 p-4 space-y-4">
+        {/* Bottom Section - Sticky Footer */}
+        <div className="border-t border-cyan-400/20 p-4 space-y-4 bg-gray-900/80 backdrop-blur-sm">
           {/* Available & Trade Amount */}
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
