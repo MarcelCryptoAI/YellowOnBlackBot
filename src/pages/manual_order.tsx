@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { bybitApi, openaiApi } from '../services/api';
 import { coinsService } from '../services/coinsService';
+import { calculateTechnicalIndicators, type TechnicalIndicators } from '../services/technicalIndicators';
 
 // Types
 interface Account {
@@ -561,60 +562,150 @@ const ManualOrderPage: React.FC = () => {
         throw new Error('No market data retrieved. Check API connection.');
       }
       
-      // Calculate score for each coin based on multiple factors
-      const scoredCoins = allMarketData.map(coinData => {
+      // Calculate score for each coin with real technical analysis
+      console.log('🔬 Calculating technical indicators for all coins...');
+      
+      const scoredCoins = await Promise.all(allMarketData.map(async (coinData) => {
         const change24h = coinData.change24h || 0;
         const volume24h = coinData.volume24h || 0;
         const price = coinData.price || 0;
         
-        // Scoring algorithm (0-100 points)
-        let score = 50; // Base score
+        // Get real technical indicators
+        const technicals = await calculateTechnicalIndicators(coinData.symbol);
         
-        // 24h change factor (up to 30 points)
+        // Advanced scoring algorithm (0-100 points) with technical analysis
+        let score = 40; // Base score (lowered to accommodate technical factors)
+        
+        // 24h change factor (up to 25 points)
         if (change24h > 0) {
-          score += Math.min(30, change24h * 2); // 2 points per % gain, capped at 30
+          score += Math.min(25, change24h * 1.8);
         } else {
-          score += Math.max(-20, change24h * 1.5); // Penalty for losses
+          score += Math.max(-15, change24h * 1.2);
         }
         
-        // Volume factor (up to 20 points) 
-        const volumeScore = Math.min(20, Math.log10(volume24h / 1000000) * 5); // Log scale for volume
+        // Volume factor (up to 15 points)
+        const volumeScore = Math.min(15, Math.log10(volume24h / 1000000) * 4);
         score += Math.max(0, volumeScore);
         
-        // Price momentum factor (up to 10 points)
-        if (change24h > 2) score += 10; // Strong momentum bonus
-        else if (change24h > 0.5) score += 5; // Moderate momentum
+        // RSI factor (up to 20 points)
+        if (technicals.rsi > 30 && technicals.rsi < 70) {
+          // Sweet spot RSI
+          score += 20;
+        } else if (technicals.rsi >= 70 && technicals.rsi < 80) {
+          // Overbought but still bullish
+          score += 10;
+        } else if (technicals.rsi <= 30) {
+          // Oversold - potential bounce
+          score += 15;
+        } else if (technicals.rsi >= 80) {
+          // Extremely overbought - risky
+          score -= 10;
+        }
         
-        // Volatility consideration (adjust risk)
-        const riskLevel = Math.abs(change24h) > 10 ? 'High' : 
-                         Math.abs(change24h) > 5 ? 'Medium' : 'Low';
+        // MACD factor (up to 15 points)
+        if (technicals.macd.trend === 'Bullish') {
+          score += 15;
+        } else if (technicals.macd.trend === 'Neutral') {
+          score += 5;
+        } else {
+          score -= 10;
+        }
+        
+        // Trend factor (up to 10 points)
+        if (technicals.trend === 'Uptrend') {
+          score += 10;
+        } else if (technicals.trend === 'Sideways') {
+          score += 2;
+        } else {
+          score -= 5;
+        }
+        
+        // Momentum factor (up to 15 points)
+        switch (technicals.momentum) {
+          case 'Strong Bullish':
+            score += 15;
+            break;
+          case 'Bullish':
+            score += 10;
+            break;
+          case 'Neutral':
+            score += 0;
+            break;
+          case 'Bearish':
+            score -= 8;
+            break;
+          case 'Strong Bearish':
+            score -= 15;
+            break;
+        }
+        
+        // Risk assessment
+        const riskLevel = 
+          technicals.rsi > 80 || Math.abs(change24h) > 15 ? 'High' :
+          technicals.rsi > 70 || Math.abs(change24h) > 8 ? 'Medium' : 'Low';
+        
+        // Generate comprehensive analysis reasons
+        const reasons = [
+          `24h Change: ${change24h >= 0 ? '+' : ''}${change24h.toFixed(2)}%`,
+          `Volume 24h: $${(volume24h / 1000000).toFixed(1)}M`,
+          `RSI: ${technicals.rsi.toFixed(1)} (${technicals.rsi > 70 ? 'Overbought' : technicals.rsi < 30 ? 'Oversold' : 'Neutral'})`,
+          `MACD: ${technicals.macd.trend}`,
+          `Trend: ${technicals.trend}`,
+          `Momentum: ${technicals.momentum}`,
+          `Support: $${technicals.support.toFixed(4)}`,
+          `Resistance: $${technicals.resistance.toFixed(4)}`
+        ];
+        
+        // Enhanced prediction based on all factors
+        let prediction = '';
+        if (score >= 80 && technicals.momentum === 'Strong Bullish') {
+          prediction = 'Exceptional bullish setup - Strong upward momentum expected';
+        } else if (score >= 70 && technicals.trend === 'Uptrend') {
+          prediction = 'Strong bullish potential with favorable technicals';
+        } else if (score >= 60) {
+          prediction = 'Moderate bullish bias - Good entry opportunity';
+        } else if (score >= 50) {
+          prediction = 'Neutral outlook - Wait for clearer signals';
+        } else if (score >= 40) {
+          prediction = 'Weak momentum - Consider alternative assets';
+        } else {
+          prediction = 'Bearish setup - High risk of downside';
+        }
+        
+        // Optimal timeframe based on momentum and volatility
+        let timeframe = '';
+        if (technicals.momentum === 'Strong Bullish' && Math.abs(change24h) > 5) {
+          timeframe = '5M-15M scalping';
+        } else if (technicals.momentum === 'Bullish' && technicals.trend === 'Uptrend') {
+          timeframe = '15M-1H swing';
+        } else if (technicals.trend === 'Uptrend') {
+          timeframe = '1H-4H position';
+        } else {
+          timeframe = '4H-1D observation';
+        }
         
         return {
           symbol: coinData.symbol,
-          score: Math.round(Math.max(0, Math.min(100, score))), // Clamp 0-100
-          momentum: change24h > 5 ? 'Very High' : change24h > 2 ? 'High' : change24h > 0 ? 'Medium' : 'Low',
-          reasons: [
-            `24h Change: ${change24h >= 0 ? '+' : ''}${change24h.toFixed(2)}%`,
-            `Volume 24h: $${(volume24h / 1000000).toFixed(1)}M`,
-            `Current Price: $${price.toFixed(price < 1 ? 4 : 2)}`,
-            change24h > 2 ? 'Strong bullish momentum' : 
-            change24h > 0 ? 'Positive momentum' : 'Consolidation phase'
-          ],
+          score: Math.round(Math.max(0, Math.min(100, score))),
+          momentum: technicals.momentum,
+          reasons,
           technicals: {
-            rsi: change24h > 0 ? Math.floor(Math.random() * 20) + 60 : Math.floor(Math.random() * 20) + 40,
-            macd: change24h > 2 ? 'Strong Bullish' : change24h > 0 ? 'Bullish' : 'Neutral',
-            ema20: change24h > 2 ? 'Above' : change24h > 0 ? 'Near' : 'Below',
-            volume: `${change24h >= 0 ? '+' : ''}${change24h.toFixed(1)}%`
+            rsi: technicals.rsi,
+            macd: technicals.macd.trend,
+            ema20: price > technicals.ema20 ? 'Above' : price < technicals.ema20 ? 'Below' : 'At',
+            volume: `${change24h >= 0 ? '+' : ''}${change24h.toFixed(1)}%`,
+            support: technicals.support,
+            resistance: technicals.resistance,
+            trend: technicals.trend,
+            macdValues: technicals.macd
           },
-          prediction: change24h > 5 ? 'Strong upward momentum expected' : 
-                     change24h > 2 ? 'Moderate bullish potential' : 
-                     change24h > 0 ? 'Consolidation with upside' : 'Range-bound trading expected',
+          prediction,
           riskLevel,
-          timeframe: change24h > 5 ? '5M-1H scalping' : change24h > 2 ? '15M-4H optimal' : '1H-1D swing',
-          confidence: `${Math.floor(score * 0.8 + 20)}%`, // Scale score to confidence %
-          marketData: coinData // Store raw data for reference
+          timeframe,
+          confidence: `${Math.floor(score * 0.9 + 10)}%`,
+          marketData: coinData
         };
-      });
+      }));
       
       // Sort by score (highest first) - SHOW ALL COINS
       const allScoredCoins = scoredCoins
@@ -664,6 +755,155 @@ const ManualOrderPage: React.FC = () => {
     // Auto-fill parameters based on current price
     if (currentPrice > 0) {
       autoFillParameters(symbol, currentPrice);
+    }
+    
+    // Automatically get AI TP/SL recommendations
+    await getAiTpSlRecommendations(symbol);
+  };
+
+  const getAiTpSlRecommendations = async (symbol: string) => {
+    try {
+      console.log(`🤖 Getting AI TP/SL recommendations for ${symbol}...`);
+      
+      // Get current market data and technicals
+      const marketResponse = await bybitApi.getMarketData([symbol]);
+      if (!marketResponse.success || marketResponse.data.length === 0) {
+        throw new Error('Unable to fetch market data for TP/SL analysis');
+      }
+      
+      const marketData = marketResponse.data[0];
+      const technicals = await calculateTechnicalIndicators(symbol);
+      
+      // Get OpenAI connections for analysis
+      const openaiConnections = await openaiApi.getConnections();
+      if (!openaiConnections.success || openaiConnections.data.length === 0) {
+        console.warn('No OpenAI connections available for TP/SL analysis');
+        return;
+      }
+      
+      const connection = openaiConnections.data[0];
+      
+      // Prepare comprehensive market analysis for OpenAI
+      const analysisPrompt = `
+As a professional crypto trading analyst, provide precise Take Profit (TP) and Stop Loss (SL) recommendations for ${symbol}.
+
+CURRENT MARKET DATA:
+- Symbol: ${symbol}
+- Current Price: $${marketData.price}
+- 24h Change: ${marketData.change24h}%
+- Volume 24h: $${(marketData.volume24h / 1000000).toFixed(1)}M
+
+TECHNICAL ANALYSIS:
+- RSI: ${technicals.rsi.toFixed(1)} (${technicals.rsi > 70 ? 'Overbought' : technicals.rsi < 30 ? 'Oversold' : 'Neutral'})
+- MACD: ${technicals.macd.trend} (${technicals.macd.macd.toFixed(4)})
+- Trend: ${technicals.trend}
+- Momentum: ${technicals.momentum}
+- Support Level: $${technicals.support}
+- Resistance Level: $${technicals.resistance}
+- EMA20: $${technicals.ema20}
+- EMA50: $${technicals.ema50}
+
+TRADING SETUP:
+- Direction: ${tradingState.direction.toUpperCase()}
+- Leverage: ${tradingState.leverage}x
+- Position Size: $${tradingState.amount}
+- Risk Level: Based on RSI and volatility
+
+Please provide:
+1. Take Profit levels (3 levels: Conservative, Moderate, Aggressive)
+2. Stop Loss level (risk-adjusted based on volatility and support/resistance)
+3. Risk/Reward ratio for each TP level
+4. Entry recommendations if current price isn't optimal
+
+Format your response as JSON:
+{
+  "takeProfits": [
+    {"level": 1, "price": 0.0000, "percentage": 0.0, "description": "Conservative TP"},
+    {"level": 2, "price": 0.0000, "percentage": 0.0, "description": "Moderate TP"},
+    {"level": 3, "price": 0.0000, "percentage": 0.0, "description": "Aggressive TP"}
+  ],
+  "stopLoss": {"price": 0.0000, "percentage": 0.0, "description": "Risk-adjusted SL"},
+  "optimalEntry": {"price": 0.0000, "reasoning": "Why this entry is better"},
+  "riskReward": {"conservative": 0.0, "moderate": 0.0, "aggressive": 0.0},
+  "recommendation": "Overall trading recommendation",
+  "timeframe": "Optimal holding period",
+  "confidence": 85
+}
+
+Consider current market volatility, support/resistance levels, and the ${tradingState.direction} direction for ${symbol}.
+`;
+
+      // Send analysis request to OpenAI
+      const analysisResponse = await openaiApi.generateAnalysis(connection.id, {
+        prompt: analysisPrompt,
+        symbol: symbol,
+        marketData: marketData,
+        technicals: technicals,
+        tradingState: tradingState
+      });
+      
+      if (analysisResponse.success && analysisResponse.data) {
+        try {
+          // Parse OpenAI response
+          const aiRecommendations = JSON.parse(analysisResponse.data.analysis || '{}');
+          
+          console.log('🎯 AI TP/SL Recommendations:', aiRecommendations);
+          
+          if (aiRecommendations.takeProfits && aiRecommendations.stopLoss) {
+            // Auto-apply recommendations to trading state
+            await applyAiRecommendations(aiRecommendations);
+            
+            // Show success notification
+            alert(`✅ AI Recommendations Applied!\n\nTake Profits:\n${aiRecommendations.takeProfits.map(tp => `${tp.description}: $${tp.price} (+${tp.percentage}%)`).join('\n')}\n\nStop Loss: $${aiRecommendations.stopLoss.price} (${aiRecommendations.stopLoss.percentage}%)\n\nConfidence: ${aiRecommendations.confidence}%`);
+          }
+          
+        } catch (parseError) {
+          console.error('Error parsing AI recommendations:', parseError);
+          console.log('Raw AI response:', analysisResponse.data.analysis);
+        }
+      }
+      
+    } catch (error) {
+      console.error('❌ Error getting AI TP/SL recommendations:', error);
+    }
+  };
+  
+  const applyAiRecommendations = async (recommendations: any) => {
+    try {
+      console.log('🔧 Applying AI recommendations to trading settings...');
+      
+      // Enable take profits and apply levels
+      updateTradingState('takeProfitsEnabled', true);
+      updateTradingState('numberOfTakeProfits', Math.min(recommendations.takeProfits.length, 3));
+      
+      // Apply take profit prices
+      if (recommendations.takeProfits.length >= 1) {
+        updateTradingState('takeProfitPriceFrom', recommendations.takeProfits[0].price);
+      }
+      if (recommendations.takeProfits.length >= 2) {
+        updateTradingState('takeProfitPriceTo', recommendations.takeProfits[recommendations.takeProfits.length - 1].price);
+      }
+      
+      // Apply stop loss
+      if (recommendations.stopLoss) {
+        updateTradingState('stopEnabled', true);
+        const currentPrice = tradingState.symbol ? await loadCurrentPrice(tradingState.symbol) : 0;
+        if (currentPrice > 0) {
+          const slPercentage = Math.abs((recommendations.stopLoss.price - currentPrice) / currentPrice * 100);
+          updateTradingState('stopLossPercent', slPercentage);
+        }
+      }
+      
+      // Apply optimal entry if suggested
+      if (recommendations.optimalEntry && recommendations.optimalEntry.price !== currentPrice) {
+        // Could update entry price range here if we had that feature
+        console.log(`💡 Optimal entry suggested: $${recommendations.optimalEntry.price} - ${recommendations.optimalEntry.reasoning}`);
+      }
+      
+      console.log('✅ AI recommendations successfully applied to trading settings');
+      
+    } catch (error) {
+      console.error('❌ Error applying AI recommendations:', error);
     }
   };
 
@@ -1847,15 +2087,24 @@ Format your response as a structured analysis with clear sections for each aspec
 
           {activeTab === 'take-profits' && (
             <>
-              {/* Take-Profits Toggle */}
+              {/* Take-Profits Toggle with AI Button */}
               <div className="flex items-center justify-between animate-fadeInUp animate-delay-1">
                 <span className="stat-title">Take-Profits</span>
-                <input
-                  type="checkbox"
-                  checked={tradingState.takeProfitsEnabled}
-                  onChange={(e) => updateTradingState('takeProfitsEnabled', e.target.checked)}
-                  className="w-5 h-5 text-cyan-400 glass-input p-1"
-                />
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={() => getAiTpSlRecommendations(tradingState.symbol)}
+                    className="btn-primary text-xs px-3 py-1.5 rounded-lg font-medium"
+                    disabled={!tradingState.symbol}
+                  >
+                    🤖 AI TP/SL
+                  </button>
+                  <input
+                    type="checkbox"
+                    checked={tradingState.takeProfitsEnabled}
+                    onChange={(e) => updateTradingState('takeProfitsEnabled', e.target.checked)}
+                    className="w-5 h-5 text-cyan-400 glass-input p-1"
+                  />
+                </div>
               </div>
 
               {tradingState.takeProfitsEnabled && (

@@ -3261,6 +3261,67 @@ async def get_trade_stats(
         logger.error(f"Error getting trade stats: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/market/klines")
+async def get_klines(symbol: str, interval: str = "1h", limit: int = 100):
+    """Get kline/candlestick data for technical analysis"""
+    try:
+        logger.info(f"Getting klines for {symbol}, interval={interval}, limit={limit}")
+        
+        # Get first available connection for market data
+        connections = get_connections()
+        if not connections:
+            raise HTTPException(status_code=400, detail="No ByBit connections available")
+        
+        connection = connections[0]  # Use first connection for market data
+        session = connection["session"]
+        
+        # Get kline data from ByBit
+        result = session.get_kline(
+            category="linear",
+            symbol=symbol,
+            interval=interval,
+            limit=limit
+        )
+        
+        if result.get("retCode") != 0:
+            logger.error(f"ByBit API error: {result.get('retMsg', 'Unknown error')}")
+            raise HTTPException(status_code=400, detail=f"ByBit API error: {result.get('retMsg', 'Unknown error')}")
+        
+        klines = result.get("result", {}).get("list", [])
+        
+        # Convert ByBit format to standard format
+        # ByBit kline format: [timestamp, open, high, low, close, volume, turnover]
+        formatted_klines = []
+        for kline in klines:
+            if len(kline) >= 6:
+                formatted_klines.append([
+                    int(kline[0]),      # timestamp
+                    float(kline[1]),    # open
+                    float(kline[2]),    # high
+                    float(kline[3]),    # low
+                    float(kline[4]),    # close
+                    float(kline[5])     # volume
+                ])
+        
+        # Sort by timestamp (oldest first) for proper technical analysis
+        formatted_klines.sort(key=lambda x: x[0])
+        
+        logger.info(f"Retrieved {len(formatted_klines)} klines for {symbol}")
+        
+        return {
+            "success": True,
+            "data": formatted_klines,
+            "symbol": symbol,
+            "interval": interval,
+            "count": len(formatted_klines)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting klines for {symbol}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 if __name__ == "__main__":
     print("🚀 Starting CTB Live ByBit Backend")
     print("📍 Server: http://localhost:8000")
