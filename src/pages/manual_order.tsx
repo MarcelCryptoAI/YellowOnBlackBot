@@ -2040,7 +2040,7 @@ Format your response as a structured analysis with clear sections for each aspec
 
               {/* Symbol Selection - Better Alignment */}
               <div className="animate-fadeInUp animate-delay-2">
-                <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center justify-between mb-1">
                   <label className="stat-title">Symbol</label>
                   <div className="flex items-center space-x-2">
                     <button
@@ -2068,7 +2068,7 @@ Format your response as a structured analysis with clear sections for each aspec
                 
                 {/* Progress indicator during analysis */}
                 {isAnalyzingCoins && (
-                  <div className="mb-3 p-3 glass-card-small border border-orange-400/30">
+                  <div className="mb-1 p-1 glass-card-small border border-orange-400/30">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs text-orange-300 font-medium">Scanning Coins...</span>
                       <span className="text-xs text-gray-400">ETA: {analyzeProgress.eta}</span>
@@ -2231,10 +2231,10 @@ Format your response as a structured analysis with clear sections for each aspec
                 <label className="stat-title">Margin Configuration</label>
                 
                 {/* Margin Mode Toggle */}
-                <div className="flex space-x-2 mb-4">
+                <div className="flex space-x-1 mb-1">
                   <button
                     onClick={() => updateTradingState('marginMode', 'percentage')}
-                    className={`flex-1 px-4 py-3 rounded-lg text-sm font-medium transition-all ${
+                    className={`flex-1 px-2 py-1 rounded-lg text-sm font-medium transition-all ${
                       tradingState.marginMode === 'percentage'
                         ? 'btn-primary'
                         : 'btn-secondary'
@@ -2244,7 +2244,7 @@ Format your response as a structured analysis with clear sections for each aspec
                   </button>
                   <button
                     onClick={() => updateTradingState('marginMode', 'fixed-usdt')}
-                    className={`flex-1 px-4 py-3 rounded-lg text-sm font-medium transition-all ${
+                    className={`flex-1 px-2 py-1 rounded-lg text-sm font-medium transition-all ${
                       tradingState.marginMode === 'fixed-usdt'
                         ? 'btn-primary'
                         : 'btn-secondary'
@@ -2256,7 +2256,7 @@ Format your response as a structured analysis with clear sections for each aspec
 
                 {/* Input based on selected mode */}
                 {tradingState.marginMode === 'percentage' ? (
-                  <div className="space-y-3">
+                  <div className="space-y-1">
                     <div>
                       <label className="text-sm text-gray-400 mb-2 block">Percentage of Balance</label>
                       <input
@@ -2278,7 +2278,7 @@ Format your response as a structured analysis with clear sections for each aspec
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-1">
                     <div>
                       <label className="text-sm text-gray-400 mb-2 block">Fixed USDT Amount</label>
                       <input
@@ -2303,7 +2303,7 @@ Format your response as a structured analysis with clear sections for each aspec
                 )}
 
                 {/* Summary */}
-                <div className="bg-gray-800/50 rounded-lg p-3 mt-3 space-y-1 text-sm">
+                <div className="bg-gray-800/50 rounded-lg p-1 mt-1 space-y-1 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-400">Position Size:</span>
                     <span className="text-white font-medium">${tradingState.amount.toFixed(2)}</span>
@@ -2335,7 +2335,7 @@ Format your response as a structured analysis with clear sections for each aspec
               <div className="animate-fadeInUp animate-delay-1">
                 <div className="flex items-center justify-between mb-2">
                   <label className="stat-title">Entry Strategy</label>
-                  <button className="btn-secondary text-sm px-3 py-1">Custom Strategies</button>
+                  <button className="btn-secondary text-sm px-1 py-1">Custom Strategies</button>
                 </div>
                 <select
                   value={tradingState.entryStrategy}
@@ -2398,7 +2398,7 @@ Format your response as a structured analysis with clear sections for each aspec
                   </button>
                 </div>
                 
-                <div className="glass-card-small p-3 space-y-2">
+                <div className="glass-card-small p-1 space-y-1">
                   <div className="grid grid-cols-4 gap-2 text-xs text-gray-400 font-medium">
                     <div>Price</div>
                     <div>Ratio</div>
@@ -2423,7 +2423,7 @@ Format your response as a structured analysis with clear sections for each aspec
               </div>
 
               {/* Trailing Entry */}
-              <div className="space-y-3 animate-fadeInUp animate-delay-5">
+              <div className="space-y-1 animate-fadeInUp animate-delay-5">
                 <div className="flex items-center justify-between">
                   <span className="stat-title">Trailing Entry</span>
                   <input
@@ -2464,7 +2464,7 @@ Format your response as a structured analysis with clear sections for each aspec
                 <div className="flex items-center space-x-3">
                   <button
                     onClick={() => getAiTpSlRecommendations(tradingState.symbol)}
-                    className="btn-primary text-xs px-3 py-1.5 rounded-lg font-medium"
+                    className="btn-primary text-xs px-1 py-1 rounded-lg font-medium"
                     disabled={!tradingState.symbol}
                   >
                     🤖 AI TP/SL
@@ -2484,7 +2484,7 @@ Format your response as a structured analysis with clear sections for each aspec
                   <div className="animate-fadeInUp animate-delay-2">
                     <div className="flex items-center justify-between mb-2">
                       <label className="stat-title">Take-Profit Strategy</label>
-                      <button className="btn-secondary text-sm px-3 py-1">Custom Strategies</button>
+                      <button className="btn-secondary text-sm px-1 py-1">Custom Strategies</button>
                     </div>
                     <select
                       value={tradingState.takeProfitStrategy}
@@ -2544,7 +2544,7 @@ Format your response as a structured analysis with clear sections for each aspec
                       </button>
                     </div>
                     
-                    <div className="glass-card-small p-3 space-y-2">
+                    <div className="glass-card-small p-1 space-y-1">
                       <div className="grid grid-cols-5 gap-2 text-xs text-gray-400 font-medium">
                         <div>Price</div>
                         <div>Ratio</div>
@@ -2704,7 +2704,7 @@ Format your response as a structured analysis with clear sections for each aspec
         </div>
 
         {/* Bottom Section - Sticky Footer */}
-        <div className="border-t border-cyan-400/20 p-4 space-y-4 bg-gray-900/80 backdrop-blur-sm">
+        <div className="border-t border-cyan-400/20 p-1 space-y-1 bg-gray-900/80 backdrop-blur-sm">
           {/* Available & Trade Amount */}
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
@@ -2723,7 +2723,7 @@ Format your response as a structured analysis with clear sections for each aspec
               <button 
                 onClick={optimizeWithAI}
                 disabled={isOptimizing}
-                className="flex-1 btn-primary py-3"
+                className="flex-1 btn-primary py-1"
               >
                 <span className={isOptimizing ? 'animate-spin' : ''}>🤖</span>
                 <span>{isOptimizing ? 'Optimizing...' : 'AI Optimize'}</span>
@@ -2731,7 +2731,7 @@ Format your response as a structured analysis with clear sections for each aspec
               <button 
                 onClick={() => autoFillParameters(tradingState.symbol, currentPrice)}
                 disabled={isOptimizing}
-                className="flex-1 btn-secondary py-3"
+                className="flex-1 btn-secondary py-1"
               >
                 <span>⚙️</span>
                 <span>Auto-Fill</span>
@@ -2746,7 +2746,7 @@ Format your response as a structured analysis with clear sections for each aspec
                 <span className={isGeneratingAdvice ? 'animate-spin' : ''}>💡</span>
                 <span>{isGeneratingAdvice ? 'Analyzing...' : 'AI Advice'}</span>
               </button>
-              <button className="flex-1 btn-secondary px-4 py-2 text-sm">
+              <button className="flex-1 btn-secondary px-1 py-1 text-sm">
                 📝 Free Text
               </button>
             </div>
@@ -2754,7 +2754,7 @@ Format your response as a structured analysis with clear sections for each aspec
           
           <button 
             onClick={createTrade}
-            className="w-full btn-primary py-3 font-bold"
+            className="w-full btn-primary py-1 font-bold"
           >
             Create Trade
           </button>
@@ -2764,7 +2764,7 @@ Format your response as a structured analysis with clear sections for each aspec
       {/* Right Panel - TradingView Chart - ULTRA THICK */}
       <div className="flex-1 relative animate-fade-in h-full overflow-hidden">
         {/* Chart Header - Better Positioning */}
-        <div className="absolute top-4 left-4 right-4 z-10 glass-panel rounded-2xl border-neon-purple/30 p-4 shadow-3d-lg">
+        <div className="absolute top-1 left-1 right-1 z-10 glass-panel rounded-2xl border-neon-purple/30 p-1 shadow-3d-lg">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-3">
@@ -2774,18 +2774,18 @@ Format your response as a structured analysis with clear sections for each aspec
                   <div className="text-neon-cyan font-rajdhani text-sm">Neural Analysis Active</div>
                 </div>
               </div>
-              <div className="glass-panel px-4 py-2 rounded-xl border-neon-green/20">
+              <div className="glass-panel px-1 py-1 rounded-xl border-neon-green/20">
                 <div className="text-gray-400 text-xs font-rajdhani uppercase tracking-wider">Live Price</div>
                 <div className="text-neon-green font-orbitron font-bold text-lg">${currentPrice.toLocaleString()}</div>
               </div>
             </div>
             
             {/* AI Order Advice Buttons */}
-            <div className="flex items-center justify-center space-x-4 my-4">
+            <div className="flex items-center justify-center space-x-1 my-1">
               <button
                 onClick={() => getAiOrderAdvice('5-15m')}
                 disabled={isGettingOrderAdvice || !tradingState.symbol}
-                className="btn-holographic px-6 py-3 rounded-xl font-orbitron font-bold text-sm relative overflow-hidden group transition-all duration-500 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn-holographic px-2 py-1 rounded-xl font-orbitron font-bold text-sm relative overflow-hidden group transition-all duration-500 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-600/20 via-cyan-600/20 to-purple-600/20 group-hover:opacity-75 transition-opacity"></div>
                 <div className="relative flex items-center space-x-2">
@@ -2797,7 +2797,7 @@ Format your response as a structured analysis with clear sections for each aspec
               <button
                 onClick={() => getAiOrderAdvice('1-4h')}
                 disabled={isGettingOrderAdvice || !tradingState.symbol}
-                className="btn-holographic px-6 py-3 rounded-xl font-orbitron font-bold text-sm relative overflow-hidden group transition-all duration-500 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn-holographic px-2 py-1 rounded-xl font-orbitron font-bold text-sm relative overflow-hidden group transition-all duration-500 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-purple-600/20 via-pink-600/20 to-orange-600/20 group-hover:opacity-75 transition-opacity"></div>
                 <div className="relative flex items-center space-x-2">
