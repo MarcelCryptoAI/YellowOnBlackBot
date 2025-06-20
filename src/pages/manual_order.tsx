@@ -1867,19 +1867,24 @@ Format your response as a structured analysis with clear sections for each aspec
         const orderPromises = [];
         
         for (const entry of tradeData.entryOrders) {
+          // Calculate quantity in contracts (for USDT perpetual, 1 contract = 1 unit of base currency)
+          const contractSize = entry.amount / entry.price;
+          
           const orderData = {
             connectionId: tradingState.selectedAccount,
             symbol: tradingState.symbol,
             side: tradingState.direction === 'long' ? 'buy' : 'sell' as 'buy' | 'sell',
             orderType: 'limit' as 'market' | 'limit',
-            quantity: entry.amount,
+            quantity: parseFloat(contractSize.toFixed(4)), // Round to 4 decimals
             price: entry.price,
             leverage: tradingState.leverage,
-            marginMode: tradingState.marginType,
-            timeInForce: 'GTC' as 'GTC' | 'IOC' | 'FOK'
+            marginMode: tradingState.marginType === 'isolated' ? 'isolated' : 'cross' as 'isolated' | 'cross',
+            timeInForce: 'GTC' as 'GTC' | 'IOC' | 'FOK',
+            reduceOnly: false
           };
           
           console.log(`📝 Creating entry order ${entry.id}:`, orderData);
+          console.log(`   Contract size: ${contractSize.toFixed(4)} (${entry.amount} USDT / ${entry.price} price)`);
           orderPromises.push(bybitApi.createTrade(orderData));
         }
         

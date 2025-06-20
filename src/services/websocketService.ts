@@ -63,12 +63,13 @@ class WebSocketService {
     console.log('🔌 Connecting to WebSocket server...');
     
     this.socket = io(this.serverUrl, {
-      transports: ['websocket'],
+      transports: ['polling', 'websocket'],
       autoConnect: true,
       reconnection: true,
       reconnectionAttempts: this.maxReconnectAttempts,
       reconnectionDelay: this.reconnectDelay,
-      timeout: 10000,
+      timeout: 20000,
+      forceNew: true,
     });
     
     this.setupEventHandlers();
