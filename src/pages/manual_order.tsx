@@ -1810,6 +1810,16 @@ Format your response as a structured analysis with clear sections for each aspec
         return;
       }
       
+      if (!tradingState.entryTargets || tradingState.entryTargets.length === 0) {
+        alert('Please configure entry targets first. Go to the "Entry Matrix" tab to set up your entries.');
+        return;
+      }
+      
+      if (tradingState.amount <= 0) {
+        alert('Please set a valid position amount');
+        return;
+      }
+      
       // Create trade logic here
       const tradeData = {
         symbol: tradingState.symbol,
@@ -1920,21 +1930,21 @@ Format your response as a structured analysis with clear sections for each aspec
   const availableAmount = accounts.find(acc => acc.id === tradingState.selectedAccount)?.balance.available || 0;
 
   return (
-    <div className="flex h-screen gap-4 p-4 overflow-hidden">
+    <div className="flex h-screen gap-1 p-1 overflow-hidden">
       {/* Left Panel - Trading Interface - WIDER */}
       <div className="w-[600px] glass-card border-r border-neon-cyan/30 flex flex-col animate-fade-in shadow-3d-lg h-full overflow-hidden">
         {/* Page Title */}
-        <div className="p-4 pb-2">
-          <h1 className="text-2xl font-orbitron font-black text-holographic mb-1">MANUAL ORDER</h1>
+        <div className="p-1 pb-1">
+          <h1 className="text-lg font-orbitron font-black text-holographic mb-1">MANUAL ORDER</h1>
           <p className="text-xs font-rajdhani text-neon-cyan uppercase tracking-wider">Neural Trading Interface</p>
         </div>
 
         {/* AI Momentum Button - Featured at Top */}
-        <div className="px-4 pb-3">
+        <div className="px-1 pb-1">
           <button
             onClick={analyzeCoinsWithAI}
             disabled={isAnalyzingCoins}
-            className="w-full btn-holographic py-3 px-6 rounded-2xl font-orbitron font-bold text-base relative overflow-hidden group transition-all duration-500 hover:scale-105"
+            className="w-full btn-holographic py-2 px-4 rounded-2xl font-orbitron font-bold text-sm relative overflow-hidden group transition-all duration-500 hover:scale-105"
           >
             <div className="absolute inset-0 bg-gradient-to-r from-purple-600/20 via-blue-600/20 to-cyan-600/20 group-hover:opacity-75 transition-opacity"></div>
             <div className="relative flex items-center justify-center space-x-3">
@@ -1966,9 +1976,9 @@ Format your response as a structured analysis with clear sections for each aspec
           </button>
         </div>
         {/* Tab Navigation */}
-        <div className="border-b border-neon-cyan/30 px-4 py-3">
-          <div className="glass-panel px-2 py-2 rounded-2xl border-neon-cyan/20">
-            <div className="flex space-x-2">
+        <div className="border-b border-neon-cyan/30 px-1 py-1">
+          <div className="glass-panel px-1 py-1 rounded-2xl border-neon-cyan/20">
+            <div className="flex space-x-1">
               {[
                 { id: 'general', label: 'Neural Core', icon: '🧠' },
                 { id: 'entries', label: 'Entry Matrix', icon: '🎯' },
@@ -1982,7 +1992,7 @@ Format your response as a structured analysis with clear sections for each aspec
                     setActiveTab(tab.id as any);
                   }}
                   className={`
-                    tab-futuristic px-6 py-4 rounded-xl font-rajdhani font-bold text-sm
+                    tab-futuristic px-3 py-2 rounded-xl font-rajdhani font-bold text-xs
                     flex flex-col items-center space-y-1 transition-all duration-300
                     ${activeTab === tab.id
                       ? 'bg-neon-cyan/20 text-white border-2 border-neon-cyan/50 shadow-neon-cyan'
@@ -1991,7 +2001,7 @@ Format your response as a structured analysis with clear sections for each aspec
                   `}
                   style={{ animationDelay: `${index * 0.1}s` }}
                 >
-                  <span className="text-lg">{tab.icon}</span>
+                  <span className="text-sm">{tab.icon}</span>
                   <span className="text-xs uppercase tracking-wider">{tab.label}</span>
                 </button>
               ))}
@@ -2000,7 +2010,7 @@ Format your response as a structured analysis with clear sections for each aspec
         </div>
 
         {/* Tab Content - Scrollable, Vertical Layout */}
-        <div className="flex-1 px-4 py-3 space-y-3 overflow-y-auto min-h-0">
+        <div className="flex-1 px-1 py-1 space-y-1 overflow-y-auto min-h-0">
           {/* Debug indicator */}
           <div className="text-xs text-gray-500 mb-2">Active tab: {activeTab}</div>
           {activeTab === 'general' && (
@@ -2086,31 +2096,31 @@ Format your response as a structured analysis with clear sections for each aspec
               </div>
 
               {/* Direction Selection - Better Spacing */}
-              <div className="animate-fadeInUp animate-delay-3 mt-2">
+              <div className="animate-fadeInUp animate-delay-3 mt-1">
                 <label className="stat-title">Direction</label>
-                <div className="flex space-x-2">
+                <div className="flex space-x-1">
                   <button
                     onClick={() => updateTradingState('direction', 'long')}
-                    className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all duration-300 ${
+                    className={`flex-1 py-2 px-2 rounded-lg font-medium transition-all duration-300 ${
                       tradingState.direction === 'long'
                         ? 'bg-green-500 hover:bg-green-400 text-white border-2 border-green-400 shadow-lg shadow-green-500/50'
                         : 'bg-gray-700 hover:bg-gray-600 text-gray-300 border-2 border-gray-600'
                     }`}
                   >
-                    <span className="flex items-center justify-center space-x-2">
+                    <span className="flex items-center justify-center space-x-1">
                       <span>📈</span>
                       <span>Long</span>
                     </span>
                   </button>
                   <button
                     onClick={() => updateTradingState('direction', 'short')}
-                    className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all duration-300 ${
+                    className={`flex-1 py-2 px-2 rounded-lg font-medium transition-all duration-300 ${
                       tradingState.direction === 'short'
                         ? 'bg-red-500 hover:bg-red-400 text-white border-2 border-red-400 shadow-lg shadow-red-500/50'
                         : 'bg-gray-700 hover:bg-gray-600 text-gray-300 border-2 border-gray-600'
                     }`}
                   >
-                    <span className="flex items-center justify-center space-x-2">
+                    <span className="flex items-center justify-center space-x-1">
                       <span>📉</span>
                       <span>Short</span>
                     </span>
@@ -2119,31 +2129,31 @@ Format your response as a structured analysis with clear sections for each aspec
               </div>
 
               {/* Margin Type - Better Spacing */}
-              <div className="animate-fadeInUp animate-delay-4 mt-2">
+              <div className="animate-fadeInUp animate-delay-4 mt-1">
                 <label className="stat-title">Margin Type</label>
-                <div className="flex space-x-2">
+                <div className="flex space-x-1">
                   <button
                     onClick={() => updateTradingState('marginType', 'isolated')}
-                    className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all duration-300 ${
+                    className={`flex-1 py-2 px-2 rounded-lg font-medium transition-all duration-300 ${
                       tradingState.marginType === 'isolated'
                         ? 'bg-blue-500 hover:bg-blue-400 text-white border-2 border-blue-400 shadow-lg shadow-blue-500/50'
                         : 'bg-gray-700 hover:bg-gray-600 text-gray-300 border-2 border-gray-600'
                     }`}
                   >
-                    <span className="flex items-center justify-center space-x-2">
+                    <span className="flex items-center justify-center space-x-1">
                       <span>🔒</span>
                       <span>Isolated</span>
                     </span>
                   </button>
                   <button
                     onClick={() => updateTradingState('marginType', 'cross')}
-                    className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all duration-300 ${
+                    className={`flex-1 py-2 px-2 rounded-lg font-medium transition-all duration-300 ${
                       tradingState.marginType === 'cross'
                         ? 'bg-purple-500 hover:bg-purple-400 text-white border-2 border-purple-400 shadow-lg shadow-purple-500/50'
                         : 'bg-gray-700 hover:bg-gray-600 text-gray-300 border-2 border-gray-600'
                     }`}
                   >
-                    <span className="flex items-center justify-center space-x-2">
+                    <span className="flex items-center justify-center space-x-1">
                       <span>🔗</span>
                       <span>Cross</span>
                     </span>
