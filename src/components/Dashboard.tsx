@@ -43,7 +43,7 @@ const PositionCard: React.FC<{ position: Position }> = ({ position }) => (
           ${position.direction === 'LONG' ? 'status-online' : 'status-offline'}
         `}></div>
         <div>
-          <div className="text-white font-orbitron font-bold text-lg tracking-wide">
+          <div className="text-white font-orbitron font-bold text-xs tracking-wide">
             {position.symbol}
           </div>
           <div className="text-xs text-neon-cyan font-rajdhani font-bold uppercase tracking-[0.2em]">
@@ -52,7 +52,7 @@ const PositionCard: React.FC<{ position: Position }> = ({ position }) => (
         </div>
       </div>
       <div className={`
-        font-orbitron font-black text-xl group-hover:scale-110 transition-transform duration-300
+        font-orbitron font-black text-xs group-hover:scale-110 transition-transform duration-300
         ${position.pnl >= 0 ? 'text-neon-green' : 'text-neon-red'}
       `}>
         {position.pnl >= 0 ? '+' : ''}${position.pnl?.toFixed(2) || '0.00'}
@@ -70,7 +70,7 @@ const StrategyCard: React.FC<{ strategy: Strategy }> = ({ strategy }) => (
           ${strategy.status === 'ACTIVE' ? 'status-online' : 'status-offline'}
         `}></div>
         <div>
-          <div className="text-white font-orbitron font-bold text-lg tracking-wide">
+          <div className="text-white font-orbitron font-bold text-xs tracking-wide">
             {strategy.name}
           </div>
           <div className="text-xs text-neon-purple font-rajdhani font-bold uppercase tracking-[0.2em]">
@@ -79,7 +79,7 @@ const StrategyCard: React.FC<{ strategy: Strategy }> = ({ strategy }) => (
         </div>
       </div>
       <div className="text-right">
-        <div className="text-neon-green font-orbitron font-black text-xl group-hover:scale-110 transition-transform duration-300">
+        <div className="text-neon-green font-orbitron font-black text-xs group-hover:scale-110 transition-transform duration-300">
           +${strategy.profit.toFixed(2)}
         </div>
         <div className="text-xs text-gray-400 font-rajdhani font-bold">{strategy.winRate}% win</div>
@@ -224,10 +224,10 @@ export const Dashboard: React.FC = () => {
       <div className="relative z-10">
         <div className="flex items-center justify-between mb-12 animate-fade-in">
           <div className="relative">
-            <h1 className="text-7xl font-orbitron font-black text-holographic mb-4">
+            <h1 className="text-xs font-orbitron font-black text-holographic mb-4">
               NEURAL COMMAND
             </h1>
-            <p className="text-2xl font-rajdhani text-neon-cyan uppercase tracking-[0.4em] font-bold">
+            <p className="text-sm font-rajdhani text-neon-cyan uppercase tracking-[0.4em] font-bold">
               ⚡ QUANTUM TRADING MATRIX ⚡
             </p>
             
@@ -240,9 +240,9 @@ export const Dashboard: React.FC = () => {
               onClick={refreshData}
               disabled={isRefreshing}
               variant="cyan"
-              className="flex items-center space-x-3 px-8 py-4 text-lg"
+              className="flex items-center space-x-3 px-8 py-4 text-xs"
             >
-              <span className={`text-2xl ${isRefreshing ? 'animate-spin' : ''}`}>⚡</span>
+              <span className={`text-sm ${isRefreshing ? 'animate-spin' : ''}`}>⚡</span>
               <span className="font-rajdhani font-bold uppercase tracking-wider">
                 {isRefreshing ? 'SYNCING' : 'QUANTUM SYNC'}
               </span>
@@ -250,9 +250,9 @@ export const Dashboard: React.FC = () => {
             <GlassButton
               onClick={() => setShowWidgetConfig(true)}
               variant="purple"
-              className="flex items-center space-x-3 px-8 py-4 text-lg"
+              className="flex items-center space-x-3 px-8 py-4 text-xs"
             >
-              <span className="text-2xl">⚙️</span>
+              <span className="text-sm">⚙️</span>
               <span className="font-rajdhani font-bold uppercase tracking-wider">MATRIX CONFIG</span>
             </GlassButton>
           </div>
@@ -328,8 +328,8 @@ export const Dashboard: React.FC = () => {
         {widgetConfig.chart && (
           <div className="animate-fade-in mb-12" style={{ animationDelay: '0.6s' }}>
             <div className="glass-card">
-              <h3 className="text-3xl font-orbitron font-black text-holographic mb-8 uppercase tracking-wider flex items-center">
-                <span className="text-4xl mr-4">📊</span>
+              <h3 className="text-base font-orbitron font-black text-holographic mb-8 uppercase tracking-wider flex items-center">
+                <span className="text-xs mr-4">📊</span>
                 PORTFOLIO QUANTUM MATRIX
               </h3>
               <div className="glass-panel p-8">
@@ -345,8 +345,8 @@ export const Dashboard: React.FC = () => {
           {widgetConfig.currentPositions && (
             <div className="animate-fade-in" style={{ animationDelay: '0.7s' }}>
               <div className="glass-card">
-                <h3 className="text-3xl font-orbitron font-black text-neon-cyan mb-8 uppercase tracking-wider flex items-center">
-                  <span className="text-4xl mr-4">💼</span>
+                <h3 className="text-base font-orbitron font-black text-neon-cyan mb-8 uppercase tracking-wider flex items-center">
+                  <span className="text-xs mr-4">💼</span>
                   LIVE POSITIONS
                   <div className="ml-6 status-dot status-online"></div>
                 </h3>
@@ -359,8 +359,8 @@ export const Dashboard: React.FC = () => {
                     ))
                   ) : (
                     <div className="text-center py-16 glass-panel">
-                      <div className="text-8xl mb-6 animate-float">📈</div>
-                      <div className="font-orbitron font-bold text-2xl text-gray-400">NO ACTIVE POSITIONS</div>
+                      <div className="text-xs mb-6 animate-float">📈</div>
+                      <div className="font-orbitron font-bold text-sm text-gray-400">NO ACTIVE POSITIONS</div>
                       <div className="text-sm mt-2 text-gray-600 font-rajdhani">Waiting for quantum opportunities</div>
                     </div>
                   )}
@@ -373,11 +373,11 @@ export const Dashboard: React.FC = () => {
           {widgetConfig.activeStrategiesList && (
             <div className="animate-fade-in" style={{ animationDelay: '0.8s' }}>
               <div className="glass-card">
-                <h3 className="text-3xl font-orbitron font-black text-neon-purple mb-8 uppercase tracking-wider flex items-center">
-                  <span className="text-4xl mr-4">🧠</span>
+                <h3 className="text-base font-orbitron font-black text-neon-purple mb-8 uppercase tracking-wider flex items-center">
+                  <span className="text-xs mr-4">🧠</span>
                   NEURAL STRATEGIES
                   {strategiesLoading ? (
-                    <div className="ml-6 animate-spin text-2xl">🔄</div>
+                    <div className="ml-6 animate-spin text-sm">🔄</div>
                   ) : (
                     <div className="ml-6 status-dot status-online"></div>
                   )}
@@ -385,8 +385,8 @@ export const Dashboard: React.FC = () => {
                 <div className="space-y-6 max-h-[400px] overflow-y-auto">
                   {strategiesLoading ? (
                     <div className="text-center py-16 glass-panel">
-                      <div className="text-8xl mb-6 animate-spin">🔄</div>
-                      <div className="font-orbitron font-bold text-2xl text-gray-400">LOADING NEURAL NETWORKS...</div>
+                      <div className="text-xs mb-6 animate-spin">🔄</div>
+                      <div className="font-orbitron font-bold text-sm text-gray-400">LOADING NEURAL NETWORKS...</div>
                     </div>
                   ) : liveStrategies.filter(s => s.status === 'ACTIVE').length > 0 ? (
                     liveStrategies
@@ -398,8 +398,8 @@ export const Dashboard: React.FC = () => {
                       ))
                   ) : (
                     <div className="text-center py-16 glass-panel">
-                      <div className="text-8xl mb-6 animate-float">🤖</div>
-                      <div className="font-orbitron font-bold text-2xl text-gray-400">NO ACTIVE STRATEGIES</div>
+                      <div className="text-xs mb-6 animate-float">🤖</div>
+                      <div className="font-orbitron font-bold text-sm text-gray-400">NO ACTIVE STRATEGIES</div>
                       <div className="text-sm mt-2 text-gray-600 font-rajdhani">Deploy your first neural network</div>
                     </div>
                   )}
@@ -413,8 +413,8 @@ export const Dashboard: React.FC = () => {
         {widgetConfig.recentActivity && (
           <div className="animate-fade-in mt-12" style={{ animationDelay: '0.9s' }}>
             <div className="glass-card">
-              <h3 className="text-3xl font-orbitron font-black text-holographic mb-8 uppercase tracking-wider flex items-center">
-                <span className="text-4xl mr-4">🕒</span>
+              <h3 className="text-base font-orbitron font-black text-holographic mb-8 uppercase tracking-wider flex items-center">
+                <span className="text-xs mr-4">🕒</span>
                 QUANTUM ACTIVITY FEED
               </h3>
               <div className="space-y-6">
@@ -426,8 +426,8 @@ export const Dashboard: React.FC = () => {
                   ))
                 ) : (
                   <div className="text-center py-16 glass-panel">
-                    <div className="text-8xl mb-6 animate-float">📊</div>
-                    <div className="font-orbitron font-bold text-2xl text-gray-400">NO RECENT ACTIVITY</div>
+                    <div className="text-xs mb-6 animate-float">📊</div>
+                    <div className="font-orbitron font-bold text-sm text-gray-400">NO RECENT ACTIVITY</div>
                     <div className="text-sm mt-2 text-gray-600 font-rajdhani">Activity will appear here</div>
                   </div>
                 )}
@@ -445,7 +445,7 @@ export const Dashboard: React.FC = () => {
                   {/* Header */}
                   <div className="p-8 border-b border-white/10">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-2xl font-orbitron font-black text-holographic uppercase tracking-wider">
+                      <h3 className="text-sm font-orbitron font-black text-holographic uppercase tracking-wider">
                         ⚙️ WIDGET MATRIX
                       </h3>
                       <GlassButton
@@ -461,7 +461,7 @@ export const Dashboard: React.FC = () => {
                   {/* Content */}
                   <div className="flex-1 p-8 space-y-10 overflow-y-auto">
                     <div>
-                      <h4 className="text-neon-cyan font-orbitron font-bold mb-6 uppercase tracking-wider text-lg">
+                      <h4 className="text-neon-cyan font-orbitron font-bold mb-6 uppercase tracking-wider text-xs">
                         📊 METRICS CONTROL
                       </h4>
                       <div className="space-y-4">
@@ -473,8 +473,8 @@ export const Dashboard: React.FC = () => {
                         ].map(({ key, label, icon }) => (
                           <div key={key} className="glass-panel flex items-center justify-between">
                             <div className="flex items-center space-x-4">
-                              <span className="text-3xl">{icon}</span>
-                              <span className="text-white font-rajdhani font-bold text-lg">{label}</span>
+                              <span className="text-base">{icon}</span>
+                              <span className="text-white font-rajdhani font-bold text-xs">{label}</span>
                             </div>
                             <input
                               type="checkbox"
@@ -488,7 +488,7 @@ export const Dashboard: React.FC = () => {
                     </div>
 
                     <div>
-                      <h4 className="text-neon-purple font-orbitron font-bold mb-6 uppercase tracking-wider text-lg">
+                      <h4 className="text-neon-purple font-orbitron font-bold mb-6 uppercase tracking-wider text-xs">
                         📈 DISPLAY MATRIX
                       </h4>
                       <div className="space-y-4">
@@ -500,8 +500,8 @@ export const Dashboard: React.FC = () => {
                         ].map(({ key, label, icon }) => (
                           <div key={key} className="glass-panel flex items-center justify-between">
                             <div className="flex items-center space-x-4">
-                              <span className="text-3xl">{icon}</span>
-                              <span className="text-white font-rajdhani font-bold text-lg">{label}</span>
+                              <span className="text-base">{icon}</span>
+                              <span className="text-white font-rajdhani font-bold text-xs">{label}</span>
                             </div>
                             <input
                               type="checkbox"
@@ -522,7 +522,7 @@ export const Dashboard: React.FC = () => {
                           setShowWidgetConfig(false);
                         }}
                         variant="cyan"
-                        className="w-full py-4 text-lg"
+                        className="w-full py-4 text-xs"
                       >
                         💾 SAVE QUANTUM MATRIX
                       </GlassButton>
@@ -539,7 +539,7 @@ export const Dashboard: React.FC = () => {
           <div className="fixed inset-0 bg-black/90 backdrop-blur-2xl z-50 flex items-center justify-center animate-fade-in">
             <div className="glass-card max-w-lg w-full mx-6">
               <div className="text-center">
-                <div className="text-8xl mb-8 animate-float">
+                <div className="text-xs mb-8 animate-float">
                   {isRefreshing ? (
                     <span className="animate-spin">⚡</span>
                   ) : refreshProgress.includes('✅') ? (
@@ -548,11 +548,11 @@ export const Dashboard: React.FC = () => {
                     <span className="text-neon-red">❌</span>
                   )}
                 </div>
-                <h3 className="text-3xl font-orbitron font-black text-holographic mb-8 uppercase tracking-wider">
+                <h3 className="text-base font-orbitron font-black text-holographic mb-8 uppercase tracking-wider">
                   {isRefreshing ? 'NEURAL SYNC' : 'SYNC COMPLETE'}
                 </h3>
                 <div className="glass-panel mb-8">
-                  <p className="text-white font-rajdhani font-bold text-lg">{refreshProgress}</p>
+                  <p className="text-white font-rajdhani font-bold text-xs">{refreshProgress}</p>
                 </div>
                 {isRefreshing && (
                   <div className="progress-bar mb-6" style={{ '--progress': '100%' } as React.CSSProperties}></div>

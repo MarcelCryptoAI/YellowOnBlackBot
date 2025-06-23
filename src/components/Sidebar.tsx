@@ -40,7 +40,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle }) => {
         <div className="flex items-center justify-between">
           {!isCollapsed && (
             <div className="animate-fade-in">
-              <h2 className="text-lg font-rajdhani font-bold text-gradient uppercase tracking-wider">
+              <h2 className="text-xs font-rajdhani font-bold text-gradient uppercase tracking-wider">
                 Navigation
               </h2>
               <p className="text-xs text-gray-500 mt-1">System Control</p>
@@ -94,7 +94,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle }) => {
                   <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'space-x-4'}`}>
                     {/* Icon with 3D effect */}
                     <div className={`
-                      relative text-2xl
+                      relative text-sm
                       ${isActive ? 'animate-float' : 'group-hover:animate-bounce-slow'}
                       transition-all duration-300
                     `}
@@ -154,7 +154,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle }) => {
                 <span className="text-xs font-rajdhani text-gray-400 uppercase tracking-wider">System Status</span>
                 <div className="status-dot status-online"></div>
               </div>
-              <div className="text-2xl font-orbitron font-bold text-neon-green">
+              <div className="text-sm font-orbitron font-bold text-neon-green">
                 ONLINE
               </div>
               <div className="text-xs text-gray-500 mt-1">All systems operational</div>

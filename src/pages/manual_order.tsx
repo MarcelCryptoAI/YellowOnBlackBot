@@ -1940,7 +1940,7 @@ Format your response as a structured analysis with clear sections for each aspec
       <div className="w-[600px] glass-card border-r border-neon-cyan/30 flex flex-col animate-fade-in shadow-3d-lg h-full overflow-hidden">
         {/* Page Title */}
         <div className="p-1 pb-1">
-          <h1 className="text-lg font-orbitron font-black text-holographic mb-1">MANUAL ORDER</h1>
+          <h1 className="text-xs font-orbitron font-black text-holographic mb-1">MANUAL ORDER</h1>
           <p className="text-xs font-rajdhani text-neon-cyan uppercase tracking-wider">Neural Trading Interface</p>
         </div>
 
@@ -1960,11 +1960,11 @@ Format your response as a structured analysis with clear sections for each aspec
                 </>
               ) : (
                 <>
-                  <span className="text-2xl">🚀</span>
+                  <span className="text-sm">🚀</span>
                   <span className="bg-gradient-to-r from-purple-400 via-blue-400 to-cyan-400 bg-clip-text text-transparent">
                     AI MOMENTUM ANALYSIS
                   </span>
-                  <span className="text-2xl">🧠</span>
+                  <span className="text-sm">🧠</span>
                 </>
               )}
             </div>
@@ -2092,7 +2092,7 @@ Format your response as a structured analysis with clear sections for each aspec
                 <select
                   value={tradingState.symbol}
                   onChange={(e) => updateTradingState('symbol', e.target.value)}
-                  className="glass-input w-full text-lg font-medium"
+                  className="glass-input w-full text-xs font-medium"
                 >
                   {[...new Set(coins)].map(coin => (
                     <option key={coin} value={coin}>{coin}</option>
@@ -2392,7 +2392,7 @@ Format your response as a structured analysis with clear sections for each aspec
                   <label className="stat-title">{tradingState.entryTargets.length} Targets</label>
                   <button
                     onClick={() => addTarget('entry')}
-                    className="btn-secondary text-lg w-8 h-8 rounded-full flex items-center justify-center"
+                    className="btn-secondary text-xs w-4 h-4 rounded-full flex items-center justify-center"
                   >
                     +
                   </button>
@@ -2538,7 +2538,7 @@ Format your response as a structured analysis with clear sections for each aspec
                       <label className="text-gray-300 text-sm font-medium">{tradingState.takeProfitTargets.length} Target{tradingState.takeProfitTargets.length !== 1 ? 's' : ''}</label>
                       <button
                         onClick={() => addTarget('takeProfit')}
-                        className="btn-secondary text-lg w-8 h-8 rounded-full flex items-center justify-center"
+                        className="btn-secondary text-xs w-4 h-4 rounded-full flex items-center justify-center"
                       >
                         +
                       </button>
@@ -2770,13 +2770,13 @@ Format your response as a structured analysis with clear sections for each aspec
               <div className="flex items-center space-x-3">
                 <div className="status-dot status-online"></div>
                 <div>
-                  <span className="text-white font-orbitron font-bold text-xl">{tradingState.symbol}</span>
+                  <span className="text-white font-orbitron font-bold text-xs">{tradingState.symbol}</span>
                   <div className="text-neon-cyan font-rajdhani text-sm">Neural Analysis Active</div>
                 </div>
               </div>
               <div className="glass-panel px-1 py-1 rounded-xl border-neon-green/20">
                 <div className="text-gray-400 text-xs font-rajdhani uppercase tracking-wider">Live Price</div>
-                <div className="text-neon-green font-orbitron font-bold text-lg">${currentPrice.toLocaleString()}</div>
+                <div className="text-neon-green font-orbitron font-bold text-xs">${currentPrice.toLocaleString()}</div>
               </div>
             </div>
             
@@ -2789,7 +2789,7 @@ Format your response as a structured analysis with clear sections for each aspec
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-600/20 via-cyan-600/20 to-purple-600/20 group-hover:opacity-75 transition-opacity"></div>
                 <div className="relative flex items-center space-x-2">
-                  <span className="text-lg">🎯</span>
+                  <span className="text-xs">🎯</span>
                   <span>{isGettingOrderAdvice ? 'Analyzing...' : 'AI Order Advice 5-15M'}</span>
                 </div>
               </button>

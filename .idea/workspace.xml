@@ -5,8 +5,10 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="5bc93a3b-5cd2-4f9e-9a14-d8b6d15e6855" name="Changes" comment="Alles testen, manual order blijft hangen op execution en strategy builder zwart scherm bij machine learning.">
-      <change beforePath="$PROJECT_DIR$/data_archive/bybit-ml-trading-bot (1).py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/data_archive/bybit-ml-trading-bot.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend_new/live_main.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend_new/live_main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/Dashboard.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/Dashboard.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/Header.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/Header.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/Sidebar.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/Sidebar.tsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/pages/manual_order.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/pages/manual_order.tsx" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -96,6 +98,7 @@
       <workItem from="1750076541128" duration="892000" />
       <workItem from="1750077871812" duration="1002000" />
       <workItem from="1750194654856" duration="34829000" />
+      <workItem from="1750294862273" duration="24520000" />
     </task>
     <task id="LOCAL-00001" summary="2">
       <option name="closed" value="true" />

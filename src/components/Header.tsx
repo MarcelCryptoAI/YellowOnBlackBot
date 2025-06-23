@@ -140,7 +140,7 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab, isRef
               
               {/* Title Section */}
               <div className="relative ml-6">
-                <h1 className="text-4xl font-black font-orbitron text-holographic tracking-wider">
+                <h1 className="text-xs font-black font-orbitron text-holographic tracking-wider">
                   CRYPTO TRADING BOT
                 </h1>
                 <p className="text-sm font-rajdhani text-neon-cyan mt-1 tracking-[0.3em] uppercase">
@@ -172,7 +172,7 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab, isRef
                     }}
                   >
                     <div className="flex items-center space-x-2">
-                      <span className="text-xl">{item.icon}</span>
+                      <span className="text-xs">{item.icon}</span>
                       <span className="font-rajdhani font-semibold tracking-wide">{item.label}</span>
                     </div>
                     
@@ -245,7 +245,7 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab, isRef
                 flex items-center space-x-2
               `}
             >
-              <span className={`text-lg ${isRefreshing ? 'animate-spin' : ''}`}>⚡</span>
+              <span className={`text-xs ${isRefreshing ? 'animate-spin' : ''}`}>⚡</span>
               <span className="font-rajdhani font-bold text-sm">
                 {isRefreshing ? 'SYNC' : 'REFRESH'}
               </span>
