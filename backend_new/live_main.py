@@ -1598,6 +1598,164 @@ Optimize for {request.coin} specifically considering its volatility and trading 
         logger.error(f"Failed to optimize trade parameters: {e}")
         raise HTTPException(status_code=500, detail=f"Trade parameters optimization error: {str(e)}")
 
+@app.post("/api/openai/generate-analysis")
+async def generate_analysis(request: dict):
+    """Generate AI analysis for manual trading decisions"""
+    try:
+        # Get the first available OpenAI connection
+        if not openai_connections_store:
+            raise HTTPException(status_code=400, detail="No OpenAI connections available")
+        
+        connection_id = request.get("connectionId")
+        if not connection_id or connection_id not in openai_connections_store:
+            # Use the first available connection if not specified
+            connection_id = list(openai_connections_store.keys())[0]
+        
+        conn_data = openai_connections_store[connection_id]
+        
+        # Initialize OpenAI client
+        client = openai.OpenAI(
+            api_key=conn_data.get("apiKey", ""),
+            organization=conn_data.get("organization", "") if conn_data.get("organization") else None
+        )
+        
+        # Extract data from request
+        symbol = request.get("symbol", "")
+        timeframe = request.get("timeframe", "5m")
+        prompt = request.get("prompt", "")
+        market_data = request.get("marketData", {})
+        technical_data = request.get("technicalData", {})
+        
+        # Build comprehensive analysis prompt
+        analysis_prompt = f"""You are an expert cryptocurrency trading strategist. Provide a detailed analysis for {symbol} trading decision.
+
+Market Data:
+- Current Price: ${market_data.get('price', 'N/A')}
+- 24h Change: {market_data.get('change24h', 'N/A')}%
+- 24h Volume: {market_data.get('volume24h', 'N/A')}
+- 24h High: ${market_data.get('high24h', 'N/A')}
+- 24h Low: ${market_data.get('low24h', 'N/A')}
+
+Technical Analysis:
+- RSI: {technical_data.get('rsi', 'N/A')}
+- MACD Signal: {technical_data.get('macd_signal', 'N/A')}
+- Support Level: ${technical_data.get('support', 'N/A')}
+- Resistance Level: ${technical_data.get('resistance', 'N/A')}
+- Trend: {technical_data.get('trend', 'N/A')}
+
+Timeframe: {timeframe}
+
+Specific Request: {prompt}
+
+Please provide a comprehensive JSON response with the following structure:
+{{
+  "direction": "LONG" or "SHORT",
+  "confidence": percentage (1-100),
+  "entry": {{
+    "price": recommended_entry_price,
+    "reasoning": "explanation for entry"
+  }},
+  "takeProfits": [
+    {{
+      "level": 1,
+      "price": price_level,
+      "percentage": percentage_of_position
+    }}
+  ],
+  "stopLoss": {{
+    "price": stop_loss_price,
+    "percentage": stop_loss_percentage
+  }},
+  "marginRecommendation": {{
+    "amount": recommended_amount_usdt,
+    "multiplier": recommended_leverage
+  }},
+  "marketAnalysis": "brief market condition analysis",
+  "technicalAnalysis": "brief technical analysis summary",
+  "reasoning": ["key point 1", "key point 2", "key point 3"]
+}}
+
+Focus on providing actionable trading advice based on the current market conditions and technical indicators."""
+
+        # Make the OpenAI API call
+        response = client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": "You are a professional cryptocurrency trading advisor. Always respond with valid JSON format for trading recommendations."},
+                {"role": "user", "content": analysis_prompt}
+            ],
+            max_tokens=1000,
+            temperature=0.3
+        )
+        
+        # Parse the response
+        ai_response = response.choices[0].message.content
+        
+        return {
+            "success": True,
+            "data": {
+                "analysis": ai_response,
+                "symbol": symbol,
+                "timeframe": timeframe,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to generate AI analysis: {e}")
+        raise HTTPException(status_code=500, detail=f"AI analysis generation error: {str(e)}")
+
+@app.post("/api/openai/test-completion")
+async def test_completion(request: dict):
+    """Test OpenAI completion for simple prompts"""
+    try:
+        # Get the first available OpenAI connection
+        if not openai_connections_store:
+            raise HTTPException(status_code=400, detail="No OpenAI connections available")
+        
+        connection_id = request.get("connectionId")
+        if not connection_id or connection_id not in openai_connections_store:
+            # Use the first available connection if not specified
+            connection_id = list(openai_connections_store.keys())[0]
+        
+        conn_data = openai_connections_store[connection_id]
+        
+        # Initialize OpenAI client
+        client = openai.OpenAI(
+            api_key=conn_data.get("apiKey", ""),
+            organization=conn_data.get("organization", "") if conn_data.get("organization") else None
+        )
+        
+        # Get message from request
+        message = request.get("message", "Hello, this is a test message.")
+        
+        # Make the OpenAI API call
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": message}
+            ],
+            max_tokens=300,
+            temperature=0.7
+        )
+        
+        # Parse the response
+        ai_response = response.choices[0].message.content
+        
+        return {
+            "success": True,
+            "data": {
+                "response": ai_response,
+                "content": ai_response,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to test completion: {e}")
+        raise HTTPException(status_code=500, detail=f"Test completion error: {str(e)}")
+
 # Strategy execution endpoints  
 @app.post("/api/strategies/execute")
 async def execute_strategy_signal(request: dict):
