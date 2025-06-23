@@ -3322,17 +3322,76 @@ async def get_klines(symbol: str, interval: str = "1h", limit: int = 100):
         logger.error(f"Error getting klines for {symbol}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# Mass Trading Status API
+@app.get("/api/mass-trading/status")
+async def get_mass_trading_status():
+    """Get mass trading system status and statistics"""
+    try:
+        from services.mass_symbol_manager import mass_symbol_manager
+        from services.ai_strategy_engine import ai_strategy_engine
+        
+        # Get AI engine status
+        ai_status = ai_strategy_engine.get_ai_engine_status()
+        
+        # Get symbol counts by priority
+        high_priority = len(mass_symbol_manager.get_symbols_by_priority('HIGH'))
+        medium_priority = len(mass_symbol_manager.get_symbols_by_priority('MEDIUM'))
+        low_priority = len(mass_symbol_manager.get_symbols_by_priority('LOW'))
+        
+        # Get top symbols with info
+        top_symbols = []
+        for symbol in mass_symbol_manager.get_symbols_by_priority('HIGH')[:10]:
+            symbol_info = mass_symbol_manager.get_symbol_info(symbol)
+            if symbol_info:
+                top_symbols.append({
+                    'symbol': symbol_info.symbol,
+                    'volume_24h': symbol_info.volume_24h,
+                    'price_change_24h': symbol_info.price_change_24h,
+                    'priority_score': symbol_info.priority_score,
+                    'priority_level': 'HIGH',
+                    'status': symbol_info.status
+                })
+        
+        stats = {
+            'total_symbols': len(mass_symbol_manager.all_symbols),
+            'high_priority': high_priority,
+            'medium_priority': medium_priority,
+            'low_priority': low_priority,
+            'active_positions': ai_status['active_positions'],
+            'pending_signals': ai_status['pending_signals'],
+            'total_trades': ai_status['performance']['total_trades'],
+            'total_pnl': ai_status['performance']['total_pnl'],
+            'win_rate': ai_status['performance']['win_rate']
+        }
+        
+        return {
+            "success": True,
+            "stats": stats,
+            "top_symbols": top_symbols,
+            "ai_engine_running": ai_status['is_running']
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting mass trading status: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "stats": None,
+            "top_symbols": []
+        }
+
 if __name__ == "__main__":
     print("🚀 Starting CTB Live ByBit Backend")
-    print("📍 Server: http://localhost:8000")
-    print("📚 Docs: http://localhost:8000/docs")
+    print("📍 Server: http://localhost:8100")
+    print("📚 Docs: http://localhost:8100/docs")
     print("🔴 LIVE MODE - Real ByBit API calls only")
     print("🤖 Strategy Engine: ENABLED")
     print("📡 Real-time Data: ENABLED")
     print("🛡️ Risk Management: ENABLED")
     print("📊 Monitoring System: ENABLED")
+    print("🤖 Mass Trading: 445 SYMBOLS")
     print("")
     print("🎯 VOLLEDIG AUTOMATISCHE TRADING BOT ACTIEF!")
     print("⚠️  GEBRUIK OP EIGEN RISICO - LIVE TRADING")
     
-    uvicorn.run(socket_app, host="0.0.0.0", port=8000, log_level="info")
+    uvicorn.run(socket_app, host="0.0.0.0", port=8100, log_level="info")

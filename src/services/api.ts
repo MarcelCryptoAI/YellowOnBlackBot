@@ -2,7 +2,9 @@
 import axios from 'axios';
 import { io, Socket } from 'socket.io-client';
 
-const API_BASE_URL = 'https://ctb-backend-api-5b94a2e25dad.herokuapp.com/api';
+const API_BASE_URL = process.env.NODE_ENV === 'production' 
+  ? 'https://ctb-backend-api-5b94a2e25dad.herokuapp.com/api'
+  : 'http://localhost:8100/api';
 
 // API Client setup
 const apiClient = axios.create({
@@ -692,6 +694,33 @@ export const monitoringApi = {
   },
 };
 
+// Mass Trading API
+export const massTradingApi = {
+  // Get mass trading status
+  getStatus: async () => {
+    const response = await apiClient.get('/mass-trading/status');
+    return response.data;
+  },
+
+  // Start mass trading
+  start: async () => {
+    const response = await apiClient.post('/mass-trading/start');
+    return response.data;
+  },
+
+  // Stop mass trading
+  stop: async () => {
+    const response = await apiClient.post('/mass-trading/stop');
+    return response.data;
+  },
+
+  // Get symbol statistics
+  getSymbolStats: async () => {
+    const response = await apiClient.get('/mass-trading/symbols');
+    return response.data;
+  },
+};
+
 // OpenAI API functions
 export const openaiApi = {
   // Test OpenAI connection
@@ -889,11 +918,15 @@ export const healthCheck = async () => {
 // Export WebSocket manager instance
 export const websocketManager = new WebSocketManager();
 
+// Export apiClient
+export { apiClient };
+
 // Default export
 export default {
   bybitApi,
   openaiApi,
   coinsApi,
+  massTradingApi,
   healthCheck,
   websocketManager,
 };

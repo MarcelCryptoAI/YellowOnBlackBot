@@ -16,6 +16,7 @@ import PositionsOrdersPage from './pages/positions_orders';
 import StrategyEngineDashboard from './components/StrategyEngineDashboard';
 import RiskManagementDashboard from './components/RiskManagementDashboard';
 import MonitoringDashboard from './components/MonitoringDashboard';
+import MassTradingDashboard from './components/MassTradingDashboard';
 
 const Router: React.FC = () => {
   return (
@@ -38,6 +39,7 @@ const Router: React.FC = () => {
           <Route path="automation/engine" element={<StrategyEngineDashboard />} />
           <Route path="automation/risk" element={<RiskManagementDashboard />} />
           <Route path="automation/monitoring" element={<MonitoringDashboard />} />
+          <Route path="mass-trading" element={<MassTradingDashboard />} />
         </Route>
       </Routes>
     </BrowserRouter>
