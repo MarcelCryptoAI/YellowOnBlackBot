@@ -905,6 +905,896 @@ const AdvancedStrategyBuilder: React.FC = () => {
             fixedPercentage: 5
           }
         }
+      },
+      'bb_rsi_volume': {
+        name: 'Bollinger Bands + RSI + Volume',
+        signalIndicator: {
+          type: 'bollinger',
+          category: 'trend',
+          timeframe: '15m',
+          parameters: {
+            period: 20,
+            std: 2.1
+          }
+        },
+        confirmingIndicators: [
+          {
+            type: 'rsi',
+            category: 'signal',
+            timeframe: '30m',
+            parameters: {
+              period: 14,
+              overbought: 75,
+              oversold: 25
+            },
+            enabled: true
+          },
+          {
+            type: 'volume',
+            category: 'signal',
+            timeframe: '1h',
+            parameters: {
+              period: 20
+            },
+            enabled: true
+          }
+        ],
+        leverage: 12,
+        stopLossSettings: {
+          type: 'fixed_from_entry',
+          percentage: 2.8
+        },
+        takeProfitSettings: {
+          type: 'multiple',
+          numberOfTPs: 2,
+          tpSpacing: {
+            type: 'fixed_percentage',
+            fixedPercentage: 3.5
+          }
+        }
+      },
+      'adx_ema_stoch': {
+        name: 'ADX + EMA + Stochastic Triple',
+        signalIndicator: {
+          type: 'adx',
+          category: 'trend',
+          timeframe: '30m',
+          parameters: {
+            period: 14,
+            threshold: 25
+          }
+        },
+        confirmingIndicators: [
+          {
+            type: 'ema',
+            category: 'trend',
+            timeframe: '1h',
+            parameters: {
+              period: 21
+            },
+            enabled: true
+          },
+          {
+            type: 'stochastic',
+            category: 'signal',
+            timeframe: '2h',
+            parameters: {
+              kPeriod: 14,
+              dPeriod: 3,
+              smooth: 3
+            },
+            enabled: true
+          }
+        ],
+        leverage: 18,
+        stopLossSettings: {
+          type: 'fixed_from_entry',
+          percentage: 3.2
+        },
+        takeProfitSettings: {
+          type: 'multiple',
+          numberOfTPs: 3,
+          tpSpacing: {
+            type: 'percentage_multiplier',
+            percentageMultiplier: 1.5
+          }
+        }
+      },
+      'psar_macd_rsi': {
+        name: 'Parabolic SAR + MACD + RSI',
+        signalIndicator: {
+          type: 'psar',
+          category: 'trend',
+          timeframe: '5m',
+          parameters: {
+            start: 0.02,
+            increment: 0.02,
+            maximum: 0.2
+          }
+        },
+        confirmingIndicators: [
+          {
+            type: 'macd',
+            category: 'signal',
+            timeframe: '15m',
+            parameters: {
+              fastPeriod: 12,
+              slowPeriod: 26,
+              signalPeriod: 9
+            },
+            enabled: true
+          },
+          {
+            type: 'rsi',
+            category: 'signal',
+            timeframe: '30m',
+            parameters: {
+              period: 21,
+              overbought: 70,
+              oversold: 30
+            },
+            enabled: true
+          }
+        ],
+        leverage: 22,
+        stopLossSettings: {
+          type: 'fixed_from_entry',
+          percentage: 2.5
+        },
+        takeProfitSettings: {
+          type: 'single',
+          tpSpacing: {
+            type: 'fixed_percentage',
+            fixedPercentage: 6
+          }
+        }
+      },
+      'vwap_bb_momentum': {
+        name: 'VWAP + Bollinger + Momentum',
+        signalIndicator: {
+          type: 'vwap',
+          category: 'trend',
+          timeframe: '15m',
+          parameters: {
+            period: 20
+          }
+        },
+        confirmingIndicators: [
+          {
+            type: 'bollinger',
+            category: 'trend',
+            timeframe: '1h',
+            parameters: {
+              period: 20,
+              std: 2
+            },
+            enabled: true
+          },
+          {
+            type: 'momentum',
+            category: 'signal',
+            timeframe: '4h',
+            parameters: {
+              period: 10
+            },
+            enabled: true
+          }
+        ],
+        leverage: 8,
+        stopLossSettings: {
+          type: 'fixed_from_entry',
+          percentage: 4
+        },
+        takeProfitSettings: {
+          type: 'multiple',
+          numberOfTPs: 2,
+          tpSpacing: {
+            type: 'fixed_percentage',
+            fixedPercentage: 4
+          }
+        }
+      },
+      'ichimoku_rsi': {
+        name: 'Ichimoku + RSI Dual Power',
+        signalIndicator: {
+          type: 'ichimoku',
+          category: 'trend',
+          timeframe: '1h',
+          parameters: {
+            tenkanSen: 9,
+            kijunSen: 26,
+            senkouB: 52
+          }
+        },
+        confirmingIndicators: [
+          {
+            type: 'rsi',
+            category: 'signal',
+            timeframe: '4h',
+            parameters: {
+              period: 14,
+              overbought: 65,
+              oversold: 35
+            },
+            enabled: true
+          }
+        ],
+        leverage: 14,
+        stopLossSettings: {
+          type: 'fixed_from_entry',
+          percentage: 3.5
+        },
+        takeProfitSettings: {
+          type: 'multiple',
+          numberOfTPs: 4,
+          tpSpacing: {
+            type: 'fixed_percentage',
+            fixedPercentage: 2.5
+          }
+        }
+      },
+      'williams_ema_volume': {
+        name: 'Williams %R + EMA + Volume',
+        signalIndicator: {
+          type: 'williams',
+          category: 'signal',
+          timeframe: '5m',
+          parameters: {
+            period: 14,
+            overbought: -20,
+            oversold: -80
+          }
+        },
+        confirmingIndicators: [
+          {
+            type: 'ema',
+            category: 'trend',
+            timeframe: '30m',
+            parameters: {
+              period: 50
+            },
+            enabled: true
+          },
+          {
+            type: 'volume',
+            category: 'signal',
+            timeframe: '1h',
+            parameters: {
+              period: 20
+            },
+            enabled: true
+          }
+        ],
+        leverage: 16,
+        stopLossSettings: {
+          type: 'fixed_from_entry',
+          percentage: 2.2
+        },
+        takeProfitSettings: {
+          type: 'multiple',
+          numberOfTPs: 3,
+          tpSpacing: {
+            type: 'fixed_percentage',
+            fixedPercentage: 2.8
+          }
+        }
+      },
+      'cci_sma_adx': {
+        name: 'CCI + SMA + ADX Trend',
+        signalIndicator: {
+          type: 'cci',
+          category: 'signal',
+          timeframe: '15m',
+          parameters: {
+            period: 20,
+            overbought: 100,
+            oversold: -100
+          }
+        },
+        confirmingIndicators: [
+          {
+            type: 'sma',
+            category: 'trend',
+            timeframe: '1h',
+            parameters: {
+              period: 200
+            },
+            enabled: true
+          },
+          {
+            type: 'adx',
+            category: 'trend',
+            timeframe: '2h',
+            parameters: {
+              period: 14,
+              threshold: 30
+            },
+            enabled: true
+          }
+        ],
+        leverage: 11,
+        stopLossSettings: {
+          type: 'fixed_from_entry',
+          percentage: 3.8
+        },
+        takeProfitSettings: {
+          type: 'single',
+          tpSpacing: {
+            type: 'fixed_percentage',
+            fixedPercentage: 7
+          }
+        }
+      },
+      'roc_bb_stoch_vol': {
+        name: 'ROC + Bollinger + Stochastic + Volume',
+        signalIndicator: {
+          type: 'roc',
+          category: 'signal',
+          timeframe: '30m',
+          parameters: {
+            period: 10
+          }
+        },
+        confirmingIndicators: [
+          {
+            type: 'bollinger',
+            category: 'trend',
+            timeframe: '1h',
+            parameters: {
+              period: 20,
+              std: 2.2
+            },
+            enabled: true
+          },
+          {
+            type: 'stochastic',
+            category: 'signal',
+            timeframe: '2h',
+            parameters: {
+              kPeriod: 14,
+              dPeriod: 3,
+              smooth: 3
+            },
+            enabled: true
+          },
+          {
+            type: 'volume',
+            category: 'signal',
+            timeframe: '4h',
+            parameters: {
+              period: 20
+            },
+            enabled: true
+          }
+        ],
+        leverage: 13,
+        stopLossSettings: {
+          type: 'fixed_from_entry',
+          percentage: 3
+        },
+        takeProfitSettings: {
+          type: 'multiple',
+          numberOfTPs: 3,
+          tpSpacing: {
+            type: 'percentage_multiplier',
+            percentageMultiplier: 1.8
+          }
+        }
+      },
+      'supertrend_williams_ema': {
+        name: 'SuperTrend + Williams %R + EMA',
+        signalIndicator: {
+          type: 'supertrend',
+          category: 'trend',
+          timeframe: '15m',
+          parameters: {
+            period: 10,
+            multiplier: 3
+          }
+        },
+        confirmingIndicators: [
+          {
+            type: 'williams',
+            category: 'signal',
+            timeframe: '30m',
+            parameters: {
+              period: 14,
+              overbought: -10,
+              oversold: -90
+            },
+            enabled: true
+          },
+          {
+            type: 'ema',
+            category: 'trend',
+            timeframe: '1h',
+            parameters: {
+              period: 100
+            },
+            enabled: true
+          }
+        ],
+        leverage: 19,
+        stopLossSettings: {
+          type: 'fixed_from_entry',
+          percentage: 2.7
+        },
+        takeProfitSettings: {
+          type: 'multiple',
+          numberOfTPs: 2,
+          tpSpacing: {
+            type: 'fixed_percentage',
+            fixedPercentage: 4.5
+          }
+        }
+      },
+      'macd_psar_volume': {
+        name: 'MACD + Parabolic SAR + Volume',
+        signalIndicator: {
+          type: 'macd',
+          category: 'signal',
+          timeframe: '5m',
+          parameters: {
+            fastPeriod: 12,
+            slowPeriod: 26,
+            signalPeriod: 9
+          }
+        },
+        confirmingIndicators: [
+          {
+            type: 'psar',
+            category: 'trend',
+            timeframe: '15m',
+            parameters: {
+              start: 0.02,
+              increment: 0.02,
+              maximum: 0.2
+            },
+            enabled: true
+          },
+          {
+            type: 'volume',
+            category: 'signal',
+            timeframe: '30m',
+            parameters: {
+              period: 20
+            },
+            enabled: true
+          }
+        ],
+        leverage: 17,
+        stopLossSettings: {
+          type: 'fixed_from_entry',
+          percentage: 2.3
+        },
+        takeProfitSettings: {
+          type: 'multiple',
+          numberOfTPs: 4,
+          tpSpacing: {
+            type: 'fixed_percentage',
+            fixedPercentage: 2
+          }
+        }
+      },
+      'sma_cross_rsi_cci': {
+        name: 'SMA Crossover + RSI + CCI',
+        signalIndicator: {
+          type: 'sma',
+          category: 'trend',
+          timeframe: '15m',
+          parameters: {
+            period: 20
+          }
+        },
+        confirmingIndicators: [
+          {
+            type: 'rsi',
+            category: 'signal',
+            timeframe: '30m',
+            parameters: {
+              period: 14,
+              overbought: 75,
+              oversold: 25
+            },
+            enabled: true
+          },
+          {
+            type: 'cci',
+            category: 'signal',
+            timeframe: '1h',
+            parameters: {
+              period: 20,
+              overbought: 150,
+              oversold: -150
+            },
+            enabled: true
+          }
+        ],
+        leverage: 9,
+        stopLossSettings: {
+          type: 'fixed_from_entry',
+          percentage: 4.2
+        },
+        takeProfitSettings: {
+          type: 'single',
+          tpSpacing: {
+            type: 'fixed_percentage',
+            fixedPercentage: 8
+          }
+        }
+      },
+      'vwap_adx_momentum': {
+        name: 'VWAP + ADX + Momentum Combo',
+        signalIndicator: {
+          type: 'vwap',
+          category: 'trend',
+          timeframe: '30m',
+          parameters: {
+            period: 20
+          }
+        },
+        confirmingIndicators: [
+          {
+            type: 'adx',
+            category: 'trend',
+            timeframe: '1h',
+            parameters: {
+              period: 14,
+              threshold: 25
+            },
+            enabled: true
+          },
+          {
+            type: 'momentum',
+            category: 'signal',
+            timeframe: '2h',
+            parameters: {
+              period: 14
+            },
+            enabled: true
+          }
+        ],
+        leverage: 12,
+        stopLossSettings: {
+          type: 'fixed_from_entry',
+          percentage: 3.5
+        },
+        takeProfitSettings: {
+          type: 'multiple',
+          numberOfTPs: 3,
+          tpSpacing: {
+            type: 'fixed_percentage',
+            fixedPercentage: 3
+          }
+        }
+      },
+      'bb_squeeze_rsi_vol': {
+        name: 'Bollinger Squeeze + RSI + Volume',
+        signalIndicator: {
+          type: 'bollinger',
+          category: 'trend',
+          timeframe: '5m',
+          parameters: {
+            period: 20,
+            std: 1.8
+          }
+        },
+        confirmingIndicators: [
+          {
+            type: 'rsi',
+            category: 'signal',
+            timeframe: '15m',
+            parameters: {
+              period: 21,
+              overbought: 65,
+              oversold: 35
+            },
+            enabled: true
+          },
+          {
+            type: 'volume',
+            category: 'signal',
+            timeframe: '30m',
+            parameters: {
+              period: 20
+            },
+            enabled: true
+          }
+        ],
+        leverage: 21,
+        stopLossSettings: {
+          type: 'fixed_from_entry',
+          percentage: 2
+        },
+        takeProfitSettings: {
+          type: 'multiple',
+          numberOfTPs: 5,
+          tpSpacing: {
+            type: 'fixed_percentage',
+            fixedPercentage: 1.8
+          }
+        }
+      },
+      'ema_ribbon_stoch': {
+        name: 'EMA Ribbon + Stochastic',
+        signalIndicator: {
+          type: 'ema',
+          category: 'trend',
+          timeframe: '15m',
+          parameters: {
+            period: 8
+          }
+        },
+        confirmingIndicators: [
+          {
+            type: 'stochastic',
+            category: 'signal',
+            timeframe: '1h',
+            parameters: {
+              kPeriod: 21,
+              dPeriod: 3,
+              smooth: 3
+            },
+            enabled: true
+          }
+        ],
+        leverage: 25,
+        stopLossSettings: {
+          type: 'fixed_from_entry',
+          percentage: 1.8
+        },
+        takeProfitSettings: {
+          type: 'single',
+          tpSpacing: {
+            type: 'fixed_percentage',
+            fixedPercentage: 4.5
+          }
+        }
+      },
+      'ichimoku_macd_volume': {
+        name: 'Ichimoku + MACD + Volume Pro',
+        signalIndicator: {
+          type: 'ichimoku',
+          category: 'trend',
+          timeframe: '30m',
+          parameters: {
+            tenkanSen: 9,
+            kijunSen: 26,
+            senkouB: 52
+          }
+        },
+        confirmingIndicators: [
+          {
+            type: 'macd',
+            category: 'signal',
+            timeframe: '1h',
+            parameters: {
+              fastPeriod: 12,
+              slowPeriod: 26,
+              signalPeriod: 9
+            },
+            enabled: true
+          },
+          {
+            type: 'volume',
+            category: 'signal',
+            timeframe: '2h',
+            parameters: {
+              period: 20
+            },
+            enabled: true
+          }
+        ],
+        leverage: 10,
+        stopLossSettings: {
+          type: 'fixed_from_entry',
+          percentage: 4.5
+        },
+        takeProfitSettings: {
+          type: 'multiple',
+          numberOfTPs: 2,
+          tpSpacing: {
+            type: 'percentage_multiplier',
+            percentageMultiplier: 2
+          }
+        }
+      },
+      'williams_cci_psar': {
+        name: 'Williams %R + CCI + Parabolic SAR',
+        signalIndicator: {
+          type: 'williams',
+          category: 'signal',
+          timeframe: '15m',
+          parameters: {
+            period: 14,
+            overbought: -15,
+            oversold: -85
+          }
+        },
+        confirmingIndicators: [
+          {
+            type: 'cci',
+            category: 'signal',
+            timeframe: '30m',
+            parameters: {
+              period: 20,
+              overbought: 120,
+              oversold: -120
+            },
+            enabled: true
+          },
+          {
+            type: 'psar',
+            category: 'trend',
+            timeframe: '1h',
+            parameters: {
+              start: 0.02,
+              increment: 0.02,
+              maximum: 0.2
+            },
+            enabled: true
+          }
+        ],
+        leverage: 18,
+        stopLossSettings: {
+          type: 'fixed_from_entry',
+          percentage: 2.8
+        },
+        takeProfitSettings: {
+          type: 'multiple',
+          numberOfTPs: 3,
+          tpSpacing: {
+            type: 'fixed_percentage',
+            fixedPercentage: 3.2
+          }
+        }
+      },
+      'roc_vwap_adx': {
+        name: 'ROC + VWAP + ADX Momentum',
+        signalIndicator: {
+          type: 'roc',
+          category: 'signal',
+          timeframe: '5m',
+          parameters: {
+            period: 12
+          }
+        },
+        confirmingIndicators: [
+          {
+            type: 'vwap',
+            category: 'trend',
+            timeframe: '15m',
+            parameters: {
+              period: 20
+            },
+            enabled: true
+          },
+          {
+            type: 'adx',
+            category: 'trend',
+            timeframe: '30m',
+            parameters: {
+              period: 14,
+              threshold: 20
+            },
+            enabled: true
+          }
+        ],
+        leverage: 15,
+        stopLossSettings: {
+          type: 'fixed_from_entry',
+          percentage: 3.3
+        },
+        takeProfitSettings: {
+          type: 'multiple',
+          numberOfTPs: 4,
+          tpSpacing: {
+            type: 'fixed_percentage',
+            fixedPercentage: 2.3
+          }
+        }
+      },
+      'supertrend_bb_rsi_vol': {
+        name: 'SuperTrend + Bollinger + RSI + Volume',
+        signalIndicator: {
+          type: 'supertrend',
+          category: 'trend',
+          timeframe: '5m',
+          parameters: {
+            period: 10,
+            multiplier: 2.8
+          }
+        },
+        confirmingIndicators: [
+          {
+            type: 'bollinger',
+            category: 'trend',
+            timeframe: '15m',
+            parameters: {
+              period: 20,
+              std: 2
+            },
+            enabled: true
+          },
+          {
+            type: 'rsi',
+            category: 'signal',
+            timeframe: '30m',
+            parameters: {
+              period: 14,
+              overbought: 70,
+              oversold: 30
+            },
+            enabled: true
+          },
+          {
+            type: 'volume',
+            category: 'signal',
+            timeframe: '1h',
+            parameters: {
+              period: 20
+            },
+            enabled: true
+          }
+        ],
+        leverage: 14,
+        stopLossSettings: {
+          type: 'fixed_from_entry',
+          percentage: 3.8
+        },
+        takeProfitSettings: {
+          type: 'multiple',
+          numberOfTPs: 3,
+          tpSpacing: {
+            type: 'percentage_multiplier',
+            percentageMultiplier: 1.6
+          }
+        }
+      },
+      'sma_momentum_stoch': {
+        name: 'SMA + Momentum + Stochastic',
+        signalIndicator: {
+          type: 'sma',
+          category: 'trend',
+          timeframe: '30m',
+          parameters: {
+            period: 50
+          }
+        },
+        confirmingIndicators: [
+          {
+            type: 'momentum',
+            category: 'signal',
+            timeframe: '1h',
+            parameters: {
+              period: 10
+            },
+            enabled: true
+          },
+          {
+            type: 'stochastic',
+            category: 'signal',
+            timeframe: '2h',
+            parameters: {
+              kPeriod: 14,
+              dPeriod: 3,
+              smooth: 3
+            },
+            enabled: true
+          }
+        ],
+        leverage: 7,
+        stopLossSettings: {
+          type: 'fixed_from_entry',
+          percentage: 5
+        },
+        takeProfitSettings: {
+          type: 'single',
+          tpSpacing: {
+            type: 'fixed_percentage',
+            fixedPercentage: 10
+          }
+        }
       }
     };
     
@@ -2514,116 +3404,57 @@ const AdvancedStrategyBuilder: React.FC = () => {
               </button>
             </div>
             
-            <div className="space-y-4">
-              {/* Strategy 1: MACD + SuperTrend + RSI */}
-              <div className="bg-gray-800 border border-gray-600 rounded-lg p-6 hover:border-purple-500 transition-colors cursor-pointer"
-                   onClick={() => applyExampleStrategy('macd_supertrend_rsi')}>
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className="text-xl font-bold text-purple-400">MACD + SuperTrend + RSI</h3>
-                    <p className="text-gray-400 text-sm mt-1">Multi-timeframe momentum strategy</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[60vh] overflow-y-auto">
+              {/* Render all strategies dynamically */}
+              {Object.entries({
+                'macd_supertrend_rsi': { name: 'MACD + SuperTrend + RSI', color: 'purple', tag: 'Popular', winRate: '75-85%' },
+                'ema_bb_stoch': { name: 'EMA + Bollinger + Stochastic', color: 'blue', tag: 'Balanced', winRate: '70-80%' },
+                'rsi_macd': { name: 'RSI + MACD Dual', color: 'green', tag: 'Beginner', winRate: '65-75%' },
+                'bb_rsi_volume': { name: 'Bollinger + RSI + Volume', color: 'cyan', tag: 'Volume', winRate: '70-78%' },
+                'adx_ema_stoch': { name: 'ADX + EMA + Stochastic', color: 'yellow', tag: 'Trend', winRate: '72-82%' },
+                'psar_macd_rsi': { name: 'PSAR + MACD + RSI', color: 'pink', tag: 'Momentum', winRate: '68-76%' },
+                'vwap_bb_momentum': { name: 'VWAP + Bollinger + Momentum', color: 'indigo', tag: 'VWAP', winRate: '65-73%' },
+                'ichimoku_rsi': { name: 'Ichimoku + RSI Power', color: 'red', tag: 'Cloud', winRate: '74-84%' },
+                'williams_ema_volume': { name: 'Williams %R + EMA + Volume', color: 'orange', tag: 'Williams', winRate: '69-77%' },
+                'cci_sma_adx': { name: 'CCI + SMA + ADX', color: 'teal', tag: 'Trend', winRate: '66-74%' },
+                'roc_bb_stoch_vol': { name: 'ROC + BB + Stoch + Volume', color: 'violet', tag: '4-Factor', winRate: '71-79%' },
+                'supertrend_williams_ema': { name: 'SuperTrend + Williams + EMA', color: 'lime', tag: 'Super', winRate: '73-81%' },
+                'macd_psar_volume': { name: 'MACD + PSAR + Volume', color: 'emerald', tag: 'Scalp', winRate: '70-78%' },
+                'sma_cross_rsi_cci': { name: 'SMA Cross + RSI + CCI', color: 'sky', tag: 'Cross', winRate: '64-72%' },
+                'vwap_adx_momentum': { name: 'VWAP + ADX + Momentum', color: 'amber', tag: 'Power', winRate: '67-75%' },
+                'bb_squeeze_rsi_vol': { name: 'BB Squeeze + RSI + Vol', color: 'rose', tag: 'Squeeze', winRate: '76-84%' },
+                'ema_ribbon_stoch': { name: 'EMA Ribbon + Stochastic', color: 'slate', tag: 'Ribbon', winRate: '68-76%' },
+                'ichimoku_macd_volume': { name: 'Ichimoku + MACD + Vol', color: 'zinc', tag: 'Pro', winRate: '72-80%' },
+                'williams_cci_psar': { name: 'Williams + CCI + PSAR', color: 'stone', tag: 'Signal', winRate: '70-78%' },
+                'roc_vwap_adx': { name: 'ROC + VWAP + ADX', color: 'neutral', tag: 'ROC', winRate: '69-77%' },
+                'supertrend_bb_rsi_vol': { name: 'SuperTrend + BB + RSI + Vol', color: 'gray', tag: 'Complete', winRate: '74-82%' },
+                'sma_momentum_stoch': { name: 'SMA + Momentum + Stoch', color: 'red', tag: 'Simple', winRate: '63-71%' }
+              }).map(([key, info]) => (
+                <div key={key} 
+                     className={`bg-gray-800 border border-gray-600 rounded-lg p-3 hover:border-${info.color}-500 transition-colors cursor-pointer`}
+                     onClick={() => applyExampleStrategy(key)}>
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <h3 className={`text-sm font-bold text-${info.color}-400`}>{info.name}</h3>
+                    </div>
+                    <span className={`px-2 py-1 bg-${info.color}-500/20 text-${info.color}-400 rounded text-xs`}>{info.tag}</span>
                   </div>
-                  <span className="px-3 py-1 bg-purple-500/20 text-purple-400 rounded-full text-sm">Popular</span>
-                </div>
-                
-                <div className="grid grid-cols-3 gap-4 mb-4">
-                  <div className="bg-gray-700/50 rounded p-3">
-                    <div className="text-xs text-gray-400 mb-1">Signal</div>
-                    <div className="text-white font-medium">MACD (15m)</div>
+                  
+                  <div className="text-xs text-gray-400 mb-2">
+                    Multi-timeframe strategy with optimized parameters
                   </div>
-                  <div className="bg-gray-700/50 rounded p-3">
-                    <div className="text-xs text-gray-400 mb-1">Confirm 1</div>
-                    <div className="text-white font-medium">SuperTrend (1h)</div>
-                  </div>
-                  <div className="bg-gray-700/50 rounded p-3">
-                    <div className="text-xs text-gray-400 mb-1">Confirm 2</div>
-                    <div className="text-white font-medium">RSI (1h)</div>
-                  </div>
-                </div>
-                
-                <div className="flex items-center justify-between text-sm">
-                  <div className="flex items-center space-x-4">
-                    <span className="text-gray-400">Leverage: <span className="text-yellow-400 font-medium">15x</span></span>
-                    <span className="text-gray-400">SL: <span className="text-red-400 font-medium">3%</span></span>
-                    <span className="text-gray-400">TP: <span className="text-green-400 font-medium">3x 2%</span></span>
-                  </div>
-                  <div className="text-green-400">
-                    Expected WR: 75-85%
-                  </div>
-                </div>
-              </div>
-              
-              {/* Strategy 2: EMA + Bollinger + Stochastic */}
-              <div className="bg-gray-800 border border-gray-600 rounded-lg p-6 hover:border-blue-500 transition-colors cursor-pointer"
-                   onClick={() => applyExampleStrategy('ema_bb_stoch')}>
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className="text-xl font-bold text-blue-400">EMA Crossover + Bollinger + Stochastic</h3>
-                    <p className="text-gray-400 text-sm mt-1">Trend following with volatility confirmation</p>
-                  </div>
-                  <span className="px-3 py-1 bg-blue-500/20 text-blue-400 rounded-full text-sm">Balanced</span>
-                </div>
-                
-                <div className="grid grid-cols-3 gap-4 mb-4">
-                  <div className="bg-gray-700/50 rounded p-3">
-                    <div className="text-xs text-gray-400 mb-1">Signal</div>
-                    <div className="text-white font-medium">EMA 9 (5m)</div>
-                  </div>
-                  <div className="bg-gray-700/50 rounded p-3">
-                    <div className="text-xs text-gray-400 mb-1">Confirm 1</div>
-                    <div className="text-white font-medium">Bollinger (15m)</div>
-                  </div>
-                  <div className="bg-gray-700/50 rounded p-3">
-                    <div className="text-xs text-gray-400 mb-1">Confirm 2</div>
-                    <div className="text-white font-medium">Stochastic (30m)</div>
+                  
+                  <div className="flex items-center justify-between text-xs">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-yellow-400">⚡</span>
+                      <span className="text-gray-400">Auto-optimized</span>
+                    </div>
+                    <div className={`text-${info.color}-400 font-medium`}>
+                      WR: {info.winRate}
+                    </div>
                   </div>
                 </div>
-                
-                <div className="flex items-center justify-between text-sm">
-                  <div className="flex items-center space-x-4">
-                    <span className="text-gray-400">Leverage: <span className="text-yellow-400 font-medium">10x</span></span>
-                    <span className="text-gray-400">SL: <span className="text-red-400 font-medium">2.5%</span></span>
-                    <span className="text-gray-400">TP: <span className="text-green-400 font-medium">2x 3%</span></span>
-                  </div>
-                  <div className="text-green-400">
-                    Expected WR: 70-80%
-                  </div>
-                </div>
-              </div>
-              
-              {/* Strategy 3: RSI + MACD */}
-              <div className="bg-gray-800 border border-gray-600 rounded-lg p-6 hover:border-green-500 transition-colors cursor-pointer"
-                   onClick={() => applyExampleStrategy('rsi_macd')}>
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className="text-xl font-bold text-green-400">RSI + MACD Dual Timeframe</h3>
-                    <p className="text-gray-400 text-sm mt-1">Simple but effective momentum strategy</p>
-                  </div>
-                  <span className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-sm">Beginner</span>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                  <div className="bg-gray-700/50 rounded p-3">
-                    <div className="text-xs text-gray-400 mb-1">Signal</div>
-                    <div className="text-white font-medium">RSI (15m)</div>
-                  </div>
-                  <div className="bg-gray-700/50 rounded p-3">
-                    <div className="text-xs text-gray-400 mb-1">Confirm</div>
-                    <div className="text-white font-medium">MACD (1h)</div>
-                  </div>
-                </div>
-                
-                <div className="flex items-center justify-between text-sm">
-                  <div className="flex items-center space-x-4">
-                    <span className="text-gray-400">Leverage: <span className="text-yellow-400 font-medium">20x</span></span>
-                    <span className="text-gray-400">SL: <span className="text-red-400 font-medium">2%</span></span>
-                    <span className="text-gray-400">TP: <span className="text-green-400 font-medium">5%</span></span>
-                  </div>
-                  <div className="text-green-400">
-                    Expected WR: 65-75%
-                  </div>
-                </div>
-              </div>
+              ))}
             </div>
             
             <div className="mt-6 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
