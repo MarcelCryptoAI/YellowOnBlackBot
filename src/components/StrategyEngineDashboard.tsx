@@ -71,6 +71,23 @@ interface MassOptimizationStatus {
   successful_deployments: number;
   failed_deployments: number;
   estimated_time_remaining: string;
+  current_phase: 'strategy_testing' | 'optimization' | 'deployment' | 'monitoring';
+  current_strategy_test: {
+    strategy_name: string;
+    indicators: string[];
+    current_winrate: number;
+    current_roi: number;
+    best_winrate: number;
+    best_roi: number;
+  };
+}
+
+interface AutoTradingConfig {
+  timeframe: '15m';
+  min_winrate: 85;
+  backtest_days: 90;
+  target_roi_priority: boolean;
+  auto_execute_trades: boolean;
 }
 
 export const StrategyEngineDashboard: React.FC = () => {
@@ -111,6 +128,17 @@ export const StrategyEngineDashboard: React.FC = () => {
   });
   const [massOptimizationStatus, setMassOptimizationStatus] = useState<MassOptimizationStatus | null>(null);
   const [selectedStrategiesForImport, setSelectedStrategiesForImport] = useState<Set<string>>(new Set());
+  
+  // New state for full auto trading system
+  const [showAutoTradingModal, setShowAutoTradingModal] = useState(false);
+  const [isAutoTradingRunning, setIsAutoTradingRunning] = useState(false);
+  const [autoTradingConfig, setAutoTradingConfig] = useState<AutoTradingConfig>({
+    timeframe: '15m',
+    min_winrate: 85,
+    backtest_days: 90,
+    target_roi_priority: true,
+    auto_execute_trades: true,
+  });
 
   useEffect(() => {
     loadEngineStatus();
@@ -438,6 +466,77 @@ export const StrategyEngineDashboard: React.FC = () => {
     }
   };
 
+  // New functions for full auto trading system
+  const startFullAutoTrading = async () => {
+    try {
+      setLoading(true);
+      setIsAutoTradingRunning(true);
+      
+      const API_BASE_URL = process.env.NODE_ENV === 'production' 
+        ? 'https://ctb-backend-api-5b94a2e25dad.herokuapp.com/api'
+        : 'http://localhost:8100/api';
+        
+      const response = await fetch(`${API_BASE_URL}/strategies/auto-trading/start`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(autoTradingConfig),
+      });
+
+      if (response.ok) {
+        setShowAutoTradingModal(false);
+        // Start polling for detailed status
+        pollAutoTradingStatus();
+      } else {
+        throw new Error('Failed to start auto trading');
+      }
+    } catch (error: any) {
+      setError(error.message || 'Failed to start auto trading');
+      setIsAutoTradingRunning(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const pollAutoTradingStatus = () => {
+    const interval = setInterval(async () => {
+      try {
+        const API_BASE_URL = process.env.NODE_ENV === 'production' 
+          ? 'https://ctb-backend-api-5b94a2e25dad.herokuapp.com/api'
+          : 'http://localhost:8100/api';
+          
+        const response = await fetch(`${API_BASE_URL}/strategies/auto-trading/status`);
+        if (response.ok) {
+          const status = await response.json();
+          setMassOptimizationStatus(status.data);
+          
+          if (!status.data?.is_running) {
+            clearInterval(interval);
+            setIsAutoTradingRunning(false);
+            await loadEngineStatus();
+          }
+        }
+      } catch (error) {
+        console.error('Error polling auto trading status:', error);
+      }
+    }, 3000); // Poll every 3 seconds for more detailed updates
+  };
+
+  const stopAutoTrading = async () => {
+    try {
+      const API_BASE_URL = process.env.NODE_ENV === 'production' 
+        ? 'https://ctb-backend-api-5b94a2e25dad.herokuapp.com/api'
+        : 'http://localhost:8100/api';
+        
+      await fetch(`${API_BASE_URL}/strategies/auto-trading/stop`, { method: 'POST' });
+      setMassOptimizationStatus(null);
+      setIsAutoTradingRunning(false);
+    } catch (error) {
+      console.error('Error stopping auto trading:', error);
+    }
+  };
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -452,10 +551,33 @@ export const StrategyEngineDashboard: React.FC = () => {
         </div>
         
         <div className="flex space-x-4">
+          {/* Main START button for full auto trading */}
+          {isAutoTradingRunning ? (
+            <button
+              onClick={stopAutoTrading}
+              className="glass-button glass-button-pink text-lg px-6 py-3 animate-pulse"
+              disabled={loading}
+            >
+              🛑 STOP AUTO TRADING
+            </button>
+          ) : (
+            <button
+              onClick={() => setShowAutoTradingModal(true)}
+              className="glass-button glass-button-green text-lg px-6 py-3 font-bold relative overflow-hidden group"
+              disabled={loading}
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-green-600/20 via-cyan-600/20 to-blue-600/20 group-hover:opacity-75 transition-opacity"></div>
+              <div className="relative flex items-center space-x-2">
+                <span className="text-xl">🚀</span>
+                <span>START AUTO TRADING</span>
+              </div>
+            </button>
+          )}
+          
           <button
             onClick={loadStrategiesFromBuilder}
             className="glass-button glass-button-purple"
-            disabled={loading}
+            disabled={loading || isAutoTradingRunning}
           >
             📥 Import Strategies
           </button>
@@ -463,7 +585,7 @@ export const StrategyEngineDashboard: React.FC = () => {
           <button
             onClick={() => setShowMassOptimization(true)}
             className="glass-button glass-button-yellow"
-            disabled={loading || importedStrategies.length === 0}
+            disabled={loading || importedStrategies.length === 0 || isAutoTradingRunning}
           >
             🎯 Mass Optimization
           </button>
@@ -471,7 +593,7 @@ export const StrategyEngineDashboard: React.FC = () => {
           <button
             onClick={() => setShowCreateForm(true)}
             className="glass-button glass-button-cyan"
-            disabled={loading}
+            disabled={loading || isAutoTradingRunning}
           >
             ➕ Create Strategy
           </button>
@@ -480,7 +602,7 @@ export const StrategyEngineDashboard: React.FC = () => {
             <button
               onClick={stopEngine}
               className="glass-button glass-button-pink"
-              disabled={loading}
+              disabled={loading || isAutoTradingRunning}
             >
               🛑 Stop Engine
             </button>
@@ -488,7 +610,7 @@ export const StrategyEngineDashboard: React.FC = () => {
             <button
               onClick={startEngine}
               className="glass-button glass-button-green"
-              disabled={loading}
+              disabled={loading || isAutoTradingRunning}
             >
               🚀 Start Engine
             </button>
@@ -587,22 +709,103 @@ export const StrategyEngineDashboard: React.FC = () => {
         </GlassCard>
       )}
 
-      {/* Mass Optimization Status */}
+      {/* Auto Trading Status */}
       {massOptimizationStatus && (
-        <GlassCard className="border-neon-yellow/50 bg-yellow-500/10">
+        <GlassCard className={`${
+          massOptimizationStatus.current_phase === 'strategy_testing' ? 'border-neon-blue/50 bg-blue-500/10' :
+          massOptimizationStatus.current_phase === 'optimization' ? 'border-neon-yellow/50 bg-yellow-500/10' :
+          massOptimizationStatus.current_phase === 'deployment' ? 'border-neon-purple/50 bg-purple-500/10' :
+          'border-neon-green/50 bg-green-500/10'
+        }`}>
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-rajdhani font-bold text-neon-yellow">
-              🎯 Mass Optimization Progress
+            <h2 className="text-xl font-rajdhani font-bold text-white">
+              {massOptimizationStatus.current_phase === 'strategy_testing' && '🧪 Testing Strategies'}
+              {massOptimizationStatus.current_phase === 'optimization' && '🎯 AI Optimization'}
+              {massOptimizationStatus.current_phase === 'deployment' && '🚀 Deploying Strategy'}
+              {massOptimizationStatus.current_phase === 'monitoring' && '📊 Live Monitoring'}
             </h2>
             {massOptimizationStatus.is_running && (
               <button
-                onClick={stopMassOptimization}
+                onClick={stopAutoTrading}
                 className="glass-button glass-button-pink text-sm"
               >
                 🛑 Stop
               </button>
             )}
           </div>
+          
+          {/* Current Coin & Phase Status */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <div className="text-center">
+              <div className="text-3xl font-orbitron font-bold text-neon-cyan">
+                {massOptimizationStatus.current_coin}
+              </div>
+              <div className="text-sm text-gray-400 mt-1">Current Coin</div>
+            </div>
+            
+            <div className="text-center">
+              <div className="text-2xl font-orbitron font-bold text-neon-purple">
+                {massOptimizationStatus.processed_coins}/{massOptimizationStatus.total_coins}
+              </div>
+              <div className="text-sm text-gray-400 mt-1">Progress</div>
+            </div>
+            
+            <div className="text-center">
+              <div className="text-2xl font-orbitron font-bold text-neon-yellow">
+                {massOptimizationStatus.estimated_time_remaining}
+              </div>
+              <div className="text-sm text-gray-400 mt-1">ETA</div>
+            </div>
+          </div>
+          
+          {/* Strategy Testing Details */}
+          {massOptimizationStatus.current_phase === 'strategy_testing' && massOptimizationStatus.current_strategy_test && (
+            <div className="mb-6 p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl">
+              <h4 className="text-neon-blue font-bold mb-4 flex items-center">
+                🧪 Strategy Testing: {massOptimizationStatus.current_strategy_test.strategy_name}
+              </h4>
+              
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                <div className="text-center">
+                  <div className={`text-xl font-bold ${
+                    massOptimizationStatus.current_strategy_test.current_winrate >= 85 ? 'text-neon-green' : 
+                    massOptimizationStatus.current_strategy_test.current_winrate >= 70 ? 'text-neon-yellow' : 'text-neon-pink'
+                  }`}>
+                    {massOptimizationStatus.current_strategy_test.current_winrate.toFixed(1)}%
+                  </div>
+                  <div className="text-sm text-gray-400">Win Rate</div>
+                </div>
+                
+                <div className="text-center">
+                  <div className={`text-xl font-bold ${
+                    massOptimizationStatus.current_strategy_test.current_roi >= 20 ? 'text-neon-green' : 
+                    massOptimizationStatus.current_strategy_test.current_roi >= 10 ? 'text-neon-yellow' : 'text-neon-pink'
+                  }`}>
+                    {massOptimizationStatus.current_strategy_test.current_roi.toFixed(1)}%
+                  </div>
+                  <div className="text-sm text-gray-400">ROI</div>
+                </div>
+                
+                <div className="text-center">
+                  <div className="text-xl font-bold text-neon-green">
+                    {massOptimizationStatus.current_strategy_test.best_winrate.toFixed(1)}%
+                  </div>
+                  <div className="text-sm text-gray-400">Best Win Rate</div>
+                </div>
+                
+                <div className="text-center">
+                  <div className="text-xl font-bold text-neon-green">
+                    {massOptimizationStatus.current_strategy_test.best_roi.toFixed(1)}%
+                  </div>
+                  <div className="text-sm text-gray-400">Best ROI</div>
+                </div>
+              </div>
+              
+              <div className="text-sm text-gray-300">
+                <strong>Testing Indicators:</strong> {massOptimizationStatus.current_strategy_test.indicators.join(', ')}
+              </div>
+            </div>
+          )}
           
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
             <div className="text-center">
@@ -1131,6 +1334,143 @@ export const StrategyEngineDashboard: React.FC = () => {
                     🚀 Start Mass Optimization
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Auto Trading Modal */}
+      {showAutoTradingModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-gray-900/95 border border-gray-700 rounded-2xl p-8 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-orbitron font-bold text-holographic">
+                🚀 Start Automated Trading System
+              </h2>
+              <button
+                onClick={() => setShowAutoTradingModal(false)}
+                className="text-gray-400 hover:text-white text-2xl"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="space-y-6">
+              {/* System Configuration */}
+              <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl">
+                <h3 className="text-neon-cyan font-bold mb-3">🔧 System Configuration</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-400">Timeframe:</span>
+                    <span className="text-neon-cyan ml-2 font-bold">15 minutes</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-400">Backtest Period:</span>
+                    <span className="text-neon-cyan ml-2 font-bold">90 days</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-400">Min Win Rate:</span>
+                    <span className="text-neon-green ml-2 font-bold">85%</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-400">Available Coins:</span>
+                    <span className="text-neon-purple ml-2 font-bold">445+ pairs</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Process Overview */}
+              <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-xl">
+                <h3 className="text-neon-green font-bold mb-3">🤖 AI Process Overview</h3>
+                <div className="space-y-3 text-sm text-gray-300">
+                  <div className="flex items-start space-x-3">
+                    <span className="text-neon-yellow">1.</span>
+                    <span>Test all indicator combinations for each coin (MA, RSI, MACD, Bollinger, etc.)</span>
+                  </div>
+                  <div className="flex items-start space-x-3">
+                    <span className="text-neon-yellow">2.</span>
+                    <span>AI optimizes parameters: indicators, take profit, stop loss, position size</span>
+                  </div>
+                  <div className="flex items-start space-x-3">
+                    <span className="text-neon-yellow">3.</span>
+                    <span>Select strategy with highest win rate (≥85%) + highest ROI</span>
+                  </div>
+                  <div className="flex items-start space-x-3">
+                    <span className="text-neon-yellow">4.</span>
+                    <span>Deploy strategy, monitor signals, execute trades automatically</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Risk Warning */}
+              <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl">
+                <h3 className="text-neon-pink font-bold mb-3">⚠️ Risk Warning</h3>
+                <div className="text-sm text-gray-300 space-y-2">
+                  <p>• This system will trade automatically across ALL available coins</p>
+                  <p>• Estimated processing time: 2-6 hours for complete setup</p>
+                  <p>• Only strategies meeting 85% win rate criteria will be deployed</p>
+                  <p>• Monitor your account balance and risk management settings</p>
+                </div>
+              </div>
+
+              {/* Auto Execute Setting */}
+              <div className="p-4 bg-purple-500/10 border border-purple-500/30 rounded-xl">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-neon-purple font-bold">🎯 Automatic Trade Execution</h3>
+                    <p className="text-sm text-gray-400 mt-1">
+                      Execute trades automatically when signals are generated
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={autoTradingConfig.auto_execute_trades}
+                      onChange={(e) => setAutoTradingConfig(prev => ({
+                        ...prev,
+                        auto_execute_trades: e.target.checked
+                      }))}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Estimated Time */}
+              <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl text-center">
+                <h3 className="text-neon-yellow font-bold mb-2">⏱️ Estimated Completion Time</h3>
+                <p className="text-2xl font-orbitron font-bold text-white">2-6 Hours</p>
+                <p className="text-sm text-gray-400 mt-1">
+                  Depends on market conditions and optimization complexity
+                </p>
+              </div>
+            </div>
+            
+            {/* Action Buttons */}
+            <div className="flex items-center justify-between mt-8 pt-6 border-t border-gray-700">
+              <div className="text-sm text-gray-400">
+                Ready to start fully automated trading system
+              </div>
+              <div className="flex space-x-4">
+                <button
+                  onClick={() => setShowAutoTradingModal(false)}
+                  className="glass-button glass-button-gray"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={startFullAutoTrading}
+                  disabled={loading}
+                  className="glass-button glass-button-green font-bold text-lg px-8 relative overflow-hidden group"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-green-600/20 via-cyan-600/20 to-blue-600/20 group-hover:opacity-75 transition-opacity"></div>
+                  <div className="relative flex items-center space-x-2">
+                    <span className="text-xl">🚀</span>
+                    <span>START AUTO TRADING</span>
+                  </div>
+                </button>
               </div>
             </div>
           </div>
