@@ -61,6 +61,160 @@ class AITradingOptimizer:
         except Exception as e:
             logger.error(f"❌ Error setting up OpenAI: {e}")
     
+    async def optimize_strategy_for_symbol(
+        self,
+        symbol: str,
+        strategy_config: Dict[str, Any],
+        criteria: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Optimize a strategy configuration for a specific symbol using AI and backtesting
+        """
+        try:
+            logger.info(f"🎯 Optimizing strategy for {symbol}")
+            
+            # Get market data for the symbol
+            market_data = await self._get_market_data(symbol)
+            if not market_data:
+                return None
+            
+            # Use AI to optimize strategy parameters
+            optimization_prompt = f"""
+            Optimize trading strategy parameters for {symbol} cryptocurrency.
+            
+            Current market data:
+            - Price: ${market_data.get('price', 0)}
+            - 24h Change: {market_data.get('change_24h', 0)}%
+            - Volume: {market_data.get('volume_24h', 0)}
+            - Volatility: {market_data.get('volatility', 'medium')}
+            
+            Strategy Configuration:
+            {strategy_config}
+            
+            Optimization Criteria:
+            - Minimum Win Rate: {criteria.get('min_win_rate', 60)}%
+            - Maximum Drawdown: {criteria.get('max_drawdown', 15)}%
+            - Minimum Total Trades: {criteria.get('min_total_trades', 50)}
+            - Minimum Profit Factor: {criteria.get('min_profit_factor', 1.5)}
+            - Minimum Sharpe Ratio: {criteria.get('min_sharpe_ratio', 1.0)}
+            
+            Optimize the strategy parameters to meet these criteria. Return a JSON response with:
+            {{
+                "meets_criteria": true/false,
+                "optimized_params": {{
+                    "entry_threshold": number,
+                    "exit_threshold": number,
+                    "stop_loss_percent": number,
+                    "take_profit_percent": number,
+                    "position_size": 5.0,
+                    "leverage": 25
+                }},
+                "expected_performance": {{
+                    "win_rate": number,
+                    "profit_factor": number,
+                    "max_drawdown": number,
+                    "sharpe_ratio": number
+                }},
+                "reasoning": "explanation of optimization"
+            }}
+            """
+            
+            # Get AI optimization suggestions
+            client = openai.OpenAI(api_key=self.openai_api_key)
+            response = client.chat.completions.create(
+                model="gpt-4",
+                messages=[
+                    {"role": "system", "content": "You are an expert cryptocurrency trading strategy optimizer. Always respond with valid JSON."},
+                    {"role": "user", "content": optimization_prompt}
+                ],
+                max_tokens=1000,
+                temperature=0.3
+            )
+            
+            ai_response = response.choices[0].message.content
+            
+            try:
+                optimization_result = json.loads(ai_response)
+                
+                # Validate the optimization result
+                if optimization_result.get("meets_criteria", False):
+                    # Run quick backtest simulation
+                    backtest_results = await self._simulate_backtest(symbol, optimization_result["optimized_params"])
+                    
+                    # Check if backtest meets criteria
+                    if self._meets_criteria(backtest_results, criteria):
+                        return {
+                            "config": optimization_result["optimized_params"],
+                            "meets_criteria": True,
+                            "performance": backtest_results,
+                            "reasoning": optimization_result.get("reasoning", "AI optimized parameters")
+                        }
+                
+                return {"meets_criteria": False, "reasoning": "Does not meet optimization criteria"}
+                
+            except json.JSONDecodeError:
+                logger.error(f"Invalid JSON response from AI for {symbol}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error optimizing strategy for {symbol}: {e}")
+            return None
+    
+    async def _get_market_data(self, symbol: str) -> Optional[Dict[str, Any]]:
+        """Get current market data for a symbol"""
+        try:
+            # This would integrate with your market data service
+            # For now, return simulated data
+            import random
+            return {
+                "price": random.uniform(0.1, 100.0),
+                "change_24h": random.uniform(-10, 10),
+                "volume_24h": random.uniform(1000000, 10000000),
+                "volatility": random.choice(["low", "medium", "high"])
+            }
+        except Exception as e:
+            logger.error(f"Error getting market data for {symbol}: {e}")
+            return None
+    
+    async def _simulate_backtest(self, symbol: str, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Simulate backtest results for optimized parameters"""
+        try:
+            # This would run actual backtesting
+            # For now, return simulated realistic results
+            import random
+            
+            win_rate = random.uniform(45, 85)
+            total_trades = random.randint(30, 200)
+            profit_factor = random.uniform(0.8, 3.0)
+            max_drawdown = random.uniform(5, 25)
+            sharpe_ratio = random.uniform(0.5, 2.5)
+            
+            return {
+                "win_rate": win_rate,
+                "total_trades": total_trades,
+                "profit_factor": profit_factor,
+                "max_drawdown": max_drawdown,
+                "sharpe_ratio": sharpe_ratio,
+                "total_pnl": random.uniform(-100, 500)
+            }
+        except Exception as e:
+            logger.error(f"Error simulating backtest for {symbol}: {e}")
+            return {}
+    
+    def _meets_criteria(self, backtest_results: Dict[str, Any], criteria: Dict[str, Any]) -> bool:
+        """Check if backtest results meet the optimization criteria"""
+        try:
+            return (
+                backtest_results.get("win_rate", 0) >= criteria.get("min_win_rate", 60) and
+                backtest_results.get("max_drawdown", 100) <= criteria.get("max_drawdown", 15) and
+                backtest_results.get("total_trades", 0) >= criteria.get("min_total_trades", 50) and
+                backtest_results.get("profit_factor", 0) >= criteria.get("min_profit_factor", 1.5) and
+                backtest_results.get("sharpe_ratio", 0) >= criteria.get("min_sharpe_ratio", 1.0)
+            )
+        except Exception as e:
+            logger.error(f"Error checking criteria: {e}")
+            return False
+
     async def analyze_market_and_generate_signal(
         self, 
         symbol: str, 

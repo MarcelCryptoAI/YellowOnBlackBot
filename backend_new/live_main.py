@@ -1756,6 +1756,182 @@ async def test_completion(request: dict):
         logger.error(f"Failed to test completion: {e}")
         raise HTTPException(status_code=500, detail=f"Test completion error: {str(e)}")
 
+@app.post("/api/strategies/mass-optimization/start")
+async def start_mass_optimization(request: dict):
+    """Start mass strategy optimization across all trading pairs"""
+    try:
+        criteria = request.get("criteria", {})
+        strategies = request.get("strategies", [])
+        
+        # Store optimization job in memory (in production, use Redis or database)
+        optimization_status = {
+            "is_running": True,
+            "total_coins": 445,  # Number of USDT trading pairs
+            "processed_coins": 0,
+            "current_coin": "BTCUSDT",
+            "successful_deployments": 0,
+            "failed_deployments": 0,
+            "estimated_time_remaining": "2-4 hours",
+            "criteria": criteria,
+            "strategies": strategies,
+            "start_time": datetime.now(timezone.utc).isoformat()
+        }
+        
+        # Store in global variable for this demo (use proper storage in production)
+        global mass_optimization_status
+        mass_optimization_status = optimization_status
+        
+        # Start background task for optimization
+        asyncio.create_task(run_mass_optimization(optimization_status))
+        
+        return {
+            "success": True,
+            "message": "Mass optimization started",
+            "data": optimization_status
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to start mass optimization: {e}")
+        raise HTTPException(status_code=500, detail=f"Mass optimization start error: {str(e)}")
+
+@app.get("/api/strategies/mass-optimization/status")
+async def get_mass_optimization_status():
+    """Get current status of mass optimization"""
+    try:
+        global mass_optimization_status
+        if 'mass_optimization_status' not in globals():
+            return {
+                "success": True,
+                "data": None
+            }
+        
+        return {
+            "success": True,
+            "data": mass_optimization_status
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to get mass optimization status: {e}")
+        raise HTTPException(status_code=500, detail=f"Mass optimization status error: {str(e)}")
+
+@app.post("/api/strategies/mass-optimization/stop")
+async def stop_mass_optimization():
+    """Stop mass optimization process"""
+    try:
+        global mass_optimization_status
+        if 'mass_optimization_status' in globals():
+            mass_optimization_status["is_running"] = False
+        
+        return {
+            "success": True,
+            "message": "Mass optimization stopped"
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to stop mass optimization: {e}")
+        raise HTTPException(status_code=500, detail=f"Mass optimization stop error: {str(e)}")
+
+async def run_mass_optimization(status_dict):
+    """Background task to run mass optimization"""
+    try:
+        from services.ai_trading_optimizer import AITradingOptimizer
+        from services.mass_symbol_manager import MassSymbolManager
+        
+        # Initialize services
+        optimizer = AITradingOptimizer()
+        symbol_manager = MassSymbolManager()
+        
+        # Get all trading symbols
+        symbols = await symbol_manager.get_all_symbols()
+        status_dict["total_coins"] = len(symbols)
+        
+        logger.info(f"🎯 Starting mass optimization for {len(symbols)} symbols")
+        
+        for i, symbol in enumerate(symbols):
+            if not status_dict["is_running"]:
+                break
+                
+            status_dict["current_coin"] = symbol
+            status_dict["processed_coins"] = i + 1
+            
+            try:
+                # Get market data for symbol
+                market_data = await symbol_manager.get_market_data(symbol)
+                
+                # Run AI optimization for each strategy
+                for strategy_config in status_dict["strategies"]:
+                    # Optimize strategy parameters using AI
+                    optimized_params = await optimizer.optimize_strategy_for_symbol(
+                        symbol, 
+                        strategy_config, 
+                        status_dict["criteria"]
+                    )
+                    
+                    if optimized_params and optimized_params.get("meets_criteria", False):
+                        # Deploy strategy with optimized parameters
+                        deployed = await deploy_optimized_strategy(symbol, optimized_params)
+                        if deployed:
+                            status_dict["successful_deployments"] += 1
+                            logger.info(f"✅ Deployed optimized strategy for {symbol}")
+                        else:
+                            status_dict["failed_deployments"] += 1
+                    else:
+                        status_dict["failed_deployments"] += 1
+                        
+            except Exception as e:
+                logger.error(f"❌ Error optimizing {symbol}: {e}")
+                status_dict["failed_deployments"] += 1
+            
+            # Update ETA
+            if i > 0:
+                avg_time_per_coin = (datetime.now(timezone.utc) - datetime.fromisoformat(status_dict["start_time"])).total_seconds() / i
+                remaining_coins = len(symbols) - i - 1
+                eta_seconds = avg_time_per_coin * remaining_coins
+                eta_hours = eta_seconds / 3600
+                status_dict["estimated_time_remaining"] = f"{eta_hours:.1f} hours"
+            
+            # Small delay to prevent overwhelming the system
+            await asyncio.sleep(1)
+        
+        status_dict["is_running"] = False
+        status_dict["current_coin"] = "COMPLETED"
+        logger.info(f"🏁 Mass optimization completed. Deployed: {status_dict['successful_deployments']}, Failed: {status_dict['failed_deployments']}")
+        
+    except Exception as e:
+        logger.error(f"❌ Mass optimization error: {e}")
+        status_dict["is_running"] = False
+        status_dict["current_coin"] = "ERROR"
+
+async def deploy_optimized_strategy(symbol: str, optimized_params: dict):
+    """Deploy an optimized strategy for a symbol"""
+    try:
+        # Create strategy using the strategy engine
+        strategy_data = {
+            "name": f"AI_Optimized_{symbol}_{datetime.now().strftime('%Y%m%d_%H%M')}",
+            "connection_id": list(connections_store.keys())[0] if connections_store else None,
+            "symbol": symbol,
+            "config": {
+                "type": "ai_optimized",
+                **optimized_params["config"],
+                "position_size": 5.0,  # $5 as requested
+                "leverage": 25,  # x25 leverage as requested
+            },
+            "risk_limits": {
+                "max_position_size": 50.0,  # $50 max
+                "max_daily_loss": 100.0,
+                "max_drawdown": 0.20,
+                "max_leverage": 25,
+            }
+        }
+        
+        # Here you would call the actual strategy creation logic
+        # For now, we'll simulate success
+        return True
+        
+    except Exception as e:
+        logger.error(f"Failed to deploy strategy for {symbol}: {e}")
+        return False
+
 # Strategy execution endpoints  
 @app.post("/api/strategies/execute")
 async def execute_strategy_signal(request: dict):

@@ -41,6 +41,38 @@ interface StrategyFormData {
   max_leverage?: number;
 }
 
+interface ImportedStrategy {
+  id: string;
+  name: string;
+  coinPair: string;
+  config: any;
+  backtest_results?: {
+    win_rate: number;
+    total_trades: number;
+    max_drawdown: number;
+    total_pnl: number;
+    sharpe_ratio: number;
+  };
+}
+
+interface OptimizationCriteria {
+  min_win_rate: number;
+  max_drawdown: number;
+  min_total_trades: number;
+  min_profit_factor: number;
+  min_sharpe_ratio: number;
+}
+
+interface MassOptimizationStatus {
+  is_running: boolean;
+  total_coins: number;
+  processed_coins: number;
+  current_coin: string;
+  successful_deployments: number;
+  failed_deployments: number;
+  estimated_time_remaining: string;
+}
+
 export const StrategyEngineDashboard: React.FC = () => {
   const [engineStatus, setEngineStatus] = useState<EngineStatus | null>(null);
   const [strategies, setStrategies] = useState<Strategy[]>([]);
@@ -65,6 +97,20 @@ export const StrategyEngineDashboard: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [connections, setConnections] = useState<any[]>([]);
+  
+  // New state for strategy import and mass optimization
+  const [importedStrategies, setImportedStrategies] = useState<ImportedStrategy[]>([]);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [showMassOptimization, setShowMassOptimization] = useState(false);
+  const [optimizationCriteria, setOptimizationCriteria] = useState<OptimizationCriteria>({
+    min_win_rate: 60,
+    max_drawdown: 15,
+    min_total_trades: 50,
+    min_profit_factor: 1.5,
+    min_sharpe_ratio: 1.0,
+  });
+  const [massOptimizationStatus, setMassOptimizationStatus] = useState<MassOptimizationStatus | null>(null);
+  const [selectedStrategiesForImport, setSelectedStrategiesForImport] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadEngineStatus();
@@ -253,6 +299,145 @@ export const StrategyEngineDashboard: React.FC = () => {
     }
   };
 
+  // New functions for strategy import and mass optimization
+  const loadStrategiesFromBuilder = async () => {
+    try {
+      setLoading(true);
+      // Load strategies from localStorage where strategy builder saves them
+      const savedStrategies = localStorage.getItem('saved_strategies');
+      if (savedStrategies) {
+        const strategies = JSON.parse(savedStrategies);
+        const importableStrategies: ImportedStrategy[] = strategies.map((strategy: any, index: number) => ({
+          id: `imported_${index}`,
+          name: strategy.name || `Strategy ${index + 1}`,
+          coinPair: strategy.coinPair || 'BTCUSDT',
+          config: strategy,
+          backtest_results: strategy.backtest_results || null,
+        }));
+        setImportedStrategies(importableStrategies);
+      } else {
+        setImportedStrategies([]);
+      }
+      setShowImportModal(true);
+    } catch (error) {
+      console.error('Error loading strategies from builder:', error);
+      setError('Failed to load strategies from builder');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const importSelectedStrategies = async () => {
+    try {
+      setLoading(true);
+      const strategiesToImport = importedStrategies.filter(strategy => 
+        selectedStrategiesForImport.has(strategy.id)
+      );
+
+      for (const strategy of strategiesToImport) {
+        // Convert strategy builder format to engine format
+        const engineStrategy = {
+          name: strategy.name,
+          connection_id: connections[0]?.connectionId || '',
+          symbol: strategy.coinPair,
+          config: {
+            type: 'imported',
+            ...strategy.config,
+            position_size: strategy.config.fixedAmount || 0.01,
+            leverage: strategy.config.leverage || 1,
+          },
+          risk_limits: {
+            max_position_size: strategy.config.fixedAmount ? strategy.config.fixedAmount * 10 : 1000,
+            max_daily_loss: 500,
+            max_drawdown: 0.20,
+            max_leverage: strategy.config.leverage || 10,
+          }
+        };
+
+        await strategyEngineApi.createStrategy(engineStrategy);
+      }
+
+      await loadEngineStatus();
+      setShowImportModal(false);
+      setSelectedStrategiesForImport(new Set());
+      setError(null);
+    } catch (error: any) {
+      setError(error.response?.data?.detail || 'Failed to import strategies');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const startMassOptimization = async () => {
+    try {
+      setLoading(true);
+      
+      // Start mass optimization process
+      const API_BASE_URL = process.env.NODE_ENV === 'production' 
+        ? 'https://ctb-backend-api-5b94a2e25dad.herokuapp.com/api'
+        : 'http://localhost:8100/api';
+        
+      const response = await fetch(`${API_BASE_URL}/strategies/mass-optimization/start`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          criteria: optimizationCriteria,
+          strategies: importedStrategies.map(s => s.config),
+        }),
+      });
+
+      if (response.ok) {
+        setShowMassOptimization(false);
+        // Start polling for status
+        pollMassOptimizationStatus();
+      } else {
+        throw new Error('Failed to start mass optimization');
+      }
+    } catch (error: any) {
+      setError(error.message || 'Failed to start mass optimization');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const pollMassOptimizationStatus = () => {
+    const interval = setInterval(async () => {
+      try {
+        const API_BASE_URL = process.env.NODE_ENV === 'production' 
+          ? 'https://ctb-backend-api-5b94a2e25dad.herokuapp.com/api'
+          : 'http://localhost:8100/api';
+          
+        const response = await fetch(`${API_BASE_URL}/strategies/mass-optimization/status`);
+        if (response.ok) {
+          const status = await response.json();
+          setMassOptimizationStatus(status.data);
+          
+          if (!status.data?.is_running) {
+            clearInterval(interval);
+            await loadEngineStatus(); // Reload strategies after completion
+          }
+        }
+      } catch (error) {
+        console.error('Error polling mass optimization status:', error);
+      }
+    }, 5000); // Poll every 5 seconds
+  };
+
+  const stopMassOptimization = async () => {
+    try {
+      const API_BASE_URL = process.env.NODE_ENV === 'production' 
+        ? 'https://ctb-backend-api-5b94a2e25dad.herokuapp.com/api'
+        : 'http://localhost:8100/api';
+        
+      await fetch(`${API_BASE_URL}/strategies/mass-optimization/stop`, { method: 'POST' });
+      setMassOptimizationStatus(null);
+    } catch (error) {
+      console.error('Error stopping mass optimization:', error);
+    }
+  };
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -267,6 +452,22 @@ export const StrategyEngineDashboard: React.FC = () => {
         </div>
         
         <div className="flex space-x-4">
+          <button
+            onClick={loadStrategiesFromBuilder}
+            className="glass-button glass-button-purple"
+            disabled={loading}
+          >
+            📥 Import Strategies
+          </button>
+          
+          <button
+            onClick={() => setShowMassOptimization(true)}
+            className="glass-button glass-button-yellow"
+            disabled={loading || importedStrategies.length === 0}
+          >
+            🎯 Mass Optimization
+          </button>
+          
           <button
             onClick={() => setShowCreateForm(true)}
             className="glass-button glass-button-cyan"
@@ -383,6 +584,80 @@ export const StrategyEngineDashboard: React.FC = () => {
               </div>
             </div>
           )}
+        </GlassCard>
+      )}
+
+      {/* Mass Optimization Status */}
+      {massOptimizationStatus && (
+        <GlassCard className="border-neon-yellow/50 bg-yellow-500/10">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-rajdhani font-bold text-neon-yellow">
+              🎯 Mass Optimization Progress
+            </h2>
+            {massOptimizationStatus.is_running && (
+              <button
+                onClick={stopMassOptimization}
+                className="glass-button glass-button-pink text-sm"
+              >
+                🛑 Stop
+              </button>
+            )}
+          </div>
+          
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+            <div className="text-center">
+              <div className="text-2xl font-orbitron font-bold text-neon-yellow">
+                {massOptimizationStatus.processed_coins}/{massOptimizationStatus.total_coins}
+              </div>
+              <div className="text-sm text-gray-400 mt-1">Progress</div>
+            </div>
+            
+            <div className="text-center">
+              <div className="text-2xl font-orbitron font-bold text-neon-green">
+                {massOptimizationStatus.successful_deployments}
+              </div>
+              <div className="text-sm text-gray-400 mt-1">Deployed</div>
+            </div>
+            
+            <div className="text-center">
+              <div className="text-2xl font-orbitron font-bold text-neon-pink">
+                {massOptimizationStatus.failed_deployments}
+              </div>
+              <div className="text-sm text-gray-400 mt-1">Failed</div>
+            </div>
+            
+            <div className="text-center">
+              <div className="text-2xl font-orbitron font-bold text-neon-cyan">
+                {massOptimizationStatus.current_coin}
+              </div>
+              <div className="text-sm text-gray-400 mt-1">Current Coin</div>
+            </div>
+            
+            <div className="text-center">
+              <div className="text-2xl font-orbitron font-bold text-neon-purple">
+                {massOptimizationStatus.estimated_time_remaining}
+              </div>
+              <div className="text-sm text-gray-400 mt-1">ETA</div>
+            </div>
+          </div>
+          
+          {/* Progress Bar */}
+          <div className="w-full bg-gray-700 rounded-full h-3 mb-4">
+            <div 
+              className="bg-gradient-to-r from-neon-cyan to-neon-purple h-3 rounded-full transition-all duration-500"
+              style={{ 
+                width: `${(massOptimizationStatus.processed_coins / massOptimizationStatus.total_coins) * 100}%` 
+              }}
+            />
+          </div>
+          
+          <div className="text-center text-sm text-gray-400">
+            {massOptimizationStatus.is_running ? (
+              <span className="text-neon-yellow">🔄 Optimizing strategies for all trading pairs...</span>
+            ) : (
+              <span className="text-neon-green">✅ Mass optimization completed!</span>
+            )}
+          </div>
         </GlassCard>
       )}
 
@@ -588,6 +863,278 @@ export const StrategyEngineDashboard: React.FC = () => {
             </div>
           </div>
         </GlassCard>
+      )}
+
+      {/* Strategy Import Modal */}
+      {showImportModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-4xl h-[80vh] glass-card animate-fadeInUp">
+            <div className="p-6 border-b border-neon-purple/20">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-rajdhani font-bold text-neon-purple">
+                  📥 Import Strategies from Builder
+                </h3>
+                <button
+                  onClick={() => setShowImportModal(false)}
+                  className="text-gray-400 hover:text-white"
+                >
+                  ✕
+                </button>
+              </div>
+              <p className="text-gray-400 text-sm mt-2">
+                Select strategies from the Strategy Builder to import into the automation engine
+              </p>
+            </div>
+            
+            <div className="p-6 overflow-y-auto h-[calc(100%-120px)]">
+              {importedStrategies.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="text-6xl mb-4">📭</div>
+                  <h3 className="text-xl font-rajdhani font-bold text-gray-400 mb-2">
+                    No Strategies Found
+                  </h3>
+                  <p className="text-gray-500">
+                    Create some strategies in the Strategy Builder first, then come back to import them.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {importedStrategies.map((strategy) => (
+                    <div 
+                      key={strategy.id}
+                      className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                        selectedStrategiesForImport.has(strategy.id)
+                          ? 'border-neon-purple bg-purple-500/20'
+                          : 'border-gray-600 hover:border-neon-purple/50'
+                      }`}
+                      onClick={() => {
+                        const newSelected = new Set(selectedStrategiesForImport);
+                        if (newSelected.has(strategy.id)) {
+                          newSelected.delete(strategy.id);
+                        } else {
+                          newSelected.add(strategy.id);
+                        }
+                        setSelectedStrategiesForImport(newSelected);
+                      }}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                          <div className="text-2xl">
+                            {selectedStrategiesForImport.has(strategy.id) ? '✅' : '⭕'}
+                          </div>
+                          <div>
+                            <h3 className="font-rajdhani font-bold text-white">
+                              {strategy.name}
+                            </h3>
+                            <p className="text-sm text-gray-400">
+                              {strategy.coinPair} • {strategy.config.signalSource || 'Technical'}
+                            </p>
+                          </div>
+                        </div>
+                        
+                        {strategy.backtest_results && (
+                          <div className="grid grid-cols-3 gap-4 text-sm">
+                            <div className="text-center">
+                              <div className={`font-bold ${
+                                strategy.backtest_results.win_rate >= 60 ? 'text-neon-green' : 
+                                strategy.backtest_results.win_rate >= 40 ? 'text-neon-yellow' : 'text-neon-pink'
+                              }`}>
+                                {strategy.backtest_results.win_rate.toFixed(1)}%
+                              </div>
+                              <div className="text-gray-400">Win Rate</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-neon-cyan font-bold">
+                                {strategy.backtest_results.total_trades}
+                              </div>
+                              <div className="text-gray-400">Trades</div>
+                            </div>
+                            <div className="text-center">
+                              <div className={`font-bold ${
+                                strategy.backtest_results.total_pnl >= 0 ? 'text-neon-green' : 'text-neon-pink'
+                              }`}>
+                                ${strategy.backtest_results.total_pnl.toFixed(2)}
+                              </div>
+                              <div className="text-gray-400">PnL</div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            <div className="p-6 border-t border-gray-700">
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-gray-400">
+                  {selectedStrategiesForImport.size} of {importedStrategies.length} strategies selected
+                </div>
+                <div className="flex space-x-4">
+                  <button
+                    onClick={() => setShowImportModal(false)}
+                    className="glass-button glass-button-gray"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={importSelectedStrategies}
+                    disabled={selectedStrategiesForImport.size === 0 || loading}
+                    className="glass-button glass-button-purple"
+                  >
+                    Import {selectedStrategiesForImport.size} Strategies
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mass Optimization Modal */}
+      {showMassOptimization && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl glass-card animate-fadeInUp">
+            <div className="p-6 border-b border-neon-yellow/20">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-rajdhani font-bold text-neon-yellow">
+                  🎯 Mass Strategy Optimization
+                </h3>
+                <button
+                  onClick={() => setShowMassOptimization(false)}
+                  className="text-gray-400 hover:text-white"
+                >
+                  ✕
+                </button>
+              </div>
+              <p className="text-gray-400 text-sm mt-2">
+                Configure criteria for AI-powered strategy optimization across all trading pairs
+              </p>
+            </div>
+            
+            <div className="p-6 space-y-6">
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Minimum Win Rate (%)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={optimizationCriteria.min_win_rate}
+                    onChange={(e) => setOptimizationCriteria({
+                      ...optimizationCriteria,
+                      min_win_rate: parseFloat(e.target.value)
+                    })}
+                    className="w-full p-3 bg-black/30 border border-gray-600 rounded-xl text-white focus:border-neon-yellow focus:ring-1 focus:ring-neon-yellow"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Maximum Drawdown (%)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={optimizationCriteria.max_drawdown}
+                    onChange={(e) => setOptimizationCriteria({
+                      ...optimizationCriteria,
+                      max_drawdown: parseFloat(e.target.value)
+                    })}
+                    className="w-full p-3 bg-black/30 border border-gray-600 rounded-xl text-white focus:border-neon-yellow focus:ring-1 focus:ring-neon-yellow"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Minimum Total Trades
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={optimizationCriteria.min_total_trades}
+                    onChange={(e) => setOptimizationCriteria({
+                      ...optimizationCriteria,
+                      min_total_trades: parseInt(e.target.value)
+                    })}
+                    className="w-full p-3 bg-black/30 border border-gray-600 rounded-xl text-white focus:border-neon-yellow focus:ring-1 focus:ring-neon-yellow"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Minimum Profit Factor
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    value={optimizationCriteria.min_profit_factor}
+                    onChange={(e) => setOptimizationCriteria({
+                      ...optimizationCriteria,
+                      min_profit_factor: parseFloat(e.target.value)
+                    })}
+                    className="w-full p-3 bg-black/30 border border-gray-600 rounded-xl text-white focus:border-neon-yellow focus:ring-1 focus:ring-neon-yellow"
+                  />
+                </div>
+                
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Minimum Sharpe Ratio
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    value={optimizationCriteria.min_sharpe_ratio}
+                    onChange={(e) => setOptimizationCriteria({
+                      ...optimizationCriteria,
+                      min_sharpe_ratio: parseFloat(e.target.value)
+                    })}
+                    className="w-full p-3 bg-black/30 border border-gray-600 rounded-xl text-white focus:border-neon-yellow focus:ring-1 focus:ring-neon-yellow"
+                  />
+                </div>
+              </div>
+              
+              <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl">
+                <h4 className="text-neon-yellow font-bold mb-2">🤖 AI Optimization Process</h4>
+                <ul className="text-sm text-gray-300 space-y-1">
+                  <li>• Backtests all imported strategies on 445+ trading pairs</li>
+                  <li>• AI optimizes parameters for each coin individually</li>
+                  <li>• Deploys only strategies meeting your criteria</li>
+                  <li>• Estimated time: 2-4 hours for complete optimization</li>
+                </ul>
+              </div>
+            </div>
+            
+            <div className="p-6 border-t border-gray-700">
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-gray-400">
+                  {importedStrategies.length} strategies available for optimization
+                </div>
+                <div className="flex space-x-4">
+                  <button
+                    onClick={() => setShowMassOptimization(false)}
+                    className="glass-button glass-button-gray"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={startMassOptimization}
+                    disabled={loading || importedStrategies.length === 0}
+                    className="glass-button glass-button-yellow"
+                  >
+                    🚀 Start Mass Optimization
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
