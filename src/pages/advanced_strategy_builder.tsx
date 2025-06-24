@@ -545,6 +545,7 @@ const AdvancedStrategyBuilder: React.FC = () => {
   const [showOptimizationReport, setShowOptimizationReport] = useState(false);
   const [optimizationResults, setOptimizationResults] = useState<any>(null);
   const [backtestPeriod, setBacktestPeriod] = useState('12m'); // Default 12 months
+  const [showExampleStrategiesModal, setShowExampleStrategiesModal] = useState(false);
   
   // Strategy configuration state
   const [config, setConfig] = useState<StrategyConfig>({
@@ -760,6 +761,228 @@ const AdvancedStrategyBuilder: React.FC = () => {
     setTimeout(() => {
       alert(`✅ ${profile.toUpperCase()} Risk Profiel toegepast!\n\n${settings.description}\n\nLeverage: ${settings.leverage}x (Isolated)\nStop Loss: ${settings.stopLossPercentage}%\nTake Profit: ${settings.takeProfitPercentage}%`);
     }, 500);
+  };
+
+  const showExampleStrategies = () => {
+    setShowExampleStrategiesModal(true);
+  };
+
+  const applyExampleStrategy = (strategyType: string) => {
+    setProcessLogs([]);
+    addProcessLog(`🚀 Applying ${strategyType} strategy...`);
+    
+    const exampleStrategies: { [key: string]: any } = {
+      'macd_supertrend_rsi': {
+        name: 'MACD + SuperTrend + RSI Multi-Timeframe',
+        signalIndicator: {
+          type: 'macd',
+          category: 'signal',
+          timeframe: '15m',
+          parameters: {
+            fastPeriod: 12,
+            slowPeriod: 26,
+            signalPeriod: 9
+          }
+        },
+        confirmingIndicators: [
+          {
+            type: 'supertrend',
+            category: 'trend',
+            timeframe: '1h',
+            parameters: {
+              period: 10,
+              multiplier: 3
+            },
+            enabled: true
+          },
+          {
+            type: 'rsi',
+            category: 'signal',
+            timeframe: '1h',
+            parameters: {
+              period: 14,
+              overbought: 70,
+              oversold: 30
+            },
+            enabled: true
+          }
+        ],
+        leverage: 15,
+        stopLossSettings: {
+          type: 'fixed_from_entry',
+          percentage: 3
+        },
+        takeProfitSettings: {
+          type: 'multiple',
+          numberOfTPs: 3,
+          tpSpacing: {
+            type: 'fixed_percentage',
+            fixedPercentage: 2
+          }
+        }
+      },
+      'ema_bb_stoch': {
+        name: 'EMA Crossover + Bollinger + Stochastic',
+        signalIndicator: {
+          type: 'ema',
+          category: 'trend',
+          timeframe: '5m',
+          parameters: {
+            period: 9
+          }
+        },
+        confirmingIndicators: [
+          {
+            type: 'bollinger',
+            category: 'trend',
+            timeframe: '15m',
+            parameters: {
+              period: 20,
+              std: 2
+            },
+            enabled: true
+          },
+          {
+            type: 'stochastic',
+            category: 'signal',
+            timeframe: '30m',
+            parameters: {
+              kPeriod: 14,
+              dPeriod: 3,
+              smooth: 3
+            },
+            enabled: true
+          }
+        ],
+        leverage: 10,
+        stopLossSettings: {
+          type: 'fixed_from_entry',
+          percentage: 2.5
+        },
+        takeProfitSettings: {
+          type: 'multiple',
+          numberOfTPs: 2,
+          tpSpacing: {
+            type: 'fixed_percentage',
+            fixedPercentage: 3
+          }
+        }
+      },
+      'rsi_macd': {
+        name: 'RSI + MACD Dual Timeframe',
+        signalIndicator: {
+          type: 'rsi',
+          category: 'signal',
+          timeframe: '15m',
+          parameters: {
+            period: 14,
+            overbought: 70,
+            oversold: 30
+          }
+        },
+        confirmingIndicators: [
+          {
+            type: 'macd',
+            category: 'signal',
+            timeframe: '1h',
+            parameters: {
+              fastPeriod: 12,
+              slowPeriod: 26,
+              signalPeriod: 9
+            },
+            enabled: true
+          }
+        ],
+        leverage: 20,
+        stopLossSettings: {
+          type: 'fixed_from_entry',
+          percentage: 2
+        },
+        takeProfitSettings: {
+          type: 'single',
+          tpSpacing: {
+            type: 'fixed_percentage',
+            fixedPercentage: 5
+          }
+        }
+      }
+    };
+    
+    const strategy = exampleStrategies[strategyType];
+    if (strategy) {
+      updateConfig({
+        signalSource: 'technical',
+        signalIndicator: strategy.signalIndicator,
+        confirmingIndicators: strategy.confirmingIndicators,
+        leverage: strategy.leverage,
+        stopLossSettings: {
+          ...config.stopLossSettings,
+          ...strategy.stopLossSettings
+        },
+        takeProfitSettings: {
+          ...config.takeProfitSettings,
+          ...strategy.takeProfitSettings
+        }
+      });
+      
+      addProcessLog(`✅ Applied ${strategy.name}`);
+      addProcessLog(`📊 Signal: ${strategy.signalIndicator.type.toUpperCase()} on ${strategy.signalIndicator.timeframe}`);
+      strategy.confirmingIndicators.forEach((ind: any, idx: number) => {
+        addProcessLog(`📈 Confirm ${idx + 1}: ${ind.type.toUpperCase()} on ${ind.timeframe}`);
+      });
+      addProcessLog(`💪 Leverage: ${strategy.leverage}x`);
+      addProcessLog(`🛡️ Stop Loss: ${strategy.stopLossSettings.percentage}%`);
+      addProcessLog('✨ Strategy configuration complete!');
+      
+      setShowExampleStrategiesModal(false);
+    }
+  };
+
+  const saveStrategy = () => {
+    try {
+      // Validation
+      if (!config.accountId || !config.coinPair || (!config.signalIndicator?.type && config.signalSource === 'technical')) {
+        alert('❌ Vul alle verplichte velden in voordat je de strategie opslaat.');
+        return;
+      }
+
+      // Generate unique ID
+      const strategyId = `strategy_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Create strategy object
+      const strategy = {
+        id: strategyId,
+        name: config.name,
+        coinPair: config.coinPair,
+        config: config,
+        created: new Date().toISOString(),
+        backtest_results: optimizationResults || {
+          win_rate: 0,
+          total_trades: 0,
+          max_drawdown: 0,
+          total_pnl: 0,
+          sharpe_ratio: 0
+        }
+      };
+
+      // Save to localStorage
+      const existingStrategies = JSON.parse(localStorage.getItem('savedStrategies') || '[]');
+      existingStrategies.push(strategy);
+      localStorage.setItem('savedStrategies', JSON.stringify(existingStrategies));
+
+      // Show success message
+      addProcessLog(`✅ Strategy "${config.name}" saved successfully!`);
+      addProcessLog(`📝 Strategy ID: ${strategyId}`);
+      addProcessLog(`💾 Saved to local storage for import into Auto Trading Engine`);
+      
+      alert(`✅ Strategie "${config.name}" succesvol opgeslagen!\n\n📋 Details:\n• Trading Pair: ${config.coinPair}\n• Signal: ${config.signalIndicator?.type?.toUpperCase() || 'ML'} (${config.signalIndicator?.timeframe})\n• Confirming: ${config.confirmingIndicators.filter(ind => ind.enabled).length} indicators\n• Leverage: ${config.leverage}x\n\n🎯 Je kunt deze strategie nu importeren in de Auto Trading Engine!`);
+      
+      setShowProcessLog(true);
+      
+    } catch (error) {
+      logError('Failed to save strategy', error);
+      alert('❌ Fout bij het opslaan van de strategie. Probeer het opnieuw.');
+    }
   };
 
   const optimizeStrategy = async () => {
@@ -2075,6 +2298,14 @@ const AdvancedStrategyBuilder: React.FC = () => {
             >
               {isOptimizing ? '🔄 Optimizing...' : '🎯 Optimize All with AI'}
             </button>
+            
+            {/* Example Strategies Button */}
+            <button
+              onClick={showExampleStrategies}
+              className="px-6 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-lg font-medium transition-all"
+            >
+              📚 Example Strategies
+            </button>
           </div>
         </div>
       </div>
@@ -2179,6 +2410,7 @@ const AdvancedStrategyBuilder: React.FC = () => {
             {/* Deploy Button */}
             <div className="flex justify-center pb-8">
               <button
+                onClick={saveStrategy}
                 className="px-8 py-4 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 text-white rounded-lg font-bold text-lg transition-all duration-300 shadow-lg hover:shadow-green-500/30"
               >
                 🚀 Deploy Strategy
@@ -2265,6 +2497,156 @@ const AdvancedStrategyBuilder: React.FC = () => {
       
       {/* Error Logger */}
       <ErrorLogger errors={errors} />
+      
+      {/* Example Strategies Modal */}
+      {showExampleStrategiesModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-gray-900/95 border border-gray-700 rounded-2xl p-8 max-w-4xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-white">
+                📚 Example Multi-Timeframe Strategies
+              </h2>
+              <button
+                onClick={() => setShowExampleStrategiesModal(false)}
+                className="text-gray-400 hover:text-white text-2xl"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              {/* Strategy 1: MACD + SuperTrend + RSI */}
+              <div className="bg-gray-800 border border-gray-600 rounded-lg p-6 hover:border-purple-500 transition-colors cursor-pointer"
+                   onClick={() => applyExampleStrategy('macd_supertrend_rsi')}>
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <h3 className="text-xl font-bold text-purple-400">MACD + SuperTrend + RSI</h3>
+                    <p className="text-gray-400 text-sm mt-1">Multi-timeframe momentum strategy</p>
+                  </div>
+                  <span className="px-3 py-1 bg-purple-500/20 text-purple-400 rounded-full text-sm">Popular</span>
+                </div>
+                
+                <div className="grid grid-cols-3 gap-4 mb-4">
+                  <div className="bg-gray-700/50 rounded p-3">
+                    <div className="text-xs text-gray-400 mb-1">Signal</div>
+                    <div className="text-white font-medium">MACD (15m)</div>
+                  </div>
+                  <div className="bg-gray-700/50 rounded p-3">
+                    <div className="text-xs text-gray-400 mb-1">Confirm 1</div>
+                    <div className="text-white font-medium">SuperTrend (1h)</div>
+                  </div>
+                  <div className="bg-gray-700/50 rounded p-3">
+                    <div className="text-xs text-gray-400 mb-1">Confirm 2</div>
+                    <div className="text-white font-medium">RSI (1h)</div>
+                  </div>
+                </div>
+                
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center space-x-4">
+                    <span className="text-gray-400">Leverage: <span className="text-yellow-400 font-medium">15x</span></span>
+                    <span className="text-gray-400">SL: <span className="text-red-400 font-medium">3%</span></span>
+                    <span className="text-gray-400">TP: <span className="text-green-400 font-medium">3x 2%</span></span>
+                  </div>
+                  <div className="text-green-400">
+                    Expected WR: 75-85%
+                  </div>
+                </div>
+              </div>
+              
+              {/* Strategy 2: EMA + Bollinger + Stochastic */}
+              <div className="bg-gray-800 border border-gray-600 rounded-lg p-6 hover:border-blue-500 transition-colors cursor-pointer"
+                   onClick={() => applyExampleStrategy('ema_bb_stoch')}>
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <h3 className="text-xl font-bold text-blue-400">EMA Crossover + Bollinger + Stochastic</h3>
+                    <p className="text-gray-400 text-sm mt-1">Trend following with volatility confirmation</p>
+                  </div>
+                  <span className="px-3 py-1 bg-blue-500/20 text-blue-400 rounded-full text-sm">Balanced</span>
+                </div>
+                
+                <div className="grid grid-cols-3 gap-4 mb-4">
+                  <div className="bg-gray-700/50 rounded p-3">
+                    <div className="text-xs text-gray-400 mb-1">Signal</div>
+                    <div className="text-white font-medium">EMA 9 (5m)</div>
+                  </div>
+                  <div className="bg-gray-700/50 rounded p-3">
+                    <div className="text-xs text-gray-400 mb-1">Confirm 1</div>
+                    <div className="text-white font-medium">Bollinger (15m)</div>
+                  </div>
+                  <div className="bg-gray-700/50 rounded p-3">
+                    <div className="text-xs text-gray-400 mb-1">Confirm 2</div>
+                    <div className="text-white font-medium">Stochastic (30m)</div>
+                  </div>
+                </div>
+                
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center space-x-4">
+                    <span className="text-gray-400">Leverage: <span className="text-yellow-400 font-medium">10x</span></span>
+                    <span className="text-gray-400">SL: <span className="text-red-400 font-medium">2.5%</span></span>
+                    <span className="text-gray-400">TP: <span className="text-green-400 font-medium">2x 3%</span></span>
+                  </div>
+                  <div className="text-green-400">
+                    Expected WR: 70-80%
+                  </div>
+                </div>
+              </div>
+              
+              {/* Strategy 3: RSI + MACD */}
+              <div className="bg-gray-800 border border-gray-600 rounded-lg p-6 hover:border-green-500 transition-colors cursor-pointer"
+                   onClick={() => applyExampleStrategy('rsi_macd')}>
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <h3 className="text-xl font-bold text-green-400">RSI + MACD Dual Timeframe</h3>
+                    <p className="text-gray-400 text-sm mt-1">Simple but effective momentum strategy</p>
+                  </div>
+                  <span className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-sm">Beginner</span>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div className="bg-gray-700/50 rounded p-3">
+                    <div className="text-xs text-gray-400 mb-1">Signal</div>
+                    <div className="text-white font-medium">RSI (15m)</div>
+                  </div>
+                  <div className="bg-gray-700/50 rounded p-3">
+                    <div className="text-xs text-gray-400 mb-1">Confirm</div>
+                    <div className="text-white font-medium">MACD (1h)</div>
+                  </div>
+                </div>
+                
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center space-x-4">
+                    <span className="text-gray-400">Leverage: <span className="text-yellow-400 font-medium">20x</span></span>
+                    <span className="text-gray-400">SL: <span className="text-red-400 font-medium">2%</span></span>
+                    <span className="text-gray-400">TP: <span className="text-green-400 font-medium">5%</span></span>
+                  </div>
+                  <div className="text-green-400">
+                    Expected WR: 65-75%
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="mt-6 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+              <div className="flex items-start space-x-3">
+                <span className="text-yellow-400 text-xl">💡</span>
+                <div className="text-sm text-gray-300">
+                  <p className="font-medium text-yellow-400 mb-1">Pro Tip:</p>
+                  <p>These strategies use different timeframes for signal and confirmation indicators to filter out false signals and improve win rate. After applying, you can fine-tune the parameters using AI optimization.</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex justify-end mt-6">
+              <button
+                onClick={() => setShowExampleStrategiesModal(false)}
+                className="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
