@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { strategyEngineApi, Strategy } from '../services/api';
-import { webSocketService } from '../services/websocketService';
+// import { webSocketService } from '../services/websocketService'; // Disabled - backend doesn't support socket.io
 import { GlassCard } from './GlassCard';
 
 interface EngineStatus {

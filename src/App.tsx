@@ -308,35 +308,35 @@ const App: React.FC = () => {
         return;
       }
 
-      // Setup WebSocket for real-time updates
-      const socket = websocketManager.connect();
+      // WebSocket disabled - backend doesn't support socket.io
+      // const socket = websocketManager.connect();
       
       // Listen for market data updates
-      websocketManager.onMarketData((data) => {
-        setMarketData(data);
-      });
+      // websocketManager.onMarketData((data) => {
+      //   setMarketData(data);
+      // });
       
-      // Listen for portfolio updates
-      websocketManager.onPortfolioData((data) => {
-        const connections = data.map(item => ({
-          id: item.connectionId,
-          name: 'ByBit Connection', // Will be updated with real metadata
-          apiKey: '****LIVE',
-          secretKey: '****hidden',
-          testnet: false,
-          markets: { spot: true, usdtPerpetual: true, inverseUsd: false },
-          status: 'Active' as const,
-          balance: item.data.balance,
-          positions: item.data.positions,
-          createdAt: item.data.lastUpdated,
-          connectionData: item.data
-        }));
-        setBybitConnections(connections);
-        
-        // Aggregate all positions
-        const allPositions = data.flatMap(item => item.data.positions || []);
-        setLivePositions(allPositions);
-      });
+      // Listen for portfolio updates - disabled
+      // websocketManager.onPortfolioData((data) => {
+      //   const connections = data.map(item => ({
+      //     id: item.connectionId,
+      //     name: 'ByBit Connection', // Will be updated with real metadata
+      //     apiKey: '****LIVE',
+      //     secretKey: '****hidden',
+      //     testnet: false,
+      //     markets: { spot: true, usdtPerpetual: true, inverseUsd: false },
+      //     status: 'Active' as const,
+      //     balance: item.data.balance,
+      //     positions: item.data.positions,
+      //     createdAt: item.data.lastUpdated,
+      //     connectionData: item.data
+      //   }));
+      //   setBybitConnections(connections);
+      //   
+      //   // Aggregate all positions
+      //   const allPositions = data.flatMap(item => item.data.positions || []);
+      //   setLivePositions(allPositions);
+      // });
 
       // Load initial data and restore saved credentials
       try {
@@ -421,9 +421,9 @@ const App: React.FC = () => {
 
     initializeApp();
 
-    // Cleanup WebSocket on unmount
+    // Cleanup WebSocket on unmount - disabled
     return () => {
-      websocketManager.disconnect();
+      // websocketManager.disconnect();
     };
   }, [currentUser.name]);
 
@@ -590,8 +590,8 @@ const App: React.FC = () => {
         setStorageInfo(apiStorage.getStorageInfo());
       }
 
-      // Subscribe to WebSocket updates for this connection
-      websocketManager.subscribeToConnection(connectionId);
+      // Subscribe to WebSocket updates for this connection - disabled
+      // websocketManager.subscribeToConnection(connectionId);
       
       // Reset form
       setApiCredentials(prev => ({
