@@ -523,7 +523,7 @@ export class AutomatedStrategyMatcher {
         // Find best strategies for this coin
         const bestStrategies = this.findBestStrategiesForCoin(characteristics, 1); // Top 1 strategy per coin
         
-        if (bestStrategies.length > 0 && bestStrategies[0].score >= 60) { // Minimum 60% compatibility
+        if (bestStrategies.length > 0 && bestStrategies[0].score >= 30) { // Minimum 30% compatibility - lowered to include more coins
           const bestStrategy = bestStrategies[0];
           
           // Add to mappings
