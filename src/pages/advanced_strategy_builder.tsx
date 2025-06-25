@@ -1875,6 +1875,86 @@ const AdvancedStrategyBuilder: React.FC = () => {
     }
   };
 
+  const exportStrategy = () => {
+    try {
+      const strategy = {
+        id: `strategy_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        name: config.name,
+        coinPair: config.coinPair,
+        config: config,
+        created: new Date().toISOString(),
+        backtest_results: optimizationResults || {
+          win_rate: 0,
+          total_trades: 0,
+          max_drawdown: 0,
+          total_pnl: 0,
+          sharpe_ratio: 0
+        }
+      };
+
+      const dataStr = JSON.stringify(strategy, null, 2);
+      const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+      
+      const exportFileDefaultName = `strategy_${config.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${new Date().toISOString().split('T')[0]}.json`;
+      
+      const linkElement = document.createElement('a');
+      linkElement.setAttribute('href', dataUri);
+      linkElement.setAttribute('download', exportFileDefaultName);
+      linkElement.click();
+      
+      addProcessLog(`✅ Strategy "${config.name}" exported successfully!`);
+      alert(`✅ Strategie "${config.name}" geëxporteerd als JSON bestand!`);
+      
+    } catch (error) {
+      logError('Failed to export strategy', error);
+      alert('❌ Fout bij het exporteren van de strategie. Probeer het opnieuw.');
+    }
+  };
+
+  const importStrategy = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const result = e.target?.result as string;
+        const importedStrategy = JSON.parse(result);
+        
+        // Validate imported strategy structure
+        if (!importedStrategy.config || !importedStrategy.name) {
+          alert('❌ Ongeldig strategie bestand. Controleer het bestandsformaat.');
+          return;
+        }
+        
+        // Load the strategy configuration
+        setConfig(importedStrategy.config);
+        
+        // Update optimization results if available
+        if (importedStrategy.backtest_results) {
+          setOptimizationResults(importedStrategy.backtest_results);
+        }
+        
+        addProcessLog(`✅ Strategy "${importedStrategy.name}" imported successfully!`);
+        addProcessLog(`📝 Strategy ID: ${importedStrategy.id}`);
+        addProcessLog(`📊 Backtest Results: ${importedStrategy.backtest_results ? 'Included' : 'Not available'}`);
+        
+        alert(`✅ Strategie "${importedStrategy.name}" succesvol geïmporteerd!\n\n📋 Details:\n• Trading Pair: ${importedStrategy.config.coinPair}\n• Signal: ${importedStrategy.config.signalIndicator?.type?.toUpperCase() || 'ML'}\n• Leverage: ${importedStrategy.config.leverage}x\n\n🎯 De strategie is nu geladen en klaar voor gebruik!`);
+        
+        setShowProcessLog(true);
+        
+      } catch (error) {
+        logError('Failed to import strategy', error);
+        alert('❌ Fout bij het importeren van de strategie. Controleer of het bestand geldig is.');
+      }
+    };
+    
+    reader.readAsText(file);
+    
+    // Reset the input value so the same file can be selected again
+    event.target.value = '';
+  };
+
   const optimizeStrategy = async () => {
     setIsOptimizing(true);
     setShowProcessLog(true);
@@ -3297,14 +3377,33 @@ const AdvancedStrategyBuilder: React.FC = () => {
             {renderTakeProfitManagement()}
             {renderStopLossManagement()}
 
-            {/* Deploy Button */}
-            <div className="flex justify-center pb-8">
+            {/* Action Buttons */}
+            <div className="flex justify-center space-x-4 pb-8">
               <button
                 onClick={saveStrategy}
-                className="px-8 py-4 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 text-white rounded-lg font-bold text-lg transition-all duration-300 shadow-lg hover:shadow-green-500/30"
+                className="px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 text-white rounded-lg font-bold transition-all duration-300 shadow-lg hover:shadow-green-500/30"
               >
                 🚀 Deploy Strategy
               </button>
+              
+              <button
+                onClick={exportStrategy}
+                className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white rounded-lg font-bold transition-all duration-300 shadow-lg hover:shadow-blue-500/30"
+              >
+                💾 Export Strategy
+              </button>
+              
+              <label className="cursor-pointer">
+                <input
+                  type="file"
+                  accept=".json"
+                  onChange={importStrategy}
+                  className="hidden"
+                />
+                <div className="px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 text-white rounded-lg font-bold transition-all duration-300 shadow-lg hover:shadow-purple-500/30">
+                  📥 Import Strategy
+                </div>
+              </label>
             </div>
           </div>
         </div>
