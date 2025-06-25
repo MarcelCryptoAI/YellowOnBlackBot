@@ -1877,6 +1877,12 @@ const AdvancedStrategyBuilder: React.FC = () => {
 
   const exportStrategy = () => {
     try {
+      // Validation
+      if (!config.name || config.name.trim() === '') {
+        alert('❌ Geef eerst een naam voor de strategie.');
+        return;
+      }
+
       const strategy = {
         id: `strategy_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         name: config.name,
@@ -1893,45 +1899,64 @@ const AdvancedStrategyBuilder: React.FC = () => {
       };
 
       const dataStr = JSON.stringify(strategy, null, 2);
-      const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
       
       const exportFileDefaultName = `strategy_${config.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${new Date().toISOString().split('T')[0]}.json`;
       
       const linkElement = document.createElement('a');
-      linkElement.setAttribute('href', dataUri);
-      linkElement.setAttribute('download', exportFileDefaultName);
+      linkElement.href = url;
+      linkElement.download = exportFileDefaultName;
+      document.body.appendChild(linkElement);
       linkElement.click();
+      document.body.removeChild(linkElement);
+      URL.revokeObjectURL(url);
       
       addProcessLog(`✅ Strategy "${config.name}" exported successfully!`);
+      addProcessLog(`📁 File: ${exportFileDefaultName}`);
       alert(`✅ Strategie "${config.name}" geëxporteerd als JSON bestand!`);
+      setShowProcessLog(true);
       
     } catch (error) {
+      console.error('Export error:', error);
       logError('Failed to export strategy', error);
       alert('❌ Fout bij het exporteren van de strategie. Probeer het opnieuw.');
     }
   };
 
   const importStrategy = (event: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('Import strategy triggered');
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (!file) {
+      console.log('No file selected');
+      return;
+    }
 
+    console.log('Selected file:', file.name, file.type, file.size);
+    
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
+        console.log('File loaded, parsing JSON...');
         const result = e.target?.result as string;
         const importedStrategy = JSON.parse(result);
         
+        console.log('Parsed strategy:', importedStrategy);
+        
         // Validate imported strategy structure
         if (!importedStrategy.config || !importedStrategy.name) {
+          console.error('Invalid strategy structure:', importedStrategy);
           alert('❌ Ongeldig strategie bestand. Controleer het bestandsformaat.');
           return;
         }
         
+        console.log('Loading strategy configuration...');
         // Load the strategy configuration
         setConfig(importedStrategy.config);
         
         // Update optimization results if available
         if (importedStrategy.backtest_results) {
+          console.log('Loading backtest results...');
           setOptimizationResults(importedStrategy.backtest_results);
         }
         
@@ -1944,6 +1969,7 @@ const AdvancedStrategyBuilder: React.FC = () => {
         setShowProcessLog(true);
         
       } catch (error) {
+        console.error('Import error:', error);
         logError('Failed to import strategy', error);
         alert('❌ Fout bij het importeren van de strategie. Controleer of het bestand geldig is.');
       }
@@ -3393,17 +3419,18 @@ const AdvancedStrategyBuilder: React.FC = () => {
                 💾 Export Strategy
               </button>
               
-              <label className="cursor-pointer">
+              <div className="relative">
                 <input
                   type="file"
                   accept=".json"
                   onChange={importStrategy}
-                  className="hidden"
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                  id="strategy-import-input"
                 />
                 <div className="px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 text-white rounded-lg font-bold transition-all duration-300 shadow-lg hover:shadow-purple-500/30">
                   📥 Import Strategy
                 </div>
-              </label>
+              </div>
             </div>
           </div>
         </div>
