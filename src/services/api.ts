@@ -3,8 +3,8 @@ import axios from 'axios';
 import { io, Socket } from 'socket.io-client';
 
 const API_BASE_URL = process.env.NODE_ENV === 'production' 
-  ? 'https://ctb-backend-api-5b94a2e25dad.herokuapp.com/api'
-  : 'http://localhost:8100/api';
+  ? 'https://ctb-backend-api-5b94a2e25dad.herokuapp.com'
+  : 'http://localhost:8100';
 
 // API Client setup
 const apiClient = axios.create({
@@ -350,7 +350,7 @@ class WebSocketManager {
 // Health check function
 export const getHealth = async (): Promise<{ success: boolean; version?: string; message?: string }> => {
   try {
-    const response = await apiClient.get('/health');
+    const response = await apiClient.get('/api/health');
     return response.data;
   } catch (error) {
     return { success: false, message: 'Backend unreachable' };
@@ -361,7 +361,7 @@ export const getHealth = async (): Promise<{ success: boolean; version?: string;
 export const bybitApi = {
   // Test ByBit connection
   testConnection: async (apiKey: string, secretKey: string, testnet = false) => {
-    const response = await apiClient.post('/bybit/test-connection', {
+    const response = await apiClient.post('/api/bybit/test-connection', {
       apiKey,
       secretKey,
       testnet,
@@ -382,7 +382,7 @@ export const bybitApi = {
       inverseUsd: boolean;
     };
   }) => {
-    const response = await apiClient.post('/bybit/add-connection', connection);
+    const response = await apiClient.post('/api/bybit/add-connection', connection);
     return response.data;
   },
 
@@ -394,7 +394,7 @@ export const bybitApi = {
 
   // Get all connections
   getConnections: async (): Promise<{ success: boolean; connections: Array<{ connectionId: string; metadata: any; data: ConnectionData }> }> => {
-    const response = await apiClient.get('/bybit/connections');
+    const response = await apiClient.get('/api/bybit/connections');
     return response.data;
   },
 
@@ -406,20 +406,20 @@ export const bybitApi = {
 
   // Get all available trading instruments/symbols
   getInstruments: async (): Promise<{ success: boolean; data: Array<{ symbol: string; baseCoin: string; quoteCoin: string; status: string; contractType: string }> }> => {
-    const response = await apiClient.get('/market/instruments');
+    const response = await apiClient.get('/api/market/instruments');
     return response.data;
   },
 
   // Get market data
   getMarketData: async (symbols?: string[]): Promise<{ success: boolean; data: MarketData[] }> => {
     const params = symbols ? { symbols: symbols.join(',') } : {};
-    const response = await apiClient.get('/market/tickers', { params });
+    const response = await apiClient.get('/api/market/tickers', { params });
     return response.data;
   },
 
   // Get portfolio summary
   getPortfolioSummary: async (): Promise<{ success: boolean; summary: PortfolioSummary }> => {
-    const response = await apiClient.get('/portfolio/summary');
+    const response = await apiClient.get('/api/portfolio/summary?args=[]&kwargs={}');
     return response.data;
   },
 
@@ -438,7 +438,7 @@ export const bybitApi = {
     takeProfitPrice?: number;
     stopLossPrice?: number;
   }) => {
-    const response = await apiClient.post('/trading/create-order', tradeData);
+    const response = await apiClient.post('/api/trading/create-order', tradeData);
     return response.data;
   },
 
@@ -454,7 +454,7 @@ export const bybitApi = {
     orderId: string;
     symbol: string;
   }) => {
-    const response = await apiClient.post('/trading/cancel-order', data);
+    const response = await apiClient.post('/api/trading/cancel-order', data);
     return response.data;
   },
 
@@ -469,7 +469,7 @@ export const bybitApi = {
     takeProfit?: number;
     stopLoss?: number;
   }) => {
-    const response = await apiClient.post('/trading/modify-order', data);
+    const response = await apiClient.post('/api/trading/modify-order', data);
     return response.data;
   },
 
@@ -479,7 +479,7 @@ export const bybitApi = {
     symbol: string;
     side: string;
   }) => {
-    const response = await apiClient.post('/trading/close-position', data);
+    const response = await apiClient.post('/api/trading/close-position', data);
     return response.data;
   },
 
@@ -493,7 +493,7 @@ export const bybitApi = {
     tpTriggerBy?: string;
     slTriggerBy?: string;
   }) => {
-    const response = await apiClient.post('/trading/modify-position', data);
+    const response = await apiClient.post('/api/trading/modify-position', data);
     return response.data;
   },
 
@@ -725,7 +725,7 @@ export const massTradingApi = {
 export const openaiApi = {
   // Test OpenAI connection
   testConnection: async (apiKey: string, organization?: string) => {
-    const response = await apiClient.post('/openai/test-connection', {
+    const response = await apiClient.post('/api/openai/test-connection', {
       apiKey,
       organization: organization || '',
     });
@@ -738,7 +738,7 @@ export const openaiApi = {
     apiKey: string;
     organization?: string;
   }) => {
-    const response = await apiClient.post('/openai/add-connection', connection);
+    const response = await apiClient.post('/api/openai/add-connection', connection);
     return response.data;
   },
 
@@ -750,7 +750,7 @@ export const openaiApi = {
 
   // Get all OpenAI connections
   getConnections: async (): Promise<{ success: boolean; connections: OpenAIConnection[] }> => {
-    const response = await apiClient.get('/openai/connections');
+    const response = await apiClient.get('/api/openai/connections');
     return response.data;
   },
 
@@ -762,7 +762,7 @@ export const openaiApi = {
 
   // Make test completion
   testCompletion: async (connectionId: string, message?: string) => {
-    const response = await apiClient.post('/openai/test-completion', {
+    const response = await apiClient.post('/api/openai/test-completion', {
       connectionId,
       message: message || 'Hello, this is a test message from CTB Trading Bot.'
     });
@@ -771,7 +771,7 @@ export const openaiApi = {
 
   // Get pricing information
   getPricing: async (): Promise<{ success: boolean; data: OpenAIPricing }> => {
-    const response = await apiClient.get('/openai/pricing');
+    const response = await apiClient.get('/api/openai/pricing');
     return response.data;
   },
 
@@ -781,7 +781,7 @@ export const openaiApi = {
     signalIndicator: any;
     confirmingIndicators: any[];
   }): Promise<{ success: boolean; data: any }> => {
-    const response = await apiClient.post('/openai/strategy-advice', {
+    const response = await apiClient.post('/api/openai/strategy-advice', {
       coin: strategyData.coin,
       signalIndicator: strategyData.signalIndicator,
       confirmingIndicators: strategyData.confirmingIndicators
@@ -795,7 +795,7 @@ export const openaiApi = {
     timeframe?: string;
     lookbackPeriod?: string;
   }): Promise<{ success: boolean; data: any }> => {
-    const response = await apiClient.post('/openai/optimize-indicators', {
+    const response = await apiClient.post('/api/openai/optimize-indicators', {
       coin: requestData.coin,
       timeframe: requestData.timeframe || '1m',
       lookbackPeriod: requestData.lookbackPeriod || '1y'
@@ -810,7 +810,7 @@ export const openaiApi = {
     confirmingIndicators: any[];
     currentSettings: any;
   }): Promise<{ success: boolean; data: any }> => {
-    const response = await apiClient.post('/openai/optimize-trade-parameters', {
+    const response = await apiClient.post('/api/openai/optimize-trade-parameters', {
       coin: requestData.coin,
       signalIndicator: requestData.signalIndicator,
       confirmingIndicators: requestData.confirmingIndicators,
@@ -827,7 +827,7 @@ export const openaiApi = {
     technicals: any;
     tradingState: any;
   }): Promise<{ success: boolean; data: any }> => {
-    const response = await apiClient.post('/openai/generate-analysis', {
+    const response = await apiClient.post('/api/openai/generate-analysis', {
       connectionId,
       ...analysisData
     });

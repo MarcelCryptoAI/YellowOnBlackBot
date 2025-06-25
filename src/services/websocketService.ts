@@ -55,6 +55,10 @@ class WebSocketService {
    * Connect to WebSocket server
    */
   connect(): void {
+    console.log('🔌 WebSocket disabled - Backend does not support socket.io');
+    // Disabled due to backend not supporting socket.io
+    return;
+    
     if (this.socket?.connected || this.isConnecting) {
       return;
     }
