@@ -332,7 +332,7 @@ export const StrategyEngineDashboard: React.FC = () => {
     try {
       setLoading(true);
       // Load strategies from localStorage where strategy builder saves them
-      const savedStrategies = localStorage.getItem('saved_strategies');
+      const savedStrategies = localStorage.getItem('savedStrategies');
       if (savedStrategies) {
         const strategies = JSON.parse(savedStrategies);
         const importableStrategies: ImportedStrategy[] = strategies.map((strategy: any, index: number) => ({
@@ -353,6 +353,40 @@ export const StrategyEngineDashboard: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Import strategies from JSON file
+  const importStrategiesFromFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const result = e.target?.result as string;
+        const importedData = JSON.parse(result);
+        
+        // Handle single strategy or array of strategies
+        const strategies = Array.isArray(importedData) ? importedData : [importedData];
+        
+        const importableStrategies: ImportedStrategy[] = strategies.map((strategy: any, index: number) => ({
+          id: strategy.id || `imported_${Date.now()}_${index}`,
+          name: strategy.name || `Strategy ${index + 1}`,
+          coinPair: strategy.coinPair || strategy.config?.coinPair || 'BTCUSDT',
+          config: strategy.config || strategy,
+          backtest_results: strategy.backtest_results || null,
+        }));
+        
+        setImportedStrategies(importableStrategies);
+        setShowImportModal(true);
+      } catch (error) {
+        console.error('Error importing strategies from file:', error);
+        setError('Failed to import strategies from file. Please check the file format.');
+      }
+    };
+    
+    reader.readAsText(file);
+    event.target.value = ''; // Reset input
   };
 
   const importSelectedStrategies = async () => {
@@ -574,13 +608,28 @@ export const StrategyEngineDashboard: React.FC = () => {
             </button>
           )}
           
-          <button
-            onClick={loadStrategiesFromBuilder}
-            className="glass-button glass-button-purple"
-            disabled={loading || isAutoTradingRunning}
-          >
-            📥 Import Strategies
-          </button>
+          <div className="flex flex-col space-y-2">
+            <button
+              onClick={loadStrategiesFromBuilder}
+              className="glass-button glass-button-purple"
+              disabled={loading || isAutoTradingRunning}
+            >
+              📥 Import from Builder
+            </button>
+            
+            <label className="cursor-pointer">
+              <input
+                type="file"
+                accept=".json"
+                onChange={importStrategiesFromFile}
+                className="hidden"
+                disabled={loading || isAutoTradingRunning}
+              />
+              <div className="glass-button glass-button-blue w-full text-center">
+                📁 Import from File
+              </div>
+            </label>
+          </div>
           
           <button
             onClick={() => setShowMassOptimization(true)}
@@ -1075,7 +1124,7 @@ export const StrategyEngineDashboard: React.FC = () => {
             <div className="p-6 border-b border-neon-purple/20">
               <div className="flex items-center justify-between">
                 <h3 className="text-xl font-rajdhani font-bold text-neon-purple">
-                  📥 Import Strategies from Builder
+                  📥 Import Strategies
                 </h3>
                 <button
                   onClick={() => setShowImportModal(false)}
@@ -1085,7 +1134,7 @@ export const StrategyEngineDashboard: React.FC = () => {
                 </button>
               </div>
               <p className="text-gray-400 text-sm mt-2">
-                Select strategies from the Strategy Builder to import into the automation engine
+                Select strategies to import into the automation engine (from Builder or JSON file)
               </p>
             </div>
             
