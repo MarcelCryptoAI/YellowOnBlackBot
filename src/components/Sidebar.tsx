@@ -16,6 +16,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle }) => {
     { path: '/positions-orders', label: 'Positions', icon: '📊', color: 'pink', description: 'Manage Positions' },
     { path: '/trades', label: 'Trades', icon: '💎', color: 'green', description: 'Trade History' },
     { path: '/strategies', label: 'Strategies', icon: '🧠', color: 'orange', description: 'AI Strategies' },
+    { path: '/automation/generator', label: 'Auto Generator', icon: '🔮', color: 'indigo', description: 'AI Strategy Matcher' },
     { path: '/automation/engine', label: 'Strategy Engine', icon: '🤖', color: 'blue', description: 'Auto Trading' },
     { path: '/automation/risk', label: 'Risk Manager', icon: '🛡️', color: 'red', description: 'Risk Control' },
     { path: '/automation/monitoring', label: 'Monitoring', icon: '📈', color: 'emerald', description: 'System Health' },

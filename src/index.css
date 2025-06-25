@@ -17,6 +17,7 @@
   --neon-orange: #ff8800;
   --neon-red: #ff0044;
   --neon-emerald: #10d49a;
+  --neon-indigo: #6366f1;
   
   /* Glass Background System */
   --glass-dark: rgba(10, 10, 20, 0.6);
@@ -754,6 +755,16 @@ body::after {
 .glass-button-gray:hover {
   @apply border-gray-400 text-white bg-gray-500/20;
   box-shadow: 0 0 30px rgba(100, 100, 100, 0.4);
+}
+
+.glass-button-indigo {
+  @apply border-indigo-500/50 text-indigo-300;
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.2);
+}
+
+.glass-button-indigo:hover {
+  @apply border-indigo-400 text-white bg-indigo-500/20;
+  box-shadow: 0 0 30px rgba(99, 102, 241, 0.4);
 }
 
 /* Automation UI Styles */
