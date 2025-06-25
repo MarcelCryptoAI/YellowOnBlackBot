@@ -546,6 +546,12 @@ export const strategyEngineApi = {
     return response.data;
   },
 
+  // Get all strategies from database
+  getAllStrategies: async () => {
+    const response = await apiClient.get('/strategies/list');
+    return response.data;
+  },
+
   // Control strategy (start/pause/stop)
   controlStrategy: async (data: {
     strategy_id: string;

@@ -1828,7 +1828,7 @@ const AdvancedStrategyBuilder: React.FC = () => {
     }
   };
 
-  const saveStrategy = () => {
+  const saveStrategy = async () => {
     try {
       // Validation
       if (!config.accountId || !config.coinPair || (!config.signalIndicator?.type && config.signalSource === 'technical')) {
@@ -1836,42 +1836,101 @@ const AdvancedStrategyBuilder: React.FC = () => {
         return;
       }
 
-      // Generate unique ID
-      const strategyId = `strategy_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      addProcessLog('🚀 Saving strategy to database...');
+      setShowProcessLog(true);
+
+      // Prepare strategy data for backend
+      const strategyData = {
+        name: config.name,
+        connection_id: config.accountId,
+        symbol: config.coinPair,
+        config: {
+          // Core strategy configuration
+          signalSource: config.signalSource,
+          signalIndicator: config.signalIndicator,
+          confirmingIndicators: config.confirmingIndicators.filter(ind => ind.enabled),
+          
+          // Position management
+          amountType: config.amountType,
+          fixedAmount: config.fixedAmount,
+          percentageAmount: config.percentageAmount,
+          leverage: config.leverage,
+          marginType: config.marginType,
+          
+          // Risk management
+          stopLossSettings: config.stopLossSettings,
+          takeProfitSettings: config.takeProfitSettings,
+          
+          // ML settings (if applicable)
+          mlModel: config.mlModel,
+          
+          // Backtest results
+          backtest_results: optimizationResults || {
+            win_rate: 0,
+            total_trades: 0,
+            max_drawdown: 0,
+            total_pnl: 0,
+            sharpe_ratio: 0
+          }
+        },
+        risk_limits: {
+          max_position_size: config.fixedAmount ? config.fixedAmount * 10 : 1000,
+          max_daily_loss: 500,
+          max_drawdown: 30,
+          stop_loss_percentage: config.stopLossSettings?.percentage || 2
+        }
+      };
+
+      // Save to backend database
+      const response = await strategyEngineApi.createStrategy(strategyData);
       
-      // Create strategy object
+      if (response.success) {
+        addProcessLog(`✅ Strategy "${config.name}" saved to database!`);
+        addProcessLog(`📝 Strategy ID: ${response.data.strategy_id}`);
+        addProcessLog(`💾 Saved to backend and ready for Auto Trading Engine`);
+        
+        // Also save to localStorage as backup
+        const localStrategy = {
+          id: response.data.strategy_id,
+          name: config.name,
+          coinPair: config.coinPair,
+          config: config,
+          created: new Date().toISOString(),
+          backtest_results: optimizationResults
+        };
+        
+        const existingStrategies = JSON.parse(localStorage.getItem('savedStrategies') || '[]');
+        existingStrategies.push(localStrategy);
+        localStorage.setItem('savedStrategies', JSON.stringify(existingStrategies));
+        
+        alert(`✅ Strategie "${config.name}" succesvol opgeslagen in database!\n\n📋 Details:\n• Trading Pair: ${config.coinPair}\n• Signal: ${config.signalIndicator?.type?.toUpperCase() || 'ML'} (${config.signalIndicator?.timeframe})\n• Confirming: ${config.confirmingIndicators.filter(ind => ind.enabled).length} indicators\n• Leverage: ${config.leverage}x\n• Database ID: ${response.data.strategy_id}\n\n🎯 De strategie is nu beschikbaar in de Auto Trading Engine!`);
+      } else {
+        throw new Error(response.message || 'Failed to save strategy to database');
+      }
+      
+    } catch (error) {
+      console.error('Save strategy error:', error);
+      logError('Failed to save strategy to database', error);
+      
+      // Fallback: save to localStorage only
+      addProcessLog('⚠️ Database save failed, saving to local storage as backup...');
+      
+      const strategyId = `strategy_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       const strategy = {
         id: strategyId,
         name: config.name,
         coinPair: config.coinPair,
         config: config,
         created: new Date().toISOString(),
-        backtest_results: optimizationResults || {
-          win_rate: 0,
-          total_trades: 0,
-          max_drawdown: 0,
-          total_pnl: 0,
-          sharpe_ratio: 0
-        }
+        backtest_results: optimizationResults
       };
 
-      // Save to localStorage
       const existingStrategies = JSON.parse(localStorage.getItem('savedStrategies') || '[]');
       existingStrategies.push(strategy);
       localStorage.setItem('savedStrategies', JSON.stringify(existingStrategies));
-
-      // Show success message
-      addProcessLog(`✅ Strategy "${config.name}" saved successfully!`);
-      addProcessLog(`📝 Strategy ID: ${strategyId}`);
-      addProcessLog(`💾 Saved to local storage for import into Auto Trading Engine`);
       
-      alert(`✅ Strategie "${config.name}" succesvol opgeslagen!\n\n📋 Details:\n• Trading Pair: ${config.coinPair}\n• Signal: ${config.signalIndicator?.type?.toUpperCase() || 'ML'} (${config.signalIndicator?.timeframe})\n• Confirming: ${config.confirmingIndicators.filter(ind => ind.enabled).length} indicators\n• Leverage: ${config.leverage}x\n\n🎯 Je kunt deze strategie nu importeren in de Auto Trading Engine!`);
-      
-      setShowProcessLog(true);
-      
-    } catch (error) {
-      logError('Failed to save strategy', error);
-      alert('❌ Fout bij het opslaan van de strategie. Probeer het opnieuw.');
+      addProcessLog(`✅ Strategy "${config.name}" saved to local storage as backup`);
+      alert('⚠️ Database opslaan mislukt, maar strategie is opgeslagen als backup in local storage.\n\nProbeer later opnieuw of neem contact op met support.');
     }
   };
 

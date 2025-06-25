@@ -46,6 +46,7 @@ interface ImportedStrategy {
   name: string;
   coinPair: string;
   config: any;
+  source?: 'database' | 'localStorage' | 'file';
   backtest_results?: {
     win_rate: number;
     total_trades: number;
@@ -327,29 +328,66 @@ export const StrategyEngineDashboard: React.FC = () => {
     }
   };
 
-  // New functions for strategy import and mass optimization
-  const loadStrategiesFromBuilder = async () => {
+  // Load strategies from database
+  const loadStrategiesFromDatabase = async () => {
     try {
       setLoading(true);
-      // Load strategies from localStorage where strategy builder saves them
-      const savedStrategies = localStorage.getItem('savedStrategies');
-      if (savedStrategies) {
-        const strategies = JSON.parse(savedStrategies);
-        const importableStrategies: ImportedStrategy[] = strategies.map((strategy: any, index: number) => ({
-          id: `imported_${index}`,
-          name: strategy.name || `Strategy ${index + 1}`,
-          coinPair: strategy.coinPair || 'BTCUSDT',
-          config: strategy,
-          backtest_results: strategy.backtest_results || null,
+      
+      // Load strategies from database
+      const response = await strategyEngineApi.getAllStrategies();
+      if (response.success && response.data) {
+        const importableStrategies: ImportedStrategy[] = response.data.map((strategy: any) => ({
+          id: strategy.strategy_id || strategy.id,
+          name: strategy.name || 'Unnamed Strategy',
+          coinPair: strategy.symbol || strategy.coinPair || 'BTCUSDT',
+          config: strategy.config || strategy,
+          backtest_results: strategy.config?.backtest_results || strategy.backtest_results || null,
+          source: 'database'
         }));
         setImportedStrategies(importableStrategies);
       } else {
-        setImportedStrategies([]);
+        // Fallback: Load from localStorage
+        const savedStrategies = localStorage.getItem('savedStrategies');
+        if (savedStrategies) {
+          const strategies = JSON.parse(savedStrategies);
+          const importableStrategies: ImportedStrategy[] = strategies.map((strategy: any, index: number) => ({
+            id: strategy.id || `local_${index}`,
+            name: strategy.name || `Strategy ${index + 1}`,
+            coinPair: strategy.coinPair || 'BTCUSDT',
+            config: strategy,
+            backtest_results: strategy.backtest_results || null,
+            source: 'localStorage'
+          }));
+          setImportedStrategies(importableStrategies);
+        } else {
+          setImportedStrategies([]);
+        }
       }
+      
       setShowImportModal(true);
     } catch (error) {
-      console.error('Error loading strategies from builder:', error);
-      setError('Failed to load strategies from builder');
+      console.error('Error loading strategies from database:', error);
+      setError('Failed to load strategies from database');
+      
+      // Fallback: try localStorage
+      try {
+        const savedStrategies = localStorage.getItem('savedStrategies');
+        if (savedStrategies) {
+          const strategies = JSON.parse(savedStrategies);
+          const importableStrategies: ImportedStrategy[] = strategies.map((strategy: any, index: number) => ({
+            id: strategy.id || `local_${index}`,
+            name: strategy.name || `Strategy ${index + 1}`,
+            coinPair: strategy.coinPair || 'BTCUSDT',
+            config: strategy,
+            backtest_results: strategy.backtest_results || null,
+            source: 'localStorage'
+          }));
+          setImportedStrategies(importableStrategies);
+          setShowImportModal(true);
+        }
+      } catch (localError) {
+        console.error('Fallback localStorage load also failed:', localError);
+      }
     } finally {
       setLoading(false);
     }
@@ -375,6 +413,7 @@ export const StrategyEngineDashboard: React.FC = () => {
           coinPair: strategy.coinPair || strategy.config?.coinPair || 'BTCUSDT',
           config: strategy.config || strategy,
           backtest_results: strategy.backtest_results || null,
+          source: 'file'
         }));
         
         setImportedStrategies(importableStrategies);
@@ -608,28 +647,26 @@ export const StrategyEngineDashboard: React.FC = () => {
             </button>
           )}
           
-          <div className="flex flex-col space-y-2">
-            <button
-              onClick={loadStrategiesFromBuilder}
-              className="glass-button glass-button-purple"
+          <button
+            onClick={loadStrategiesFromDatabase}
+            className="glass-button glass-button-purple"
+            disabled={loading || isAutoTradingRunning}
+          >
+            💾 Load from Database
+          </button>
+          
+          <label className="cursor-pointer">
+            <input
+              type="file"
+              accept=".json"
+              onChange={importStrategiesFromFile}
+              className="hidden"
               disabled={loading || isAutoTradingRunning}
-            >
-              📥 Import from Builder
-            </button>
-            
-            <label className="cursor-pointer">
-              <input
-                type="file"
-                accept=".json"
-                onChange={importStrategiesFromFile}
-                className="hidden"
-                disabled={loading || isAutoTradingRunning}
-              />
-              <div className="glass-button glass-button-blue w-full text-center">
-                📁 Import from File
-              </div>
-            </label>
-          </div>
+            />
+            <div className="glass-button glass-button-cyan hover:shadow-neon-cyan transform hover:scale-105 transition-all duration-300">
+              📁 Import from File
+            </div>
+          </label>
           
           <button
             onClick={() => setShowMassOptimization(true)}
